@@ -337,10 +337,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Tools
 
-- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
-- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
-- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
-- [opencode Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
 - [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## No-Code Platforms
@@ -500,8 +496,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Get Started
 
 - [AI Governance Overview](https://langwatch.ai/docs/ai-governance/overview.md): A personal tool home for developers and a governance home for admins.
-- [Track your Claude Code usage](https://langwatch.ai/docs/ai-governance/track-your-claude-code-usage.md): See what you spend per session, which models you hit, how many tokens are cached, and the full prompt + response trail. Two paths, depending on whether you pay Anthropic per token or on a Claude Max / Pro plan.
-- [Explore your usage with your own agent](https://langwatch.ai/docs/ai-governance/explore-your-usage-with-your-own-agent.md): Point Claude Code or any coding agent at your own LangWatch usage. One device login, one pasted prompt, and the agent answers where your tokens went.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 - [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
@@ -562,6 +556,59 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Governance REST API](https://langwatch.ai/docs/ai-governance/api.md): Hono-mounted REST/JSON API at /api/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
 - [Governance CLI](https://langwatch.ai/docs/ai-governance/cli.md): langwatch governance <resource> <verb>, a thin shell over the governance REST API for agentic workflows. Same auth as the rest of the CLI, same RBAC, same audit-row emission. Tagged with surface=cli for incident response.
 - [Governance MCP server](https://langwatch.ai/docs/ai-governance/mcp.md): An MCP server exposing every governance resource × verb as a tool under the governance_ namespace. Same RBAC, same audit emission, same service-layer source of truth as the REST API and CLI, built so an agent (Claude Code, Codex, Cursor) can fully set up governance via tool calls.
+
+# Coding Agents
+
+## Get Started
+
+- [Coding Agents](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+- [Quickstart](https://langwatch.ai/docs/coding-agents/quickstart.md): Connect a coding agent to LangWatch with one command.
+- [Track your Claude Code usage](https://langwatch.ai/docs/coding-agents/track-your-claude-code-usage.md): See what you spend per session, which models you hit, how many tokens are cached, and the full prompt + response trail. Two paths, depending on whether you pay Anthropic per token or on a Claude Max / Pro plan.
+
+## Set Up Your Agent
+
+### Claude Code
+
+- [Claude Code Integration Guide](https://langwatch.ai/docs/coding-agents/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+
+### Codex
+
+- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/coding-agents/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+
+### GitHub Copilot
+
+- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/coding-agents/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+
+### Gemini CLI
+
+- [Gemini CLI Integration Guide](https://langwatch.ai/docs/coding-agents/gemini-cli.md): Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+
+### opencode
+
+- [opencode Integration Guide](https://langwatch.ai/docs/coding-agents/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
+
+## See Your Usage
+
+- [Sessions](https://langwatch.ai/docs/coding-agents/sessions.md): Every coding-agent session on one list, with the context it carried, what it cost, the pull requests it drove, and a terminal replay of the whole conversation.
+- [Pull Request Cost](https://langwatch.ai/docs/coding-agents/pull-requests.md): What each pull request cost in coding-agent usage, across every session and every contributor that worked on it.
+- [Usage Analytics](https://langwatch.ai/docs/coding-agents/usage-analytics.md): Spend, tokens and activity for your coding agents, on your personal page, over the command line, and over the API.
+- [Repository and PR Attribution](https://langwatch.ai/docs/coding-agents/repository-and-pr-attribution.md): How a coding-agent session gets joined to the repository, branch and pull request it worked on.
+
+## Teams & Fleets
+
+- [Team Projects](https://langwatch.ai/docs/coding-agents/team-projects.md): Point a coding agent at a shared project, so a team's sessions, pull requests and spend land in one place.
+- [Headless Machines and CI](https://langwatch.ai/docs/coding-agents/headless-and-ci.md): Wire coding agents on servers, build agents and machine fleets with an ingest key, no login and no browser.
+
+## Privacy & Security
+
+- [Privacy](https://langwatch.ai/docs/coding-agents/privacy.md): Where your coding-agent data lands, who can read it, and the controls that limit or remove content.
+- [Secrets Redaction](https://langwatch.ai/docs/coding-agents/secrets-redaction.md): Credentials that appear in prompts or tool output are replaced with a typed marker at ingestion, before storage. On by default for every project.
+
+## Investigate With Your Agent
+
+- [Explore your usage with your own agent](https://langwatch.ai/docs/coding-agents/explore-your-usage-with-your-own-agent.md): Point Claude Code or any coding agent at your own LangWatch usage. One device login, one pasted prompt, and the agent answers where your tokens went.
+- [Find Your Context Sweet Spot](https://langwatch.ai/docs/coding-agents/find-your-context-sweet-spot.md): Your agent investigates its own sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn.
+- [Compare Provider Costs](https://langwatch.ai/docs/coding-agents/compare-provider-costs.md): Your agent prices your real usage mix, with its cache read and write split, against other providers' current price cards.
 
 # Langy
 

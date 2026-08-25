@@ -1,0 +1,140 @@
+---
+title: Gemini CLI Integration Guide
+sidebarTitle: Gemini CLI
+description: Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+---
+
+Gemini CLI reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompts behind both.
+
+There are two ways to set it up:
+
+- `langwatch gemini` starts Gemini CLI and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument gemini` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install Gemini CLI.
+- Install the LangWatch command line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Gemini CLI through the wrapper
+
+```bash
+langwatch login --device
+langwatch gemini
+```
+
+The first run asks one question:
+
+| Answer | What it does |
+| --- | --- |
+| **Using a Gemini subscription** | Gemini CLI keeps your own plan and your own login. LangWatch receives telemetry only. |
+| **Using an API key** | Gemini CLI calls travel through the LangWatch AI Gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch gemini` accepts the same flags and the same subcommands as `gemini`, and it returns the same exit code.
+
+<Note>
+  For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper warns when it sees that. The telemetry path works with either.
+</Note>
+
+## Set up a machine without starting Gemini CLI
+
+`langwatch instrument gemini` writes a `gemini` function into your shell start file (`~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`), which applies the LangWatch settings to that tool and to nothing else. A plain `gemini` run in a new terminal then sends its telemetry to LangWatch.
+
+```bash
+langwatch instrument gemini
+```
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start Gemini CLI with `langwatch gemini` each time instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument gemini` | Your personal workspace |
+| `langwatch instrument gemini --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument gemini --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument gemini --personal` | Back to your personal workspace |
+
+The wrapper accepts the same flags: `langwatch gemini --project acme-app` pins the project and then starts Gemini CLI. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Gemini CLI reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command line tool wrote, for every tool.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Gemini CLI to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per Gemini CLI session, with the context it carried and how long it worked.
+- **Traces**: one trace per turn, with the model, the tokens and the timing of each step, and each tool call with its details.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
+- **Content**: the prompt of each turn.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The setup sets `GEMINI_TELEMETRY_LOG_PROMPTS=true`, which is what puts the text of your prompts on the wire; without it, Gemini CLI reports the prompt as a length and no text. It also sets `GEMINI_TELEMETRY_TRACES_ENABLED=true`, which adds the tool call details to the spans.
+
+Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt text off. To keep content out of storage organization-wide, use the [data privacy policy](/ai-governance/data-privacy). Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Nothing arrives in LangWatch">
+    Open a new terminal. The `gemini` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Then run `langwatch instrument gemini` again and read what it prints. It names what it wrote and the destination the telemetry goes to.
+  </Accordion>
+
+  <Accordion title="Gemini CLI fails at startup with a telemetry configuration error">
+    `GEMINI_TELEMETRY_TARGET` accepts `local` or `gcp` only. A value of `otlp`, which older examples show, stops Gemini CLI with a configuration error. The LangWatch setup uses `local` with `GEMINI_TELEMETRY_USE_COLLECTOR=true`, which is what forwards to an OTLP endpoint.
+  </Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument gemini --project <id-or-slug>` to move it to a team project, or `langwatch instrument gemini --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables the setup writes for you:
+
+```bash
+export GEMINI_TELEMETRY_ENABLED=true
+export GEMINI_TELEMETRY_TARGET=local
+export GEMINI_TELEMETRY_USE_COLLECTOR=true
+export GEMINI_TELEMETRY_TRACES_ENABLED=true
+export GEMINI_TELEMETRY_OTLP_PROTOCOL=http
+export GEMINI_TELEMETRY_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export GEMINI_TELEMETRY_LOG_PROMPTS=true
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=gemini-cli"
+gemini
+```
+
+The header takes an ingest key (`ik-lw-...`), which can create traces and nothing else. Keep a full project API key (`sk-lw-...`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint host with the address of your instance and keep the `/api/otel` path. The exporters append the per-signal paths on their own.

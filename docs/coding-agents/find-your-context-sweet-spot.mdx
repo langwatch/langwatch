@@ -1,0 +1,166 @@
+---
+title: Find Your Context Sweet Spot
+sidebarTitle: Context Sweet Spot
+description: Your agent investigates its own sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn.
+---
+
+Long context is not free even when it fits the window. Every cache rebuild re-bills the whole context at write rates, compactions burn turns, and cost per turn climbs as a session swells.
+
+Between "fresh session" and "the window is full" there is a size your sessions should stay under. It is different per team, per model and per working style, so measure your own sessions to find it.
+
+This investigation runs as a skill for your coding agent. It reads your sessions from LangWatch, computes the economics, and writes a report with your number.
+
+## Run the investigation
+
+{/* lw-generated:skill:start */}
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Find my context sweet spot</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/context-sweet-spot"} data-track="docs_copy_skill_install" data-track-title={"Find my context sweet spot"} data-track-skill={"langwatch/skills/context-sweet-spot"}>
+          <code>npx skills add langwatch/skills/context-sweet-spot</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/context-sweet-spot"} data-track="docs_copy_slash_command" data-track-title={"Find my context sweet spot"} data-track-command={"/context-sweet-spot"}>
+          <code><span className="lw-slash-command">/context-sweet-spot</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Find my context sweet spot"} data-track-skill={"langwatch/skills/context-sweet-spot"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Find my context sweet spot
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Find the Context Size Where Your Sessions Stop Paying
+
+This skill answers one question with the user's own data: at what context size do their coding-agent sessions become a bad deal? Long context is not free even when it fits the window: every cache rebuild re-bills the whole context at write rates, compactions burn turns, and models degrade before their window ends. The sweet spot is where those costs start outrunning the value of the carried context. It is read-only on the platform: the only thing it writes is a report file.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 2: Collect the Sessions
+
+Get the session population from the coding-agent traces, then pull each interesting session's per-call rows:
+
+```bash
+langwatch trace export --origin coding_agent --format jsonl --limit 1000 -o coding-traces.jsonl
+```
+
+Each trace carries `metadata.thread_id` (the session id) and `metadata."langwatch.source"` (which agent). Collect the distinct session ids, then for each session with enough turns to mean anything (5 or more model calls):
+
+```bash
+langwatch session events <sessionId> --format json
+```
+
+The events are the raw material: every model call with its input, output, cache-read and cache-creation tokens, its cost, its model, plus explicit `compaction` and `rate_limit` events.
+
+## Step 3: Compute the Economics
+
+Write a small local script (python3 or jq) over the events. Per session, compute:
+
+1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the cache-write rate, which is higher than fresh input.
+3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
+4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
+5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
+
+Then aggregate across sessions: bucket by peak-context share (for example under 25%, 25 to 50%, 50 to 75%, over 75% of the window) and compare cost per call, rebuild rate and compaction rate between buckets. The sweet spot is the highest bucket where those three stay flat.
+
+## Step 4: Report the Finding
+
+Write a single self-contained `context-sweet-spot-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The number**: the context share where this user's sessions start degrading, stated in the first line ("your sessions stay economical up to about 55% of the window; past that, cost per turn doubles")
+- The bucket comparison table with cost per call, rebuild rate and compaction rate per bucket
+- The three most expensive sessions dissected: where the context grew, where it rebuilt, what one rebuild cost
+- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (their context does not ride the main session), whether the user's compactions arrive too late
+- Links to example sessions in LangWatch for every claim
+
+Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
+
+## Common Mistakes
+
+- Do NOT judge context by peak share alone; a fat context that never rebuilds is cheap, and a modest one that rebuilds every turn is expensive. The rebuild rate carries the finding.
+- Do NOT compare sessions across different models as one population; window sizes and cache pricing differ. Bucket per model, then compare.
+- Do NOT count cache-read tokens as cost the way input tokens are; they bill at a fraction. The split is in the event rows, use it.
+- Do NOT report a threshold without the sessions behind it; every bucket statistic needs 2 or 3 example session ids.
+- Do NOT include sessions with fewer than 5 model calls; they carry no lifetime signal and flatten the buckets.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/context-sweet-spot/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Find my context sweet spot"} data-track-skill={"langwatch/skills/context-sweet-spot"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* lw-generated:skill:end */}
+
+## What it computes
+
+The skill exports your coding-agent sessions and their per-call rows, then buckets sessions by peak-context share of the model's window and compares three things between buckets:
+
+- **Cost per model call**, split by session lifetime: does the last third of a session cost more per call than the first third?
+- **Cache rebuild rate**: model calls that re-created the context instead of reading it from cache. Each one pays write rates for tokens that were already paid for.
+- **Compaction rate**: how often the agent had to compress its conversation to keep going.
+
+The sweet spot is the highest context share where all three stay flat. The report states it in one line, shows the bucket comparison behind it, and dissects your three most expensive sessions: where the context grew, where it rebuilt, what one rebuild cost.
+
+## What to do with the number
+
+The report ties each recommendation to your own evidence: start a fresh session instead of pushing a long one further; offload research to sub-agents, whose context stays out of the main session; watch whether compactions arrive too late to save the session that needed them.
+
+The [session detail](/coding-agents/sessions#session-detail) shows the same cache-health stats live, per session, so you can watch the habit change after you act on the report.
+
+**Also check:** [Sessions](/coding-agents/sessions) for the data this investigation reads, and [Compare provider costs](/coding-agents/compare-provider-costs) for the other question your usage data answers.

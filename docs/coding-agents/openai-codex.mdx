@@ -39,8 +39,6 @@ LangWatch remembers the answer, so later runs do not ask again. Everything else 
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
 
-To route the model calls themselves through the gateway with a service key, and to read the routing, budget and model alias options, see [Codex CLI on the AI Gateway](/ai-gateway/cli/codex).
-
 ## Set up a machine without starting Codex
 
 `langwatch instrument codex` writes the connection into `~/.codex/config.toml` and exits. A plain `codex` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
@@ -51,61 +49,16 @@ langwatch instrument codex
 
 ### Choose where the telemetry goes
 
-Pass one scope flag, and one only.
+Pass one scope flag, and one only:
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument codex` | Your personal workspace | Yes |
-| `langwatch instrument codex --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument codex --key <ingest-key>` | The project that owns the key | No |
-| `langwatch instrument codex --personal` | Back to your personal workspace | Yes |
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument codex` | Your personal workspace |
+| `langwatch instrument codex --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument codex --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument codex --personal` | Back to your personal workspace |
 
-### Send the telemetry to a team project
-
-```bash
-langwatch instrument codex --project acme-app
-```
-
-This creates an ingest key for this device and holds Codex to that project. LangWatch creates one key per device and never replaces the key of another device, so many machines can report to one project at the same time. You need a login and the `traces:create` permission on the project. See [Roles and permissions](/ai-governance/roles-and-permissions).
-
-The wrapper accepts the same flags. This pins the project and then starts Codex:
-
-```bash
-langwatch codex --project acme-app
-```
-
-`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before Codex reads it, so they never reach the agent.
-
-### Set up a machine that never logs in
-
-`--key` takes an ingest key (`ik-lw-…`). It needs no login and contacts no server, which makes it the option for a shared machine, a build agent, or a base image.
-
-```bash
-langwatch instrument codex --key ik-lw-...
-```
-
-The command reads the same value from the `LANGWATCH_INGEST_KEY` environment variable:
-
-```bash
-export LANGWATCH_INGEST_KEY=ik-lw-...
-langwatch instrument codex
-```
-
-For a self-hosted instance, add its address:
-
-```bash
-langwatch instrument codex --key ik-lw-... --endpoint https://langwatch.your-company.internal
-```
-
-To get an ingest key without the command line tool, install an ingestion template for the tool in the dashboard: the setup drawer mints one for you. See [Ingestion templates](/ai-governance/ingestion-templates).
-
-### Move a tool back to your personal workspace
-
-```bash
-langwatch instrument codex --personal
-```
-
-This removes the project pin and writes the personal connection again.
+The wrapper accepts the same flags: `langwatch codex --project acme-app` pins the project and then starts Codex. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Codex reads it.
 
 ### Remove the setup
 
@@ -119,18 +72,19 @@ This deletes every connection the command line tool wrote, for every tool.
 
 Open your personal page at `/me`, or open the project you pinned Codex to.
 
-- **Sessions**: one row per Codex session, with the context it carried, how long it worked, and the pull requests it drove.
+- **[Sessions](/coding-agents/sessions)**: one row per Codex session, with the context it carried, how long it worked, and a terminal replay of the whole conversation.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
-- **Cost**: the amount per session and per turn.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
 - **Content**: the prompt of each turn, each tool call with its result, and the answer of the model.
 
-Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 ### Attribute sessions to pull requests
 
-LangWatch joins a session to a pull request through the repository and branch the session reports. Codex records the directory once, when the session starts, so the automatic attribution follows the directory `codex` was started in. A `cd` inside the session does not change it. A session started outside any checkout, for example a home directory, attaches to no repository and no pull request on its own. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
+The general model, both reporting channels and their limits, is covered on [Repository and PR attribution](/coding-agents/repository-and-pr-attribution). The Codex specifics live here, because Codex records its directory once, when the session starts: a `cd` inside the session does not change it, so the declared channel carries more weight than on other agents.
 
-The agent can move the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that lives in a scratch directory and reviews one checkout after another runs the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
+The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that lives in a scratch directory and reviews one checkout after another runs the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
 
 The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. This is exact. Several codex sessions can work at the same time on one machine and each one declares for itself.
 
@@ -148,9 +102,9 @@ cd "<repo>/.claude/worktrees/<name>" && codex
 
 `-B` points the local branch at `origin/<branch>`, so run this only where that branch has no commits you have not pushed, and where no other worktree has it checked out. The branch name must stay the pull request's own, because that name is what joins the session to the pull request.
 
-Claude Code sessions can also switch natively, with the EnterWorktree tool. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
+## Route through the LangWatch AI Gateway
 
-One limit to know: a session keeps the first repository it reported. Declarations for other branches of the same repository are attributed in full; a declaration for a different repository keeps that session's row on the first repository.
+Everything above is telemetry: Codex keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and model aliases on top of the same telemetry. [Codex CLI through the gateway](/ai-gateway/cli/codex) covers that setup and the governance recipes.
 
 ## Content and privacy
 

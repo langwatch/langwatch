@@ -47,61 +47,16 @@ langwatch instrument claude
 
 ### Choose where the telemetry goes
 
-Pass one scope flag, and one only.
+Pass one scope flag, and one only:
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument claude` | Your personal workspace | Yes |
-| `langwatch instrument claude --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument claude --key <ingest-key>` | The project that owns the key | No |
-| `langwatch instrument claude --personal` | Back to your personal workspace | Yes |
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument claude` | Your personal workspace |
+| `langwatch instrument claude --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument claude --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument claude --personal` | Back to your personal workspace |
 
-### Send the telemetry to a team project
-
-```bash
-langwatch instrument claude --project acme-app
-```
-
-This creates an ingest key for this device and holds Claude Code to that project. LangWatch creates one key per device and never replaces the key of another device, so many machines can report to one project at the same time. You need a login and the `traces:create` permission on the project. See [Roles and permissions](/ai-governance/roles-and-permissions).
-
-The wrapper accepts the same flags. This pins the project and then starts Claude Code:
-
-```bash
-langwatch claude --project acme-app
-```
-
-`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before Claude Code reads it, so they never reach the agent.
-
-### Set up a machine that never logs in
-
-`--key` takes an ingest key (`ik-lw-…`). It needs no login and contacts no server, which makes it the option for a shared machine, a build agent, or a base image.
-
-```bash
-langwatch instrument claude --key ik-lw-...
-```
-
-The command reads the same value from the `LANGWATCH_INGEST_KEY` environment variable:
-
-```bash
-export LANGWATCH_INGEST_KEY=ik-lw-...
-langwatch instrument claude
-```
-
-For a self-hosted instance, add its address:
-
-```bash
-langwatch instrument claude --key ik-lw-... --endpoint https://langwatch.your-company.internal
-```
-
-To get an ingest key without the command line tool, install an ingestion template for the tool in the dashboard: the setup drawer mints one for you. See [Ingestion templates](/ai-governance/ingestion-templates).
-
-### Move a tool back to your personal workspace
-
-```bash
-langwatch instrument claude --personal
-```
-
-This removes the project pin and writes the personal connection again.
+The wrapper accepts the same flags: `langwatch claude --project acme-app` pins the project and then starts Claude Code. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Claude Code reads it.
 
 ### Remove the setup
 
@@ -115,25 +70,17 @@ This deletes every connection the command line tool wrote, for every tool.
 
 Open your personal page at `/me`, or open the project you pinned Claude Code to.
 
-- **Sessions**: one row per Claude Code session, with the context it carried, how often it compacted, how long it worked, and the pull requests it drove.
+- **[Sessions](/coding-agents/sessions)**: one row per Claude Code session, with the context it carried, how often it compacted, how long it worked, and a terminal replay of the whole conversation.
 - **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
-- **Cost**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
 - **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model.
 
-Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 ### Attribute sessions to pull requests
 
-LangWatch joins a session to a pull request through the repository and branch the session reports. Two channels report it, and together they cover every way a session moves:
-
-- **Automatic**: the session reports the directory it is working in, read at the start of the session and again after every turn. A native switch with the EnterWorktree tool moves it; a `cd` inside the Bash tool does not, because the session's own directory stays where it was launched.
-- **Declared by the agent**: the agent runs `langwatch ingest context` from inside a checkout, and the session is attributed to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through the Bash tool in a directory the session never natively entered.
-
-The setup installs the second channel for you. The LangWatch plugin (or, without plugin support, the hooks `langwatch instrument claude` writes) tells every session to run the command when it switches repository, branch or worktree, so a session declares its own moves without you asking it to. You can also just tell a session "declare your working context" at any time.
-
-Work done outside any checkout, for example reviewing with `gh` commands from a home directory, attaches to no repository and no pull request, and its token cost cannot be attributed. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
-
-One limit to know: a session keeps the first repository it reported. A later declaration for a different branch of the same repository is attributed in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository keeps that session's row on the first repository.
+The session reports the repository and branch it works on: automatically from its working directory, and by declaring with `langwatch ingest context` when it works somewhere else through the Bash tool. The setup installs the declaration channel for you, through the LangWatch plugin or the hooks `langwatch instrument claude` writes. [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) covers both channels and their limits.
 
 ## Content and privacy
 
@@ -151,6 +98,10 @@ Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: 
 `langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
 
 Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
+
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: Claude Code keeps your own plan and your own provider login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and provider fallback on top of the same telemetry. [Claude Code through the gateway](/ai-gateway/cli/claude-code) covers that setup, model aliases and the governance recipes.
 
 ## Troubleshooting
 
@@ -251,17 +202,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
 }
 ```
 
-To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/ai-governance/track-your-claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper).
-
-### Managed settings for a fleet
-
-An administrator can apply the same block to every machine through the managed settings file:
-
-- macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`
-- Linux and Windows Subsystem for Linux: `/etc/claude-code/managed-settings.json`
-- Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
-
-Variables in the managed settings file take precedence and a user cannot override them. Distribute the file with your device management system.
+To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/coding-agents/track-your-claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper). To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
 
 ### Team attribution
 

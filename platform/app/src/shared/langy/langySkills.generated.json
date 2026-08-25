@@ -28,6 +28,13 @@
 		"userPrompt": "Connect my agent to LangWatch simulations"
 	},
 	{
+		"id": "context-sweet-spot",
+		"label": "Context sweet spot",
+		"description": "Investigates the context economics of your own coding-agent sessions in LangWatch. Reads real sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn, and delivers a report with the context size your sessions should stay under, with example sessions behind every claim. Use when coding-agent sessions feel expensive or degrade as they grow.",
+		"category": "skill",
+		"userPrompt": "Find my context sweet spot"
+	},
+	{
 		"id": "datasets",
 		"label": "Datasets",
 		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
@@ -122,6 +129,13 @@
 		"description": "Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.",
 		"category": "skill",
 		"userPrompt": "Version my prompts with LangWatch"
+	},
+	{
+		"id": "provider-cost-comparison",
+		"label": "Provider cost comparison",
+		"description": "Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.",
+		"category": "skill",
+		"userPrompt": "Would another provider be cheaper for my usage?"
 	},
 	{
 		"id": "scenarios",

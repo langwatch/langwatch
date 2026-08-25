@@ -1,0 +1,50 @@
+---
+title: Pull Request Cost
+sidebarTitle: Pull Requests
+description: What each pull request cost in coding-agent usage, across every session and every contributor that worked on it.
+---
+
+Use this view to price a change instead of a session. Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
+
+<Frame caption="The pull requests list. Status is read live from GitHub; Token cost sums every session that drove the branch.">
+  ![Pull requests list](/images/coding-agents/pull-requests-list.png)
+</Frame>
+
+## Prerequisites
+
+Two things join a session to a pull request:
+
+1. The session reports the repository and branch it works on. This happens automatically once your agent is set up; [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) explains the mechanics.
+2. The organization has GitHub connected, under **Settings → Integrations**. LangWatch maps each reported branch to the pull requests whose head is that branch, and reads pull request status live from GitHub.
+
+## The list
+
+| Column | What it shows |
+| --- | --- |
+| **Pull request** | Repository and number. |
+| **Title** | The pull request's title. |
+| **Status** | Open, merged, closed or draft, read live from GitHub. |
+| **Last update** | The last coding-agent activity on the pull request's branches. |
+| **Models** | The models the sessions used. |
+| **Tokens** | Total tokens across every attributed session. |
+| **Token cost** | The summed cost of those sessions. |
+
+Cost is priced over the pull request's whole lifetime, not the period you selected: a pull request opened three weeks ago shows everything spent on it since, across every contributor. That is the number to compare against what the change was worth.
+
+## Pull request detail
+
+Click a row for the breakdown:
+
+- **Contributors**: who spent what on this pull request. A contributor is a person, or a project when the work ran through a team project.
+- **Models**: the token and cost split per model.
+- **Sessions**: every session that drove the branch, each opening into its [terminal replay](/coding-agents/sessions#terminal-replay).
+
+<Frame caption="Pull request detail: per-contributor cost, per-model split, and the sessions behind them.">
+  ![Pull request detail](/images/coding-agents/pull-request-detail.png)
+</Frame>
+
+## Read it over the API
+
+`GET /api/coding-agent/pull-request-usage` returns the same rollup, filterable by project, user and agent. See [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
+
+**Also check:** [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) for how sessions reach pull requests, and what happens with work done outside any checkout.

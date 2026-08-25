@@ -1,0 +1,165 @@
+---
+title: Compare Provider Costs
+sidebarTitle: Compare Provider Costs
+description: Your agent prices your real usage mix, with its cache read and write split, against other providers' current price cards.
+---
+
+"Provider X is 80% cheaper" compares price cards, not workloads. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. A real comparison prices your own month of usage under each candidate, and that is what this investigation does.
+
+## Run the investigation
+
+{/* lw-generated:skill:start */}
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Would another provider be cheaper for my usage?</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/provider-cost-comparison"} data-track="docs_copy_skill_install" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+          <code>npx skills add langwatch/skills/provider-cost-comparison</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/provider-cost-comparison"} data-track="docs_copy_slash_command" data-track-title={"Would another provider be cheaper for my usage?"} data-track-command={"/provider-cost-comparison"}>
+          <code><span className="lw-slash-command">/provider-cost-comparison</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Would another provider be cheaper for my usage?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Price Your Real Usage Mix Against Other Providers
+
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform: the only thing it writes is a report file.
+
+## Step 1: Set up the LangWatch CLI
+
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 2: Export the Real Mix
+
+Get the aggregate mix first, then the cache split that the aggregates hide:
+
+```bash
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+```
+
+For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
+
+```bash
+langwatch session events <sessionId> --format json
+```
+
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the observed monthly totals. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+
+## Step 3: Fetch Current Prices
+
+Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some do not offer caching at all), and the context window.
+
+Candidates come from the user; when they name none, take the current obvious ones for the workload's model class and say why those.
+
+## Step 4: Reprice and Compare
+
+For each candidate, reprice the same mix:
+
+1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching.
+2. **No-cache degradation**: for a candidate without caching, cache reads rebill as fresh input. State this row separately; it is where most "80% cheaper" claims die.
+3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
+4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
+
+## Step 5: Report
+
+Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first**: "your last 30 days cost $X; under the candidate the same usage prices at $Y" with the cache assumption named in the same sentence
+- The mix table: tokens per model per kind (input, output, cache read, cache write)
+- The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
+- The sensitivity chart or table across cache-hit shares
+- A short "what would have to be true" closing: the conditions under which switching saves the claimed amount
+
+State the headline numbers directly in the conversation too.
+
+## Common Mistakes
+
+- Do NOT compare on input and output prices alone; on coding agents the cache columns decide the answer.
+- Do NOT use remembered prices; fetch the price page and cite it with a date.
+- Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
+- Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them; scope with `--origin`.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/provider-cost-comparison/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Would another provider be cheaper for my usage?"} data-track-skill={"langwatch/skills/provider-cost-comparison"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* lw-generated:skill:end */}
+
+## What it computes
+
+The skill exports your real token mix per model: input, output, cache reads and cache writes, from your own LangWatch data. It fetches the candidates' current price pages at analysis time, and reprices the same mix under each one, three ways:
+
+- **Direct**: your tokens at their rates, cache split preserved where the candidate offers caching.
+- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is where most cheap-provider claims die.
+- **Sensitivity**: the same comparison at your observed cache-hit share, at half of it, and at zero, so the conclusion survives a change in how you work.
+
+The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
+
+## What it does not claim
+
+Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you. It is a cost analysis, not a migration verdict.
+
+**Also check:** [Usage analytics](/coding-agents/usage-analytics) for the data this investigation reads, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) for lowering the bill without switching anything.

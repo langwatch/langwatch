@@ -60,61 +60,16 @@ Open a new terminal after the command, or read the start file again, so the func
 
 ### Choose where the telemetry goes
 
-Pass one scope flag, and one only.
+Pass one scope flag, and one only:
 
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument opencode` | Your personal workspace | Yes |
-| `langwatch instrument opencode --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument opencode --key <ingest-key>` | The project that owns the key | No |
-| `langwatch instrument opencode --personal` | Back to your personal workspace | Yes |
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument opencode` | Your personal workspace |
+| `langwatch instrument opencode --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument opencode --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument opencode --personal` | Back to your personal workspace |
 
-### Send the telemetry to a team project
-
-```bash
-langwatch instrument opencode --project acme-app
-```
-
-This creates an ingest key for this device and holds opencode to that project. LangWatch creates one key per device and never replaces the key of another device, so many machines can report to one project at the same time. You need a login and the `traces:create` permission on the project. See [Roles and permissions](/ai-governance/roles-and-permissions).
-
-The wrapper accepts the same flags. This pins the project and then starts opencode:
-
-```bash
-langwatch opencode --project acme-app
-```
-
-`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before opencode reads it, so they never reach the agent.
-
-### Set up a machine that never logs in
-
-`--key` takes an ingest key (`ik-lw-…`). It needs no login and contacts no server, which makes it the option for a shared machine, a build agent, or a base image.
-
-```bash
-langwatch instrument opencode --key ik-lw-...
-```
-
-The command reads the same value from the `LANGWATCH_INGEST_KEY` environment variable:
-
-```bash
-export LANGWATCH_INGEST_KEY=ik-lw-...
-langwatch instrument opencode
-```
-
-For a self-hosted instance, add its address:
-
-```bash
-langwatch instrument opencode --key ik-lw-... --endpoint https://langwatch.your-company.internal
-```
-
-To get an ingest key without the command line tool, install an ingestion template for the tool in the dashboard: the setup drawer mints one for you. See [Ingestion templates](/ai-governance/ingestion-templates).
-
-### Move a tool back to your personal workspace
-
-```bash
-langwatch instrument opencode --personal
-```
-
-This removes the project pin and writes the personal connection again.
+The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts opencode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before opencode reads it.
 
 ### Remove the setup
 
@@ -128,14 +83,22 @@ This deletes every connection the command line tool wrote, for every tool.
 
 Open your personal page at `/me`, or open the project you pinned opencode to.
 
-- **Sessions**: one row per opencode session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per opencode session, with the context it carried and how long it worked.
 - **Traces**: one trace per turn, with each model call and each tool call in order.
-- **Cost**: the amount per session and per turn.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
 - **Content**: the arguments of each tool call and the result it returned.
 
 LangWatch keeps the model calls and the tool calls, and drops the internal work opencode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
 
-Your agent can read all of this back. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+opencode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: opencode keeps your own provider logins. The wrapper can instead route the model calls through the LangWatch AI Gateway with a virtual key, which adds budgets and model policies on top of the same telemetry. [opencode through the gateway](/ai-gateway/cli/opencode) covers that setup.
 
 ## Troubleshooting
 

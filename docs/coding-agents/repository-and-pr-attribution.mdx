@@ -1,0 +1,52 @@
+---
+title: Repository and PR Attribution
+sidebarTitle: Repo & PR Attribution
+description: How a coding-agent session gets joined to the repository, branch and pull request it worked on.
+---
+
+Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. Everything on the [pull requests view](/coding-agents/pull-requests) rests on this join, so this page states exactly how the report happens, what moves it, and what its limits are.
+
+## Two channels report the working context
+
+Together they cover every way a session moves between checkouts.
+
+**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the report follows. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
+
+**Declared by the agent.** The agent runs one command from inside a checkout:
+
+```bash
+langwatch ingest context
+```
+
+LangWatch attributes the session to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through shell commands in a directory the session never natively entered.
+
+A standing agent that runs from a scratch directory and works on one checkout after another attributes each piece of work correctly by declaring as it goes.
+
+You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also just tell a session "declare your working context" at any time.
+
+The command resolves which session is asking on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
+
+## From branch to pull request
+
+With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping keeps working in both directions in time: a pull request opened after the session already went quiet is still found, and connecting GitHub backfills recent branches.
+
+LangWatch reads pull request status (open, merged, closed) live from GitHub whenever you look, and never stores it.
+
+## Limits, exactly
+
+- **A session keeps the first repository it reported.** Later declarations for other branches of the same repository attribute in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository does not move the session's row off the first repository.
+- **Work outside any checkout attaches to nothing.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
+- **One declaration cannot be split.** A single turn that touches two repositories attributes to the one the agent declared last.
+
+## Verify it
+
+Run a session, do some work, then open [/me/sessions](https://app.langwatch.ai/me/sessions): the session row shows the pull requests its branches map to. From the terminal:
+
+```bash
+langwatch ingest context
+# Declared github.com/acme/shop@feat/checkout for claude_code session 6f2e...
+```
+
+The command prints one line saying what it declared, or why it declared nothing. It never interrupts the session.
+
+**Also check:** [Pull request cost](/coding-agents/pull-requests) for what the join buys you, and each agent's setup page for agent-specific mechanics, for example [Codex in a sandbox](/coding-agents/openai-codex).

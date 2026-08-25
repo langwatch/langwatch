@@ -1,0 +1,76 @@
+---
+name: provider-cost-comparison
+user-prompt: "Would another provider be cheaper for my usage?"
+description: Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.
+license: MIT
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface.
+---
+
+import CliInstall from '../_shared/cli-install.mdx'
+import CliSetup from '../_shared/cli-setup.mdx'
+
+# Price Your Real Usage Mix Against Other Providers
+
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform: the only thing it writes is a report file.
+
+## Step 1: Set up the LangWatch CLI
+
+<CliInstall />
+
+Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+
+<CliSetup />
+
+## Step 2: Export the Real Mix
+
+Get the aggregate mix first, then the cache split that the aggregates hide:
+
+```bash
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+```
+
+For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
+
+```bash
+langwatch session events <sessionId> --format json
+```
+
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the observed monthly totals. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+
+## Step 3: Fetch Current Prices
+
+Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some do not offer caching at all), and the context window.
+
+Candidates come from the user; when they name none, take the current obvious ones for the workload's model class and say why those.
+
+## Step 4: Reprice and Compare
+
+For each candidate, reprice the same mix:
+
+1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching.
+2. **No-cache degradation**: for a candidate without caching, cache reads rebill as fresh input. State this row separately; it is where most "80% cheaper" claims die.
+3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
+4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
+
+## Step 5: Report
+
+Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
+
+- **The answer first**: "your last 30 days cost $X; under the candidate the same usage prices at $Y" with the cache assumption named in the same sentence
+- The mix table: tokens per model per kind (input, output, cache read, cache write)
+- The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
+- The sensitivity chart or table across cache-hit shares
+- A short "what would have to be true" closing: the conditions under which switching saves the claimed amount
+
+State the headline numbers directly in the conversation too.
+
+## Common Mistakes
+
+- Do NOT compare on input and output prices alone; on coding agents the cache columns decide the answer.
+- Do NOT use remembered prices; fetch the price page and cite it with a date.
+- Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
+- Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them; scope with `--origin`.
+- If the CLI returns an error, report the user-facing consequence, not the raw error text.

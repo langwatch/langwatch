@@ -1,0 +1,74 @@
+---
+title: Headless Machines and CI
+sidebarTitle: Headless & CI
+description: Wire coding agents on servers, build agents and machine fleets with an ingest key, no login and no browser.
+---
+
+A background agent spends tokens the same way an interactive one does, and needs the same accounting. This page covers machines with no interactive login: a VPS full of agents, a CI job, a base image, a managed fleet.
+
+## One machine, no login
+
+`--key` takes an ingest key (`ik-lw-...`). It needs no login and contacts no server:
+
+```bash
+langwatch instrument claude --key ik-lw-...
+langwatch instrument codex --key ik-lw-...
+```
+
+The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
+
+```bash
+export LANGWATCH_INGEST_KEY=ik-lw-...
+langwatch instrument claude
+```
+
+For a self-hosted instance, add its address:
+
+```bash
+langwatch instrument claude --key ik-lw-... --endpoint https://langwatch.your-company.internal
+```
+
+An ingest key can create traces and nothing else, so a leaked key from a build log cannot read or change project data. Get one from the dashboard: the [ingestion template](/ai-governance/ingestion-templates) install drawer mints one for the tool, scoped to the project it should report to.
+
+## CI
+
+The same setup, inside the job. For example, a GitHub Actions job running Claude Code headless:
+
+```yaml
+jobs:
+  nightly-maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g langwatch @anthropic-ai/claude-code
+      - run: langwatch instrument claude
+        env:
+          LANGWATCH_INGEST_KEY: ${{ secrets.LANGWATCH_INGEST_KEY }}
+      - run: claude -p "Update the dependency table in README.md"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+The session appears on the project's [sessions list](/coding-agents/sessions) like any other, and its branch work attributes to [pull requests](/coding-agents/pull-requests) the same way.
+
+For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
+
+## Bake it into an image
+
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`. Add `--json` for machine-readable output.
+
+## Roll out to a managed fleet
+
+For Claude Code, an administrator can apply the telemetry configuration to every machine through the managed settings file, distributed with your device management system:
+
+- macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`
+- Linux and Windows Subsystem for Linux: `/etc/claude-code/managed-settings.json`
+- Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
+
+Put the same `env` block in it that [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) shows for `~/.claude/settings.json`. Variables in the managed settings file take precedence, and a user cannot override them.
+
+## See your machines
+
+Every CLI sign-in, CI runners included, appears under **Devices** on [/me/configure](https://app.langwatch.ai/me/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
+
+**Also check:** [Team projects](/coding-agents/team-projects) for pinning interactive machines to a shared project with a login.

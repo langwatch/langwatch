@@ -1,0 +1,39 @@
+---
+title: Team Projects
+sidebarTitle: Team Projects
+description: Point a coding agent at a shared project, so a team's sessions, pull requests and spend land in one place.
+---
+
+By default a coding agent reports to your personal workspace. Pin it to a team project when the work belongs to the team: an application project the whole team debugs, a shared machine, or an initiative whose agent spend you want accounted together.
+
+## Pin a tool to a project
+
+```bash
+langwatch instrument claude --project acme-app
+```
+
+This mints an ingest key for this device, scoped to the project, and holds the tool to it. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
+
+The wrapper takes the same flag and then starts the agent:
+
+```bash
+langwatch claude --project acme-app
+```
+
+`--project` and `--personal` are LangWatch flags. LangWatch removes them from the command line before the agent reads it. The pin is per device and per tool: your laptop's Codex can stay personal while its Claude Code reports to the team.
+
+## What the project gets
+
+Once the project records coding-agent activity, **Sessions** and **Pull requests** appear in its sidebar, the same views as on your personal page, project-scoped. Session traces land with the project's traces, costs land in the project's analytics, and the [pull request rollup](/coding-agents/pull-requests) attributes the project as a contributor.
+
+Who sees what inside the project follows the project's access rules and permissions, exactly as on any project. See [Privacy](/coding-agents/privacy).
+
+## Back to personal
+
+```bash
+langwatch instrument claude --personal
+```
+
+This removes the project pin on this device and writes the personal connection again.
+
+**Also check:** [Headless machines and CI](/coding-agents/headless-and-ci) for machines that never log in, and [Roles and permissions](/ai-governance/roles-and-permissions) for what `traces:create` covers.

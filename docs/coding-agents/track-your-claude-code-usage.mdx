@@ -156,29 +156,13 @@ Within ~30 seconds of your first turn:
 
 ## Headless machines and team projects
 
-The wrapper wires a tool when it starts it, which needs somebody at the keyboard. `langwatch instrument claude` writes the same wiring into `~/.claude/settings.json` and exits, so a plain `claude` run on that machine reports to LangWatch. Use it on a server that holds many agents, in a machine image, or in a configuration management run.
+The wrapper wires a tool when it starts it, which needs somebody at the keyboard. `langwatch instrument claude` writes the same wiring into `~/.claude/settings.json` and exits, so a plain `claude` run on that machine reports to LangWatch.
 
 ```bash
 langwatch instrument claude
 ```
 
-By default the telemetry goes to your personal workspace, which needs `langwatch login --device`. Pass one scope flag to change that:
-
-| Command | Destination | Needs a login |
-| --- | --- | --- |
-| `langwatch instrument claude --project <id-or-slug>` | A team project | Yes |
-| `langwatch instrument claude --key ik-lw-...` | The project that owns the key | No |
-| `langwatch instrument claude --personal` | Back to your personal workspace | Yes |
-
-`--project` creates an ingest key for this device and holds Claude Code to that project. LangWatch creates one key per device and never replaces the key of another device, so a whole fleet can report to one project:
-
-```bash
-langwatch instrument claude --project acme-app
-```
-
-`--key` takes an ingest key you paste, or the `LANGWATCH_INGEST_KEY` environment variable, and needs no login at all. Add `--endpoint <url>` for a self-hosted instance. The wrappers accept `--project` and `--personal` too, so `langwatch claude --project acme-app` pins the project and then starts Claude Code.
-
-`langwatch logout` removes every wiring target the CLI wrote. Full detail is on the [Claude Code integration guide](/integration/tools/integrations/claude-code).
+To send the telemetry to a shared project instead of your personal workspace, or to wire a server that never logs in, see [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci). `langwatch logout` removes every wiring target the CLI wrote. Full detail is on the [Claude Code integration guide](/coding-agents/claude-code).
 
 ## Per-repo telemetry with plain `claude` (no wrapper)
 
@@ -306,7 +290,7 @@ You can read every prompt the agent issued, including the long system prompt and
 
 ### Ask your own agent where your tokens went
 
-The same CLI that captured your sessions can read them back, authenticated by your device login, with no API key to configure (an explicit `LANGWATCH_API_KEY` still wins when you set one). Paste one prompt into Claude Code and it answers which sessions were the most expensive, what ran above 150k context, which subagents consumed the most, and more. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
+The same CLI that captured your sessions can read them back, authenticated by your device login, with no API key to configure (an explicit `LANGWATCH_API_KEY` still wins when you set one). Paste one prompt into Claude Code and it answers which sessions were the most expensive, what ran above 150k context, which subagents consumed the most, and more. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 ### Have the agent improve itself off its own traces
 
@@ -318,12 +302,12 @@ Same pattern works for the other agent CLIs you might be running. Each wrapper a
 
 | Command | Using an API key | Using your own subscription |
 |---|---|---|
-| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingest key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-…"` + the four `OTEL_LOG_*` content knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted. See [Claude Code](/integration/tools/integrations/claude-code) |
-| `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via the `[otel]` block in `~/.codex/config.toml`, plus a turn program that recovers the conversation Codex never exports. See [OpenAI Codex](/integration/tools/integrations/openai-codex) |
-| `langwatch copilot` | gateway via `COPILOT_PROVIDER_*` keys, which moves the spend off your Copilot seat | OTLP via `COPILOT_OTEL_ENABLED` and a scoped shell function. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli) |
-| `langwatch code` | not available for Copilot Chat | OTLP for the Copilot Chat extension in Visual Studio Code. See [GitHub Copilot](/integration/tools/integrations/github-copilot-cli) |
-| `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP with native `gen_ai.*` attributes |
-| `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP for the model calls and the tool calls, with opencode's own internal spans filtered out. See [opencode](/integration/tools/integrations/opencode) |
+| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingest key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-…"` + the four `OTEL_LOG_*` content knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted. See [Claude Code](/coding-agents/claude-code) |
+| `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via the `[otel]` block in `~/.codex/config.toml`, plus a turn program that recovers the conversation Codex never exports. See [OpenAI Codex](/coding-agents/openai-codex) |
+| `langwatch copilot` | gateway via `COPILOT_PROVIDER_*` keys, which moves the spend off your Copilot seat | OTLP via `COPILOT_OTEL_ENABLED` and a scoped shell function. See [GitHub Copilot](/coding-agents/github-copilot-cli) |
+| `langwatch code` | not available for Copilot Chat | OTLP for the Copilot Chat extension in Visual Studio Code. See [GitHub Copilot](/coding-agents/github-copilot-cli) |
+| `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP with native `gen_ai.*` attributes. See [Gemini CLI](/coding-agents/gemini-cli) |
+| `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP for the model calls and the tool calls, with opencode's own internal spans filtered out. See [opencode](/coding-agents/opencode) |
 
 ## Privacy
 

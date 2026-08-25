@@ -174,7 +174,9 @@ Secrets redaction is **on by default for every project**.
 Coding-agent traces are full of live credentials, so the safe default
 is to scrub them. It runs natively in the ingestion pipeline and
 replaces each detected secret with a redaction placeholder, leaving
-the surrounding text intact.
+the surrounding text intact. How detection decides what is a
+credential is covered on
+[Secrets redaction](/coding-agents/secrets-redaction).
 
 The built-in catalog covers:
 

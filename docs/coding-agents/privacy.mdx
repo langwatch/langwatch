@@ -1,0 +1,51 @@
+---
+title: Privacy
+sidebarTitle: Privacy
+description: Where your coding-agent data lands, who can read it, and the controls that limit or remove content.
+---
+
+The question behind coding-agent telemetry is "can my boss read what I typed". The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored. The rest of this page states each boundary exactly.
+
+## Where your data lands
+
+By default, your sessions land in your **personal project**: one project, one owner, you. It is not a filter on a shared table; it is a separate project that other members' queries never touch. A session lands in a shared project only when you, or an administrator setting up a machine, pinned the tool to one with `--project`. See [Team projects](/coding-agents/team-projects).
+
+## What a teammate can see
+
+Nothing from your personal project. Teammates see your sessions only in a team project the tool was deliberately pinned to, under that project's access rules.
+
+## What an administrator can see
+
+Spend and usage always aggregate: the governance dashboard shows cost per user, per team and per department, because cost accounting is the point of the product. Those are numbers, not conversations.
+
+Reading your actual sessions is possible for an organization administrator, and it is deliberately never silent:
+
+- The only path is the drill-in from the governance dashboard, which shows a persistent **"Viewing as admin"** banner for the whole time. The banner is enforced on the server, not painted by the browser.
+- Every such read writes an audit-log row. You can read the log yourself at **Settings → Audit log**, so "has anyone looked at my sessions" is a question you can answer, not one you have to trust.
+- There is no bypass flag and no service-token side door around the audit hook.
+
+Permissions gate what any viewer sees even inside an allowed project: a viewer without content permission gets session rows with the generated titles blanked, and a viewer without the cost permission sees no cost at all rather than a zero.
+
+## What the organization can remove
+
+An organization that must not store conversational content sets input, output and system instructions to **Drop** in the [data privacy policy](/ai-governance/data-privacy). LangWatch strips dropped content at ingestion, before storage, on every ingestion path, coding-agent telemetry included.
+
+What survives is metadata: model, tokens, cost, latency, timings, status, identity. The rollups keep working, and no person can read what was asked or answered.
+
+The named posture for this is [no-spy mode](/ai-governance/no-spy-mode). Scope it to personal projects only to cover the coding assistants without touching product observability.
+
+If the requirement is "only a small audience may read it" rather than "it must not exist", **Restrict** keeps the content for a chosen audience and shows everyone else a `[REDACTED]` placeholder with the reason.
+
+## What you control from your own machine
+
+You decide content capture at the source, before anything is sent. Each agent's setup page names its flags; for example, removing the `OTEL_LOG_*` flags from Claude Code's settings keeps the usage numbers flowing and stops the content. See the [Content and privacy](/coding-agents/claude-code#content-and-privacy) section of your agent's page.
+
+## Secrets
+
+Credentials that appear in prompts or tool output are replaced with a `[SECRET]` marker at ingestion, on by default for every project. [Secrets redaction](/coding-agents/secrets-redaction) covers how detection works and how to extend it.
+
+## Retention
+
+Stored data expires on a schedule the organization sets, resolved per project. See [Data retention](/platform/data-retention).
+
+**Also check:** [Data privacy policy](/ai-governance/data-privacy) for the full policy reference: scopes, dispositions, audiences and PII redaction.
