@@ -22,6 +22,7 @@ async function identifierRow(args: {
   state?: string;
   accountId?: string | null;
   providerId?: string | null;
+  issuer?: string | null;
   providerAccountId?: string | null;
   detachedAt?: Date | null;
 }) {
@@ -35,6 +36,7 @@ async function identifierRow(args: {
       identifierHash: null,
       accountId: args.accountId ?? null,
       providerId: args.providerId ?? null,
+      issuer: args.issuer ?? null,
       providerAccountId: args.providerAccountId ?? null,
       state: args.state ?? "VERIFIED",
       connectionId: null,
@@ -60,6 +62,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         userId: USER,
         state: "PRIMARY",
         providerId: "auth0",
+        issuer: "local:oauth:auth0",
         providerAccountId: "sub-12345",
       });
 
@@ -75,6 +78,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         identifierHash: null,
         accountId: null,
         providerId: "auth0",
+        issuer: "local:oauth:auth0",
         providerAccountId: "sub-12345",
         connectionId: null,
         state: "PRIMARY",

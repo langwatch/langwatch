@@ -87,9 +87,69 @@ describe("useWorkbenchUpdateListener", () => {
   });
 
   describe("when a newer version lands and the workbench is dirty", () => {
-    /** @scenario A backend edit never clobbers a workbench with unsaved changes */
-    it("banners instead of reloading", async () => {
+    /** @scenario "A tab with a save on the way waits for its own answer" */
+    it("says nothing while the tab's own save is still coming", async () => {
       const reloadFromServer = vi.fn(async () => undefined);
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(6);
+
+      // Autosave arms on every change, so unsaved edits mean an answer is on
+      // its way. Interrupting the reader now is what put a conflict banner in
+      // front of them for Langy's work in their own tab.
+      await waitFor(() => expect(sseCalls.length).toBeGreaterThan(0));
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
+      expect(reloadFromServer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A backend edit never clobbers a workbench with unsaved changes */
+    it("banners once autosave has stood down and nothing else is coming", async () => {
+      const reloadFromServer = vi.fn(async () => undefined);
+      // The refused save already stood autosave down; this is the state a tab
+      // is left in when the server rejected its write.
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setStaleWorkbench({ serverVersion: 5 });
+      });
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(6);
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+          serverVersion: 6,
+          actorLabel: "langy",
+        }),
+      );
+      expect(reloadFromServer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A tab whose autosave failed still hears the next version" */
+    it("banners after a failed save, because no answer is coming", async () => {
+      const reloadFromServer = vi.fn(async () => undefined);
+      // A save that failed for any reason other than a newer version leaves the
+      // workbench dirty and schedules no retry. Waiting for an answer that is
+      // not coming would keep the tab silent until the reader edits again.
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setAutosaveStatus("evaluation", "error", "Network error");
+      });
       renderHook(() =>
         useWorkbenchUpdateListener({
           projectId: "project-1",
@@ -156,6 +216,42 @@ describe("useWorkbenchUpdateListener", () => {
 
       await waitFor(() => expect(fetchVersion).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(reloadFromServer).toHaveBeenCalledTimes(1));
+    });
+
+    /** @scenario "A change Langy made is named as Langy's" */
+    it("carries who wrote it into the banner, rather than a stranger", async () => {
+      fetchVersion.mockResolvedValue({
+        experimentId: "experiment_1",
+        version: 7,
+        updatedAt: new Date(),
+        actorLabel: "langy",
+      });
+      // Dirty with autosave already stood down: the one state where the probe
+      // is the only word there is, so its banner is the one the reader sees.
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setStaleWorkbench({ serverVersion: 5 });
+      });
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer: vi.fn(async () => undefined),
+        }),
+      );
+
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+          serverVersion: 7,
+          actorLabel: "langy",
+        }),
+      );
     });
   });
 });

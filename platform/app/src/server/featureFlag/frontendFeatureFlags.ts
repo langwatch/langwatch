@@ -117,6 +117,14 @@ export const FRONTEND_FEATURE_FLAGS = [
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
+  // The identifier-first front door: the sign-in, sign-up and invitation
+  // screens (D13, ADR-117). Deliberately NOT a PostHog flag — every screen it
+  // governs is reached SIGNED OUT, and `featureFlag.isEnabled` is a protected
+  // procedure that answers 401 rather than false to a visitor with no session.
+  // It resolves from this browser's own override, set by `?ff_<flag>=on` and
+  // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
+  // when no override is set. See useIdentityFrontDoor.
+  "release_ui_identity_front_door_enabled",
 ] as const;
 
 /**

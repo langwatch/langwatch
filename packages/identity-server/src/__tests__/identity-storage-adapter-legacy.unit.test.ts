@@ -97,6 +97,9 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
   await context.internalAdapter.linkAccount({
     userId,
     providerId: "google",
+    // better-auth 1.7 keys an account by `(issuer, accountId)`, and
+    // synthesises this issuer for a provider that declares none of its own.
+    issuer: "local:oauth:google",
     accountId: "sub-google-1",
   });
   const linked = await context.internalAdapter.findAccounts(userId);

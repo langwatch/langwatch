@@ -264,8 +264,10 @@ registry, and dashboard stay the same.
   server once no stack is running (opt-in: native-mode tests and
   `haven db url clickhouse` reach it with no stack up) — the next `up`
   restarts it over the same data in seconds.
-- **tsgo can never take the machine down.** The daemon watches every tsgo
-  process on the machine — however it was spawned — and reclaims runaways: a
+- **The TypeScript compiler can never take the machine down.** The daemon
+  watches every compiler process on the machine — `tsc` (typescript@7) and
+  `tsgo` (the preview package) alike, as one class against one budget, however
+  it was spawned — and reclaims runaways: a
   whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
   server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
   `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
@@ -338,7 +340,7 @@ registry, and dashboard stay the same.
   `--yes` skips the picker and applies only the safe categories. Agents (and
   any non-TTY) get the read-only report and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU). The
+  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
   `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
   `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
   spawns and stays the only thing counting it.

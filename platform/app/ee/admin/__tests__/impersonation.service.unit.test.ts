@@ -36,6 +36,7 @@ interface StubUser {
 interface StubPrisma {
   user: StubUser;
   session: StubSession;
+  organizationUser: { findMany: ReturnType<typeof vi.fn> };
 }
 
 function makePrisma(): StubPrisma {
@@ -45,6 +46,9 @@ function makePrisma(): StubPrisma {
       findUnique: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
     },
+    // No organization of the target's requires a second factor by default,
+    // so the operator's own enrollment is not consulted (D06).
+    organizationUser: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 
@@ -70,6 +74,95 @@ describe("ImpersonationService", () => {
   });
 
   describe("start", () => {
+    describe("given the target belongs to an organization requiring a second factor", () => {
+      const healthyTarget = {
+        id: "user_target",
+        name: "Target",
+        email: "target@example.com",
+        image: null,
+        deactivatedAt: null,
+      };
+
+      /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
+      it("refuses when the operator has not set one up, and stamps nothing", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique
+          .mockResolvedValueOnce(healthyTarget)
+          // The operator's own account, read only because the target's
+          // organization requires one.
+          .mockResolvedValueOnce({ twoFactorEnabled: false });
+        prisma.organizationUser.findMany.mockResolvedValue([
+          { organization: { slug: "acme" } },
+        ]);
+        const auditLog = makeAuditLog();
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          auditLog,
+        );
+
+        const attempt = service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "Debugging trace #42",
+          req: {},
+        });
+
+        await expect(attempt).rejects.toMatchObject({
+          code: "cannot_impersonate_without_second_factor",
+        });
+        // Refused before anything happened: no window opened.
+        expect(prisma.session.update).not.toHaveBeenCalled();
+      });
+
+      it("allows it when the operator has one of their own", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique
+          .mockResolvedValueOnce(healthyTarget)
+          .mockResolvedValueOnce({ twoFactorEnabled: true });
+        prisma.organizationUser.findMany.mockResolvedValue([
+          { organization: { slug: "acme" } },
+        ]);
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          makeAuditLog(),
+        );
+
+        await service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "Debugging trace #42",
+          req: {},
+        });
+
+        expect(prisma.session.update).toHaveBeenCalled();
+      });
+
+      it("does not consult the operator when no organization requires one", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique.mockResolvedValue(healthyTarget);
+        prisma.organizationUser.findMany.mockResolvedValue([]);
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          makeAuditLog(),
+        );
+
+        await service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "Debugging trace #42",
+          req: {},
+        });
+
+        // Only the target was read. Nobody's own enrollment is anybody's
+        // business until an organization actually asks for it.
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+        expect(prisma.session.update).toHaveBeenCalled();
+      });
+    });
+
     describe("given a healthy, non-admin, non-deactivated target", () => {
       it("writes an audit log and stamps the session with the impersonating user", async () => {
         const prisma = makePrisma();

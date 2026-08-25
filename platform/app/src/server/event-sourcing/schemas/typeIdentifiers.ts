@@ -12,6 +12,14 @@ import {
 import {
   IDENTITY_COMMAND_TYPES,
   IDENTITY_EVENT_TYPES,
+  JOIN_REQUEST_COMMAND_TYPES,
+  JOIN_REQUEST_EVENT_TYPES,
+  MFA_COMMAND_TYPES,
+  MFA_EVENT_TYPES,
+  SCIM_SYNC_COMMAND_TYPES,
+  SCIM_SYNC_EVENT_TYPES,
+  SSO_CONNECTION_COMMAND_TYPES,
+  SSO_CONNECTION_EVENT_TYPES,
 } from "@langwatch/identity";
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
@@ -86,6 +94,10 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_EVENT_TYPES,
   ...IDENTITY_EVENT_TYPES,
+  ...MFA_EVENT_TYPES,
+  ...SSO_CONNECTION_EVENT_TYPES,
+  ...JOIN_REQUEST_EVENT_TYPES,
+  ...SCIM_SYNC_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -109,6 +121,10 @@ export const EVENT_TYPE_IDENTIFIERS = [
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_COMMAND_TYPES,
   ...IDENTITY_COMMAND_TYPES,
+  ...MFA_COMMAND_TYPES,
+  ...SSO_CONNECTION_COMMAND_TYPES,
+  ...JOIN_REQUEST_COMMAND_TYPES,
+  ...SCIM_SYNC_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -143,6 +159,26 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "authz_grant",
   "authz_role",
   "user_identity",
+  // D04: a connection is its own aggregate, tenanted by the organization.
+  // Separate from `user_identity` because it is keyed by a DIFFERENT thing —
+  // an organization, not a person — so it cannot share that aggregate's id.
+  // (Not because a pipeline may hold only one aggregate type: `trace` carries
+  // spans, logs and annotations, and `user_identity` carries two-step
+  // verification alongside identifiers. `storeEvents` takes the aggregate
+  // type per call and validates a batch against it, #7406.)
+  "sso_connection",
+  "join_request",
+  "scim_sync",
+  // D08: a connection's DIRECTORY SYNC is its own aggregate, tenanted by the
+  // D12: a join request is its own aggregate, tenanted by the organization,
+  // `user_identity` because of the KEY rather than the entity kind: it is
+  // and the aggregate id is what the queue shards on.
+  // because the people who read one are its admins. Separate from
+  // because the two have different lifecycles - a connection outlives every
+  // keyed by `joinRequestId` where the identity aggregate is keyed by user,
+  // organization like the connection is. Separate from `sso_connection`
+  // token minted for it - and because one pipeline declares one aggregate
+  // type (#7406).
   "trigger",
   "trace",
   "metric",

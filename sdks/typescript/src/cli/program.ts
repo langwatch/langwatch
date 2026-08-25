@@ -789,6 +789,65 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }
   });
 
+  // `langwatch ingest context`: the agent declares the repository and branch
+  // it is working on, run from inside the checkout. Visible, because its
+  // audience IS the agent reading `--help`: the always-loaded guidance the
+  // CLI installs names this command, and the agent runs it when it switches
+  // repository, branch or worktree mid-session. Renders its own result (one
+  // plain line) and never exits non-zero, so a declaration can never be why
+  // a session broke.
+  rendersOwnResult(
+    ingestCmd
+      .command("context")
+      .description(
+        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
+      )
+      .option(
+        "--session-id <id>",
+        "declare for this session instead of resolving the live one",
+      )
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex or opencode",
+      ),
+  ).action(async (options: { sessionId?: string; agent?: string }) => {
+    try {
+      const { contextCommand } = await import("./commands/ingestion/context.js");
+      await contextCommand(options);
+    } catch {
+      // Never break the session the agent runs this from.
+    }
+  });
+
+  // `langwatch ingest guidance <tool>`: prints the declare-your-context
+  // guidance as SessionStart additionalContext JSON. Hidden: nobody types
+  // this, the session-hooks install writes it into claude's settings for
+  // installs without plugin support (the plugin carries its own copy).
+  rendersOwnResult(
+    ingestCmd
+      .command("guidance <tool>", { hidden: true })
+      .description(
+        "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
+      ),
+  ).action(async (tool: string) => {
+    try {
+      if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
+      const { SESSION_CONTEXT_GUIDANCE } = await import(
+        "./utils/governance/session-guidance.js"
+      );
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: SESSION_CONTEXT_GUIDANCE,
+          },
+        })}\n`,
+      );
+    } catch {
+      // A hook is never allowed to be why a session broke.
+    }
+  });
+
   const governanceCmd = program
     .command("governance")
     .description(
