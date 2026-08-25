@@ -335,17 +335,19 @@ export function isShareLinkPermission(
  * its row. `null` (a row written before the column existed) reads as the
  * default, exactly as it did when the value was a constant.
  *
- * A stored string OUTSIDE the allowlist grants literally itself and nothing
- * else — parsed, not asserted, the same discipline the projection's resource
- * kind follows: a row an older writer or a hand-run statement left behind
- * must not be able to widen itself through an implication table it was never
- * validated against.
+ * A stored string OUTSIDE the allowlist grants NOTHING. The allowlist is a
+ * closed bearer capability, and it has to mean the same thing at both ends:
+ * `share.service.ts` refuses to MINT a link for `datasets:manage`, so a row
+ * carrying `datasets:manage` — left by an older writer, a hand-run statement
+ * or a corrupted write — must not confer it either. Conferring the raw value
+ * let a row nobody validated grant a permission the mint would have rejected
+ * outright, which is the one direction a bearer token must never fail in.
  */
 export function shareLinkPermissionsGranted(
   permission: string | null | undefined,
 ): readonly string[] {
   const stored = permission ?? DEFAULT_SHARE_LINK_PERMISSION;
-  return isShareLinkPermission(stored) ? SHARE_LINK_PERMISSIONS[stored] : [stored];
+  return isShareLinkPermission(stored) ? SHARE_LINK_PERMISSIONS[stored] : [];
 }
 
 /**

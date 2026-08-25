@@ -290,14 +290,13 @@ describe("collector at the resource tier", () => {
       );
     });
 
-    /** @scenario "A stored permission outside the allowlist confers only itself" */
-    it("grants a stored value outside the allowlist literally, with no implication", async () => {
-      // A row an older writer or a hand-run statement left behind is PARSED,
-      // not trusted to be expandable: it says one thing and gets one thing.
+    /** @scenario "A stored permission outside the allowlist confers nothing" */
+    it("grants nothing for a stored value outside the allowlist", async () => {
+      // `share.service.ts` refuses to mint a link for `datasets:manage`, so a
+      // row carrying it is one no mint approved. Honouring it would let an
+      // unvalidated row confer what the mint rejected outright.
       const grants = await collectFrom("datasets:manage");
-      expect(grants.map((grant) => grant.permission)).toEqual([
-        "datasets:manage",
-      ]);
+      expect(grants).toEqual([]);
     });
   });
 

@@ -77,15 +77,16 @@ Feature: A share link states what it confers
       Given a share link that allows annotating
       Then the only things its holder may do are read the trace and comment on it
 
-    # A row an older writer or a hand-run statement left behind is read for
-    # what it says, never expanded through a table it was never checked
-    # against.
+    # The allowlist means the same thing at both ends. Minting refuses a
+    # permission we do not offer, so a row carrying one — left by an older
+    # writer, a hand-run statement or a corrupted write — confers nothing
+    # rather than the thing the mint would have refused.
     @unit
-    Scenario: A stored permission outside the allowlist confers only itself
+    Scenario: A stored permission outside the allowlist confers nothing
       Given a share link whose stored permission is not one we offer
       When someone presents it
-      Then it confers exactly the permission written on it
-      And nothing that permission would otherwise imply
+      Then it confers nothing at all
+      And the holder is refused what the row named
 
   Rule: A link cannot be minted for something sharing does not confer
 
