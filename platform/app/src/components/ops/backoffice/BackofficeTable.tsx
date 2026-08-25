@@ -10,17 +10,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import type { PropsWithChildren, ReactNode } from "react";
+import type { ReactNode } from "react";
+import {
+  type PaginationState,
+} from "@langwatch/ops-web";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SearchInput } from "~/components/ui/SearchInput";
 import { HandledErrorAlert } from "~/features/errors";
-
-export interface PaginationState {
-  page: number;
-  perPage: number;
-  total: number;
-  onPageChange: (page: number) => void;
-}
 
 interface BackofficeTableProps {
   title: string;
@@ -162,50 +158,4 @@ function PaginationBar({
       </HStack>
     </HStack>
   );
-}
-
-/** Dash placeholder for empty cell values — avoids `-` noise scattered across. */
-export function EmptyCell({ children }: PropsWithChildren) {
-  return (
-    <Text color="fg.muted" fontSize="sm">
-      {children ?? "—"}
-    </Text>
-  );
-}
-
-/** Human-readable date (respects locale, uses user's TZ). */
-export function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return "—";
-  const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString();
-}
-
-export function formatDateTime(
-  value: string | Date | null | undefined,
-): string {
-  if (!value) return "—";
-  const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
-}
-
-/**
- * Turn a `<input type="date">` string (always `YYYY-MM-DD`, always the user's
- * local calendar date) into an ISO string without drifting the day.
- *
- * Background: `new Date("2026-04-16").toISOString()` parses as UTC midnight.
- * A user in PST typing "2026-04-16" and saving gets `2026-04-15T23:00:00Z`
- * back on read — shifting the calendar day. Parsing as local noon keeps the
- * date stable regardless of timezone.
- */
-export function dateInputToISO(value: string): string | null {
-  if (!value) return null;
-  const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
-  const [year, month, day] = parts;
-  // Noon local time — gives a 12h buffer either side of UTC so the calendar
-  // day stays correct in every real-world timezone.
-  const d = new Date(year!, month! - 1, day!, 12, 0, 0, 0);
-  return d.toISOString();
 }

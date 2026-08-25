@@ -1,8 +1,8 @@
 import { Button, HStack, Spacer } from "@chakra-ui/react";
 
-import type { OpsBlobSort } from "~/server/app-layer/ops/types";
+import type { OpsBlobSort } from "@langwatch/ops-contract";
 
-import { BlobFilters } from "./BlobFilters";
+import { BlobFilters } from "./blob-filters";
 
 export function BlobToolbar({
   queueNames,

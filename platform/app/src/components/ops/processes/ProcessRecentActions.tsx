@@ -1,6 +1,6 @@
 import { Box, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 
 const ACTION_LABELS: Record<string, string> = {

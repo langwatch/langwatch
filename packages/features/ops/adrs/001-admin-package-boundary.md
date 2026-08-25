@@ -1,4 +1,4 @@
-# ADR-001: Platform-admin policy is explicitly composed
+# ADR-001: Ops owns platform administration and operator capabilities
 
 **Status:** Accepted
 
@@ -12,33 +12,36 @@ The behaviour in this record moves to core `ops`; it is not Enterprise-licensed.
 
 ## Context
 
-Platform-admin access, impersonation policy, Prisma writes, Hono routes, and
-Backoffice React code previously shared an application `ee/admin` directory.
+Platform-admin access, impersonation policy, and operator capabilities were
+spread across app routes, app-layer services, and several UI locations.
 
 ## Decision
 
-Own portable identities, commands, and errors in a contract package. Own
-class-based access, impersonation, and Prisma adapters in a server package.
-Own the browser transport client and portable banner in a web package.
+Own portable identities, commands, errors, and operator DTOs in the contract
+package. Own class-based services and storage adapters in the server package.
+Own browser-safe clients, formatters, and reusable controls in the web package.
 
 ## Public surfaces and transports
 
-Only package roots are public. The contract exposes Zod 4 DTOs and one
-`OpsService`; the server exposes its composition adapter; the web package
-exposes `AdminClient` and the banner. The application still owns the Hono route
-and app-specific Backoffice views.
+Only package roots are public. The contract exposes Zod 4 DTOs, blob-store
+result types, and `OpsService`; the server exposes its composition adapter while
+blob-store services/repositories remain private; the web package exposes `AdminClient`, the
+impersonation banner, and reusable blob controls. The application still owns
+the Hono route, tRPC procedures, and app-specific Backoffice views.
 
 ## Dependencies
 
 Contract depends on handled errors and Zod 4. Server depends on contract and
-generated Prisma only inside `repositories/prisma`. Web is browser-safe and
-depends on contract, React, and Chakra UI.
+generated Prisma only inside `repositories/prisma`; Redis and group-queue
+access stays in the private Redis repository. Web is browser-safe and depends
+on contract, React, and Chakra UI.
 
 ## Persistence
 
-`PrismaImpersonationRepository` owns session JSON mutation. Admin list queries
-remain inside the application Hono adapter until the generic data-provider
-surface is replaced with purpose-built repository methods.
+`PrismaImpersonationRepository` owns session JSON mutation. The private Ops
+backoffice repository owns the compatibility data-provider operations,
+safe-selects, search predicates, and CRUD. Blob listing and cleanup persistence
+is owned by the private Redis repository.
 
 ## Runtime and registration
 

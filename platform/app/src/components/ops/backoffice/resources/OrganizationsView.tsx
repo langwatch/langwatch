@@ -24,19 +24,19 @@ import { showErrorToast } from "~/features/errors";
 import { Currency, PricingModel } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
-  BackofficeTable,
   dateInputToISO,
   EmptyCell,
   formatDate,
-} from "../BackofficeTable";
+} from "@langwatch/ops-web";
+import { BackofficeTable } from "../BackofficeTable";
 import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Organization shape — intentionally does NOT include
  * s3Endpoint / s3AccessKeyId /
  * s3SecretAccessKey / s3Bucket. Those are credentials and the admin Hono
- * route strips them from every list / getOne response (see
- * ee/admin/safeSelects.ts). The edit drawer still accepts *new* values for
+ * route strips them from every list / getOne response (see the Ops admin
+ * transport). The edit drawer still accepts *new* values for
  * those fields, write-only.
  */
 interface AdminOrganization {
@@ -234,7 +234,7 @@ function OrganizationEditDrawer({
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
       useCustomS3: !!organization.useCustomS3,
       // Credentials are write-only: the server doesn't echo them back in
-      // list/getOne responses (see ee/admin/safeSelects.ts), so the form
+      // list/getOne responses (see the Ops admin transport), so the form
       // always starts empty. A non-empty value on save is the user typing
       // a *new* secret; an empty value is left unchanged.
       s3Endpoint: "",

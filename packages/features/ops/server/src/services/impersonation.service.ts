@@ -5,6 +5,7 @@ import {
   type StopImpersonationInput,
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
+import type { AdminAuditRequest } from "@langwatch/ops-contract";
 import type { AdminAccess } from "./admin-access.service";
 
 const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
@@ -36,7 +37,7 @@ export abstract class AdminAuditSink {
     userId: string;
     action: string;
     args: Record<string, unknown>;
-    req: unknown;
+    req: AdminAuditRequest;
   }): Promise<void>;
 }
 

@@ -1,10 +1,12 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
   type ImpersonationWindow,
 } from "../../services/impersonation.service";
-import type { AdminDatabase } from "../../ports/admin-database.port";
+
+export type AdminDatabase = PrismaClient;
 
 export class PrismaImpersonationRepository extends ImpersonationRepository {
   private constructor(private readonly database: AdminDatabase) {

@@ -1,4 +1,4 @@
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import type { GroupInfo, PipelineNode } from "~/server/app-layer/ops/types";
 import type { StatusFilter } from "./types";
 

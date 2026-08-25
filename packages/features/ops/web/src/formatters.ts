@@ -1,3 +1,20 @@
+export function formatTimeAgo(ms: number | null, now = Date.now()): string {
+  if (ms === null) return "—";
+  const diff = now - ms;
+  const absDiff = Math.abs(diff);
+  const seconds = Math.floor(absDiff / 1000);
+  const isFuture = diff < 0;
+  const prefix = isFuture ? "in " : "";
+  const suffix = isFuture ? "" : " ago";
+  if (seconds < 60) return `${prefix}${seconds}s${suffix}`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${prefix}${minutes}m${suffix}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${prefix}${hours}h${suffix}`;
+  const days = Math.floor(hours / 24);
+  return `${prefix}${days}d${suffix}`;
+}
+
 export function formatRate(value: number): string {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   if (value >= 100) return value.toFixed(0);
@@ -53,21 +70,4 @@ export function formatDurationMs(ms: number): string {
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;
   return `${hours}h ${remainMins}m ${secs}s`;
-}
-
-export function formatTimeAgo(ms: number | null, now = Date.now()): string {
-  if (ms === null) return "—";
-  const diff = now - ms;
-  const absDiff = Math.abs(diff);
-  const seconds = Math.floor(absDiff / 1000);
-  const isFuture = diff < 0;
-  const prefix = isFuture ? "in " : "";
-  const suffix = isFuture ? "" : " ago";
-  if (seconds < 60) return `${prefix}${seconds}s${suffix}`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${prefix}${minutes}m${suffix}`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${prefix}${hours}h${suffix}`;
-  const days = Math.floor(hours / 24);
-  return `${prefix}${days}d${suffix}`;
 }

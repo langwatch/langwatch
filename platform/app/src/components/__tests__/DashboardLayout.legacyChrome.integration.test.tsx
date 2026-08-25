@@ -202,7 +202,7 @@ vi.mock("../governance/AdminViewingAsBanner", () => ({
 vi.mock("@langwatch/ops-web", () => ({
   ImpersonationBanner: () => null,
 }));
-vi.mock("~/features/enterprise/admin/ImpersonationSwitchBackMenuItem", () => ({
+vi.mock("~/components/ops/ImpersonationSwitchBackMenuItem", () => ({
   ImpersonationSwitchBackMenuItem: () => null,
 }));
 vi.mock("../sidebar/PresenceMenuItem", () => ({

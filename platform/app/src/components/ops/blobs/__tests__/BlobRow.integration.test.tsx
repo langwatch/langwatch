@@ -9,7 +9,7 @@ import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { OpsBlobSummary } from "~/server/app-layer/ops/types";
+import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 import { BlobRow } from "../BlobRow";
 

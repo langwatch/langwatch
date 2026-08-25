@@ -3,8 +3,10 @@ import type {
   OpsService as OpsServiceContract,
   UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
-import type { AdminDatabase } from "../ports/admin-database.port";
+import type { Cluster, Redis as IORedis } from "ioredis";
+import type { UserService } from "@langwatch/user-contract";
 import {
+  type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
   PrismaImpersonationRepository,
   PROJECT_SAFE_SELECT,
@@ -20,12 +22,19 @@ import {
   ImpersonationService,
 } from "../services/impersonation.service";
 import { OpsService } from "../services/ops.service";
+import { BlobStoreService } from "../services/blob-store.service";
+import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository";
+import { NullBlobStoreRepository } from "../repositories/blob-store.repository";
+import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository";
+import { AdminBackofficeService } from "../services/admin-backoffice.service";
 
 export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   database: AdminDatabase;
   audit: AdminAuditSink;
   access?: AdminAccess | undefined;
   now?: (() => Date) | undefined;
+  redis?: IORedis | Cluster | undefined;
+  users: UserService;
 }
 
 export class PostgresOpsAdapter {
@@ -52,6 +61,18 @@ export class PostgresOpsAdapter {
       AdminAccessService.create({ adminEmails: this.options.adminEmails });
     return OpsService.create({
       access,
+      adminBackoffice: AdminBackofficeService.create({
+        repository: PrismaAdminBackofficeRepository.create(
+          this.options.database,
+        ),
+        users: this.options.users,
+        audit: this.options.audit,
+      }),
+      blobStore: BlobStoreService.create(
+        this.options.redis
+          ? BlobStoreRedisRepository.create(this.options.redis)
+          : NullBlobStoreRepository.create(),
+      ),
       impersonation: ImpersonationService.create({
         repository: PrismaImpersonationRepository.create(this.options.database),
         access,

@@ -22,11 +22,11 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { PlanTypes, SubscriptionStatus } from "~/generated/prisma/client";
 import {
-  BackofficeTable,
   dateInputToISO,
   EmptyCell,
   formatDate,
-} from "../BackofficeTable";
+} from "@langwatch/ops-web";
+import { BackofficeTable } from "../BackofficeTable";
 import {
   useAdminCreate,
   useAdminList,

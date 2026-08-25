@@ -1,6 +1,6 @@
 import { HStack } from "@chakra-ui/react";
 import { LinkedStat } from "~/components/ops/dashboard/LinkedStat";
-import { formatCount } from "~/components/ops/shared/formatters";
+import { formatCount } from "@langwatch/ops-web";
 import type { ProcessFleetSummary } from "~/server/app-layer/ops/manager-explorer.service";
 
 /** The fleet's headline numbers, one row, trouble colored. */

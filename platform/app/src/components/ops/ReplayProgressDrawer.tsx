@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
-import { formatDuration } from "~/components/ops/shared/formatters";
+import { formatDuration } from "@langwatch/ops-web";
 import {
   PHASE_ICONS,
   PHASE_LABELS,

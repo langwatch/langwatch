@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { formatDuration } from "~/components/ops/shared/formatters";
+import { formatDuration } from "@langwatch/ops-web";
 import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { Link } from "~/components/ui/link";

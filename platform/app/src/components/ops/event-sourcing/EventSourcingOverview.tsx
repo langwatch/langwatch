@@ -12,7 +12,7 @@ import { ArrowRight, Skull } from "lucide-react";
 import { ProcessFleetStrip } from "~/components/ops/processes/ProcessFleetStrip";
 import { ProcessRecentActions } from "~/components/ops/processes/ProcessRecentActions";
 import { hasFleetTrouble } from "~/components/ops/processes/processFleet";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
 

@@ -1,14 +1,16 @@
 import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { RequestAppServices } from "~/runtime/app/requestApp";
+import {
+  deleteBlobInputSchema,
+  getBlobInputSchema,
+  listBlobsInputSchema,
+  runBlobCleanupInputSchema,
+} from "@langwatch/ops-contract";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
-import {
-  type DashboardData,
-  OPS_BLOB_SORTS,
-} from "~/server/app-layer/ops/types";
+import type { DashboardData } from "~/server/app-layer/ops/types";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import {
   resolveHotDays,
@@ -83,17 +85,6 @@ function requireDestructiveOpsAuth(
   }
 }
 
-function requireOps(app: RequestAppServices) {
-  const ops = app.ops;
-  if (!ops) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "Ops module is not available",
-    });
-  }
-  return ops;
-}
-
 export const opsRouter = createTRPCRouter({
   /**
    * Status probe — returns the calling user's ops scope. Always succeeds for
@@ -118,7 +109,7 @@ export const opsRouter = createTRPCRouter({
 
   getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
     const ops = ctx.app.ops;
-    if (!ops?.snapshotReader) return null;
+    if (!ops.snapshotReader) return null;
     return ops.snapshotReader.getDashboardData();
   }),
 
@@ -136,7 +127,7 @@ export const opsRouter = createTRPCRouter({
       computedAt: Date | null;
     } => {
       const ops = ctx.app.ops;
-      if (!ops?.snapshotReader) {
+      if (!ops.snapshotReader) {
         // Same shape as the served path so no caller has to branch on whether
         // the field exists — but `computedAt: null`, because these zeroes are
         // "we cannot say" rather than "nothing is wrong". Stamping the current
@@ -150,7 +141,7 @@ export const opsRouter = createTRPCRouter({
   dashboardStream: protectedProcedure
     .use(opsViewPermission)
     .subscription(async function* ({ signal, ctx }) {
-      const reader = ctx.app.ops?.snapshotReader;
+      const reader = ctx.app.ops.snapshotReader;
       if (!reader) return;
 
       // Yield the current snapshot immediately so the client doesn't have
@@ -184,12 +175,12 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getParkedGroups(input);
     }),
 
   listQueues: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
-    const ops = requireOps(ctx.app);
+    const ops = ctx.app.ops;
     return ops.queues.getQueues();
   }),
 
@@ -197,7 +188,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
     }),
 
@@ -214,7 +205,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.listPausedSchedules({ limit: input.limit });
     }),
 
@@ -223,7 +214,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.listRecentActions({ limit: input.limit });
     }),
 
@@ -236,7 +227,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string(), active: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.setActive({
         scheduleId: input.scheduleId,
         active: input.active,
@@ -249,7 +240,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.clearStuckSlot({
         scheduleId: input.scheduleId,
         actorUserId: ctx.session.user.id,
@@ -265,7 +256,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.scheduler.runNow({
         scheduleId: input.scheduleId,
         actorUserId: ctx.session.user.id,
@@ -282,7 +273,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getGroups(input);
     }),
 
@@ -295,7 +286,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       const group = await ops.queues.getGroupDetail(input);
       if (!group) {
         throw new TRPCError({
@@ -323,7 +314,7 @@ export const opsRouter = createTRPCRouter({
   getBlockedSummary: protectedProcedure
     .use(opsViewPermission)
     .query(async ({ ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getBlockedSummary();
     }),
 
@@ -338,7 +329,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getGroupJobs(input);
     }),
 
@@ -351,7 +342,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.unblockGroup(input);
     }),
 
@@ -363,7 +354,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.unblockAll(input);
     }),
 
@@ -376,7 +367,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.drainGroup(input);
     }),
 
@@ -389,7 +380,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.pausePipeline(input);
     }),
 
@@ -402,7 +393,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.unpausePipeline(input);
     }),
 
@@ -415,7 +406,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.pauseTenant(input);
     }),
 
@@ -428,7 +419,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.unpauseTenant(input);
     }),
 
@@ -436,7 +427,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ queueName: z.string() }))
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.listPausedTenants(input);
     }),
 
@@ -452,7 +443,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.drainTenant(input);
     }),
 
@@ -466,7 +457,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.retryBlocked(input);
     }),
 
@@ -493,7 +484,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getForAggregate({
+      return ctx.app.ops.managerExplorer.getForAggregate({
         aggregateType: input.aggregateType,
         projectId: input.tenantId,
         aggregateId: input.aggregateId,
@@ -517,7 +508,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).managerExplorer.requeueDeadMessages({
+      return ctx.app.ops.managerExplorer.requeueDeadMessages({
         processName: input.processName,
         projectId: input.tenantId,
         processKey: input.processKey,
@@ -530,7 +521,7 @@ export const opsRouter = createTRPCRouter({
 
   /** One row per process name: registry identity + live trouble counts. */
   listProcessFleet: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    return requireOps(ctx.app).managerExplorer.getFleetSummary();
+    return ctx.app.ops.managerExplorer.getFleetSummary();
   }),
 
   /**
@@ -550,12 +541,12 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getDeadLetters(input);
+      return ctx.app.ops.managerExplorer.getDeadLetters(input);
     }),
 
   /** Dead totals per process, for the navigation badge and dashboard card. */
   listDeadLetterCounts: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    return requireOps(ctx.app).managerExplorer.getDeadLetterCounts();
+    return ctx.app.ops.managerExplorer.getDeadLetterCounts();
   }),
 
   listProcessInstances: protectedProcedure
@@ -570,7 +561,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getInstances(input);
+      return ctx.app.ops.managerExplorer.getInstances(input);
     }),
 
   /** The soonest-due process wakes, for the dashboard's timed-work table. */
@@ -582,7 +573,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getUpcomingWakes(input);
+      return ctx.app.ops.managerExplorer.getUpcomingWakes(input);
     }),
 
   getProcessInstance: protectedProcedure
@@ -595,7 +586,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getInstanceDetail({ ref: input });
+      return ctx.app.ops.managerExplorer.getInstanceDetail({ ref: input });
     }),
 
   listProcessOutbox: protectedProcedure
@@ -611,14 +602,14 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const { page, pageSize, ...ref } = input;
-      return requireOps(ctx.app).managerExplorer.getOutbox({ ref, page, pageSize });
+      return ctx.app.ops.managerExplorer.getOutbox({ ref, page, pageSize });
     }),
 
   listProcessActions: protectedProcedure
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.listRecentActions(input);
+      return ctx.app.ops.managerExplorer.listRecentActions(input);
     }),
 
   processWakeNow: protectedProcedure
@@ -631,7 +622,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).managerExplorer.wakeNow({
+      return ctx.app.ops.managerExplorer.wakeNow({
         ref: input,
         actorUserId: ctx.session.user.id,
       });
@@ -647,7 +638,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).managerExplorer.redriveDeadInstance({
+      return ctx.app.ops.managerExplorer.redriveDeadInstance({
         ref: input,
         actorUserId: ctx.session.user.id,
       });
@@ -665,7 +656,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { messageId, ...ref } = input;
-      return requireOps(ctx.app).managerExplorer.redriveDeadMessage({
+      return ctx.app.ops.managerExplorer.redriveDeadMessage({
         ref,
         messageId,
         actorUserId: ctx.session.user.id,
@@ -685,7 +676,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { messageId, ...ref } = input;
-      return requireOps(ctx.app).managerExplorer.discardDeadMessage({
+      return ctx.app.ops.managerExplorer.discardDeadMessage({
         ref,
         messageId,
         actorUserId: ctx.session.user.id,
@@ -704,7 +695,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).managerExplorer.redriveDeadLetters({
+      return ctx.app.ops.managerExplorer.redriveDeadLetters({
         ...input,
         actorUserId: ctx.session.user.id,
       });
@@ -734,7 +725,7 @@ export const opsRouter = createTRPCRouter({
         }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).managerExplorer.discardDeadLetters({
+      return ctx.app.ops.managerExplorer.discardDeadLetters({
         ...(input.processName ? { processName: input.processName } : {}),
         actorUserId: ctx.session.user.id,
       });
@@ -750,7 +741,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).managerExplorer.getOutboxAttempts(input);
+      return ctx.app.ops.managerExplorer.getOutboxAttempts(input);
     }),
 
   processReleaseLapsedLease: protectedProcedure
@@ -765,7 +756,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { messageId, ...ref } = input;
-      return requireOps(ctx.app).managerExplorer.releaseLapsedLease({
+      return ctx.app.ops.managerExplorer.releaseLapsedLease({
         ref,
         messageId,
         actorUserId: ctx.session.user.id,
@@ -782,7 +773,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
 
       return ops.eventExplorer.discoverAggregates({
         projectionNames: input.projectionNames,
@@ -823,7 +814,7 @@ export const opsRouter = createTRPCRouter({
   getReplayHistory: protectedProcedure
     .use(opsViewPermission)
     .query(async ({ ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.replay.getHistory();
     }),
 
@@ -831,7 +822,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ runId: z.string() }))
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.replay.findHistoryEntry({ runId: input.runId });
     }),
 
@@ -848,7 +839,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
 
       const userName =
         ctx.session.user.name ?? ctx.session.user.email ?? "unknown";
@@ -876,14 +867,14 @@ export const opsRouter = createTRPCRouter({
     }),
 
   getReplayStatus: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
-    const ops = requireOps(ctx.app);
+    const ops = ctx.app.ops;
     return ops.replay.getStatus();
   }),
 
   cancelReplay: protectedProcedure
     .use(opsManagePermission)
     .mutation(async ({ ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.replay.cancelReplay();
     }),
 
@@ -895,14 +886,14 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.listDlqGroups(input);
     }),
 
   listAllDlqGroups: protectedProcedure
     .use(opsViewPermission)
     .query(async ({ ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getAllDlqGroups();
     }),
 
@@ -914,7 +905,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.listPausedKeys(input);
     }),
 
@@ -928,7 +919,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.getDrainPreview(input);
     }),
 
@@ -941,7 +932,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.moveToDlq(input);
     }),
 
@@ -955,7 +946,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.moveAllBlockedToDlq(input);
     }),
 
@@ -968,7 +959,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.replayFromDlq(input);
     }),
 
@@ -982,7 +973,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.replayAllFromDlq(input);
     }),
 
@@ -1000,7 +991,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).queues.redriveManyFromDlq({
+      return ctx.app.ops.queues.redriveManyFromDlq({
         ...input,
         requestedBy: ctx.session.user.id,
       });
@@ -1019,7 +1010,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return requireOps(ctx.app).queues.discardManyFromDlq({
+      return ctx.app.ops.queues.discardManyFromDlq({
         ...input,
         requestedBy: ctx.session.user.id,
       });
@@ -1035,7 +1026,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.canaryRedrive(input);
     }),
 
@@ -1049,7 +1040,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.queues.canaryUnblock(input);
     }),
 
@@ -1063,7 +1054,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
       const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
 
@@ -1099,7 +1090,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
       return ops.eventExplorer.getAggregateEvents(input);
     }),
 
@@ -1114,7 +1105,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = requireOps(ctx.app);
+      const ops = ctx.app.ops;
 
       const result = await ops.eventExplorer.computeProjectionState(input);
       if (!result.aggregateType) {
@@ -1339,48 +1330,33 @@ export const opsRouter = createTRPCRouter({
   // ---------------------------------------------------------------------------
 
   listBlobQueues: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
-    return requireOps(ctx.app).blobStore.getQueueNames();
+    return ctx.app.ops.listBlobQueues();
   }),
 
   getBlobStoreStats: protectedProcedure
     .use(opsViewPermission)
     .query(async ({ ctx }) => {
-      return requireOps(ctx.app).blobStore.getStats();
+      return ctx.app.ops.getBlobStoreStats();
     }),
 
   listBlobs: protectedProcedure
     .use(opsViewPermission)
-    .input(
-      z.object({
-        queueName: z.string().min(1).max(200),
-        cursor: z.string().max(4000).nullish(),
-        limit: z.number().int().min(1).max(200).default(50),
-        projectId: z.string().max(200).nullish(),
-        sort: z.enum(OPS_BLOB_SORTS).default("largest"),
-      }),
-    )
+    .input(listBlobsInputSchema)
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).blobStore.getBlobs(input);
+      return ctx.app.ops.listBlobs(input);
     }),
 
   getBlob: protectedProcedure
     .use(opsViewPermission)
-    .input(
-      z.object({
-        queueName: z.string().min(1).max(200),
-        projectId: z.string().min(1).max(200),
-        hash: z.string().min(1).max(200),
-      }),
-    )
+    .input(getBlobInputSchema)
     .query(async ({ input, ctx }) => {
-      return requireOps(ctx.app).blobStore.getBlobById(input);
+      return ctx.app.ops.tryGetBlob(input);
     }),
 
   runBlobCleanup: protectedProcedure
     .use(opsManagePermission)
     .input(
-      z.object({
-        dryRun: z.boolean().default(true),
+      runBlobCleanupInputSchema.extend({
         // Typed confirmation, required only for the destructive form. A sweep
         // that reclaims is not something to reach by mis-clicking a toggle.
         confirm: z.literal("RECLAIM").optional(),
@@ -1390,7 +1366,7 @@ export const opsRouter = createTRPCRouter({
       if (!input.dryRun) {
         requireDestructiveOpsAuth(ctx, input.confirm);
       }
-      return requireOps(ctx.app).blobStore.runCleanup({
+      return ctx.app.ops.runBlobCleanup({
         dryRun: input.dryRun,
         // Opaque id, not email: the audit trail must trace the actor without
         // carrying PII into the log stream.
@@ -1400,17 +1376,10 @@ export const opsRouter = createTRPCRouter({
 
   deleteBlob: protectedProcedure
     .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string().min(1).max(200),
-        projectId: z.string().min(1).max(200),
-        hash: z.string().min(1).max(200),
-        confirm: z.literal("DELETE"),
-      }),
-    )
+    .input(deleteBlobInputSchema.extend({ confirm: z.literal("DELETE") }))
     .mutation(async ({ ctx, input }) => {
       requireDestructiveOpsAuth(ctx, input.confirm);
-      return requireOps(ctx.app).blobStore.deleteBlob({
+      return ctx.app.ops.deleteBlob({
         queueName: input.queueName,
         projectId: input.projectId,
         hash: input.hash,

@@ -10,7 +10,7 @@ import {
 import { CalendarClock } from "lucide-react";
 import { useMemo } from "react";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api, type RouterOutputs } from "~/utils/api";
 import { SchedulerHeader } from "./SchedulerHeader";

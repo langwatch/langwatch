@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";

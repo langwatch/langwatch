@@ -16,7 +16,7 @@ describe("admin contract", () => {
         impersonatorUserId: "user_admin",
         userIdToImpersonate: "user_target",
         reason: "",
-        req: null,
+        req: { headers: {} },
       }).success,
     ).toBe(false);
   });

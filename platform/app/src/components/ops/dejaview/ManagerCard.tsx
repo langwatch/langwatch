@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 
 import { JsonViewer } from "~/components/ops/JsonViewer";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import type {
   AggregateProcessManager,
   AggregateProcessManagerInstance,

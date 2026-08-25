@@ -1,5 +1,5 @@
 import { HStack, Stat, Text, VStack } from "@chakra-ui/react";
-import { formatBytes } from "~/components/ops/shared/formatters";
+import { formatBytes } from "@langwatch/ops-web";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 
 // CloudWatch defaults for ElastiCache: 80% memory, 70% engine CPU. The goal is

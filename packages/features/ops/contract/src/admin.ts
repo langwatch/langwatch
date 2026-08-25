@@ -8,12 +8,25 @@ export const adminIdentitySchema = z.object({
 
 export type AdminIdentity = z.infer<typeof adminIdentitySchema>;
 
+const adminAuditHeaderValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+]);
+
+/** Transport-neutral request metadata needed by the audit adapter. */
+export const adminAuditRequestSchema = z.object({
+  headers: z.record(z.string(), adminAuditHeaderValueSchema),
+  remoteAddress: z.string().optional(),
+});
+
+export type AdminAuditRequest = z.infer<typeof adminAuditRequestSchema>;
+
 export const startImpersonationInputSchema = z.object({
   sessionId: z.string().min(1),
   impersonatorUserId: z.string().min(1),
   userIdToImpersonate: z.string().min(1),
   reason: z.string().min(1),
-  req: z.unknown(),
+  req: adminAuditRequestSchema,
 });
 
 export type StartImpersonationInput = z.infer<
@@ -33,6 +46,7 @@ export const adminResourceNameSchema = z.enum([
   "organization",
   "project",
   "subscription",
+  "team",
 ]);
 
 export type AdminResourceName = z.infer<typeof adminResourceNameSchema>;

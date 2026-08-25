@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { formatDurationMs } from "~/components/ops/shared/formatters";
+import { formatDurationMs } from "@langwatch/ops-web";
 import type { SchedulerJobStatus } from "./schedulerStatus";
 
 const PRESENTATION: Record<

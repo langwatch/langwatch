@@ -1,6 +1,6 @@
 import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { formatDuration } from "~/components/ops/shared/formatters";
+import { formatDuration } from "@langwatch/ops-web";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";

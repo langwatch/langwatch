@@ -15,7 +15,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
+import { EmptyCell, formatDateTime } from "@langwatch/ops-web";
+import { BackofficeTable } from "../BackofficeTable";
 
 const PAGE_SIZE = 25;
 

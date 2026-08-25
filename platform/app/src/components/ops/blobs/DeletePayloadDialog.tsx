@@ -1,5 +1,5 @@
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import type { OpsBlobSummary } from "~/server/app-layer/ops/types";
+import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 export function DeletePayloadDialog({
   target,

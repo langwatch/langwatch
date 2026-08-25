@@ -8,7 +8,7 @@ import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { LEGACY_CALLBACK_PROVIDER_IDS } from "~/runtime/app/features/sso";
 import { type Context, Hono } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { app as adminApp } from "~/server/enterprise/admin/routes";
+import { app as adminApp } from "~/server/routes/ops/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";

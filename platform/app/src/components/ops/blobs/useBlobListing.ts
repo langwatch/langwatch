@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { OpsBlobSort, OpsBlobSummary } from "~/server/app-layer/ops/types";
+import type { OpsBlobSort, OpsBlobSummary } from "@langwatch/ops-contract";
 import { api } from "~/utils/api";
 
 /** One SCAN page per fetch, bounded so a browser never pulls a whole keyspace. */

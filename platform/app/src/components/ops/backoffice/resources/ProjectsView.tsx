@@ -21,14 +21,15 @@ import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
-import { BackofficeTable, EmptyCell, formatDate } from "../BackofficeTable";
+import { EmptyCell, formatDate } from "@langwatch/ops-web";
+import { BackofficeTable } from "../BackofficeTable";
 import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Project shape — does NOT include s3Endpoint / s3AccessKeyId /
  * s3SecretAccessKey / s3Bucket. Project-level S3 overrides are credentials
  * and the admin Hono route strips them from every list / getOne response
- * (see ee/admin/safeSelects.ts). The edit drawer accepts new values,
+ * (see the Ops admin transport). The edit drawer accepts new values,
  * write-only.
  */
 interface AdminProject {
@@ -212,7 +213,7 @@ function ProjectEditDrawer({
       userLinkTemplate: project.userLinkTemplate ?? "",
       traceSharingEnabled: !!project.traceSharingEnabled,
       // S3 credentials are write-only: the server strips them from
-      // read payloads (ee/admin/safeSelects.ts), so the form always
+      // read payloads (see the Ops admin transport), so the form always
       // starts empty. Typing a value replaces the stored secret;
       // leaving it blank keeps the current one untouched.
       s3Endpoint: "",

@@ -1,4 +1,4 @@
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import type { ProcessFleetSummary } from "~/server/app-layer/ops/manager-explorer.service";
 
 /** Anything the summary counted as wrong — decides row tinting. */

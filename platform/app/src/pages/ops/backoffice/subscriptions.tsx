@@ -1,4 +1,4 @@
-import SubscriptionsView from "~/features/enterprise/admin/backoffice/resources/SubscriptionsView";
+import SubscriptionsView from "~/components/ops/backoffice/resources/SubscriptionsView";
 import BackofficeShell from "./_shell";
 
 export default function BackofficeSubscriptionsPage() {

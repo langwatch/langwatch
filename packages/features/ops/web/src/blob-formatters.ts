@@ -1,4 +1,4 @@
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "./formatters";
 
 /** Verdict a sweep would reach, phrased for a reader rather than for the script. */
 const OUTCOME_LABELS = {

@@ -78,7 +78,7 @@ const input = {
   impersonatorUserId: "user_admin",
   userIdToImpersonate: "user_target",
   reason: "Debugging trace 42",
-  req: { path: "/api/admin/impersonate" },
+  req: { headers: {} },
 };
 
 describe("ImpersonationService", () => {

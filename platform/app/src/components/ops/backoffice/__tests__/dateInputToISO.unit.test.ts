@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateInputToISO } from "../BackofficeTable";
+import { dateInputToISO } from "@langwatch/ops-web";
 
 /**
  * Regression — CodeRabbit review on #3254 surfaced that

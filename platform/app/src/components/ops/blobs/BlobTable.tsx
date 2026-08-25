@@ -1,6 +1,6 @@
 import { Box, Table } from "@chakra-ui/react";
 
-import type { OpsBlobSummary } from "~/server/app-layer/ops/types";
+import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 import { BlobRow } from "./BlobRow";
 

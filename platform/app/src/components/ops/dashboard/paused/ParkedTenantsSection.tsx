@@ -10,7 +10,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
-import { formatCount, formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatCount, formatTimeAgo } from "@langwatch/ops-web";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 

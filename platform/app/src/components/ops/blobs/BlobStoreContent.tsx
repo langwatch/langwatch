@@ -2,10 +2,10 @@ import { Text } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { useOpsPermission } from "~/hooks/useOpsPermission";
-import type { OpsBlobSummary } from "~/server/app-layer/ops/types";
+import type { OpsBlobSummary } from "@langwatch/ops-contract";
+import { BlobToolbar } from "@langwatch/ops-web";
 
 import { BlobStoreBody } from "./BlobStoreBody";
-import { BlobToolbar } from "./BlobToolbar";
 import { DeletePayloadDialog } from "./DeletePayloadDialog";
 import { RunCleanupDialog } from "./RunCleanupDialog";
 import { useBlobListing } from "./useBlobListing";

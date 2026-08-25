@@ -14,7 +14,7 @@ import {
 import { MoreVertical, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";

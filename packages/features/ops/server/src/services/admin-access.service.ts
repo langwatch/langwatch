@@ -2,7 +2,6 @@ import type { AdminIdentity } from "@langwatch/ops-contract";
 
 export interface AdminAccess {
   isAdmin(identity: AdminIdentity): boolean;
-  emails(): readonly string[];
 }
 
 export interface AdminAccessServiceOptions {
@@ -32,7 +31,4 @@ export class AdminAccessService implements AdminAccess {
     return this.normalizedEmails.includes(identity.email.trim().toLowerCase());
   }
 
-  emails(): readonly string[] {
-    return this.normalizedEmails;
-  }
 }

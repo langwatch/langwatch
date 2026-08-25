@@ -1,5 +1,5 @@
 import { Card, HStack, Table, Text } from "@chakra-ui/react";
-import { formatCount, formatMs } from "~/components/ops/shared/formatters";
+import { formatCount, formatMs } from "@langwatch/ops-web";
 import type {
   LatencyWindowPercentiles,
   LatencyWindows,

@@ -8,7 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useState } from "react";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
 import {

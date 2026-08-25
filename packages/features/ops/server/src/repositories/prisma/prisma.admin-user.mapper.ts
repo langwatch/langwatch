@@ -5,7 +5,7 @@ import type {
   UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
 
-const USER_BACKOFFICE_INCLUDE = {
+export const USER_BACKOFFICE_INCLUDE = {
   orgMemberships: {
     include: {
       organization: {

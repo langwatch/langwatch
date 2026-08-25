@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ProcessInstanceRow } from "~/server/app-layer/ops/repositories/process-ops.repository";

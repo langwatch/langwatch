@@ -12,7 +12,7 @@ import {
 import { RotateCcw, Skull, XCircle } from "lucide-react";
 import { JsonViewer } from "~/components/ops/JsonViewer";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 
 /** Exactly what this surface renders; a structural subset of the server view. */

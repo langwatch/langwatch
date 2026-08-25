@@ -18,3 +18,15 @@ Feature: Platform administration package boundary
     Given a healthy non-admin target
     When an admin starts impersonation with a reason
     Then the attempt is audited and the session window expires after one hour
+
+  @unit
+  Scenario: Blob listing reports sampled ordering honestly
+    Given an operator requests a ranked blob listing
+    When Redis returns a bounded sample
+    Then the result reports the sample size and rankedFromSample
+
+  @unit
+  Scenario: Blob deletion refuses a live lease atomically
+    Given a blob still has a live lease
+    When an operator requests deletion
+    Then the bytes remain and the result reports deleted as false

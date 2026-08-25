@@ -1,7 +1,7 @@
 /**
  * Thin typed wrapper around the Hono `/api/admin/:resource` endpoints.
  *
- * The backend (see `ee/admin/routes/admin.ts`) is a `ra-data-simple-prisma`
+ * The backend (see the app-owned Ops Hono route) is a `ra-data-simple-prisma`
  * handler: every call is a POST with `{ resource, method, params }`. The
  * Chakra backoffice UI talks to it through this wrapper, keeping all business
  * logic (user deactivate/reactivate side effects, org ssoDomain normalization,

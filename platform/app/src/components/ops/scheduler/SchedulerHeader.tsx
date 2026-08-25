@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import type { SchedulerHeaderCounts } from "./schedulerStatus";
 
 /**

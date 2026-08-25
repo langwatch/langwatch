@@ -3,7 +3,7 @@ import {
   formatCount,
   formatMs,
   formatRate,
-} from "~/components/ops/shared/formatters";
+} from "@langwatch/ops-web";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { LATENCY_SAMPLE_SIZE } from "~/shared/ops/latency";
 import { api } from "~/utils/api";

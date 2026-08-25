@@ -5,7 +5,7 @@ import {
   getAllBugReports,
   getBugReportById,
 } from "~/server/app-layer/bug-reports/bug-report.service";
-import { isAdmin as checkIsAdmin } from "~/runtime/app/features/admin";
+import type { OpsService } from "@langwatch/ops-contract";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -15,8 +15,11 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * read is audit-logged: reports carry reporter-submitted transcripts and
  * contact emails.
  */
-const requireAdmin = (user: { email?: string | null }) => {
-  if (!checkIsAdmin(user)) {
+const requireAdmin = (
+  user: { email?: string | null },
+  ops: OpsService,
+) => {
+  if (!ops.isAdmin(user)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Admin access required",
@@ -38,7 +41,7 @@ export const bugReportsRouter = createTRPCRouter({
     })
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      requireAdmin(user);
+      requireAdmin(user, ctx.app.ops);
       await auditLog({
         userId: user.id,
         action: "bugReports.getAll",
@@ -61,7 +64,7 @@ export const bugReportsRouter = createTRPCRouter({
     })
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      requireAdmin(user);
+      requireAdmin(user, ctx.app.ops);
       await auditLog({
         userId: user.id,
         action: "bugReports.getById",

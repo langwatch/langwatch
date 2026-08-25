@@ -1,6 +1,6 @@
 import { HStack, NativeSelect } from "@chakra-ui/react";
 
-import type { OpsBlobSort } from "~/server/app-layer/ops/types";
+import type { OpsBlobSort } from "@langwatch/ops-contract";
 
 /**
  * Reader-facing name for each server sort mode.

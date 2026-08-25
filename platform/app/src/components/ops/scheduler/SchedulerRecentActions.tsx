@@ -1,5 +1,5 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatTimeAgo } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 
 const ACTION_LABELS: Record<string, string> = {
