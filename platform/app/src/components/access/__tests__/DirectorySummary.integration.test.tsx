@@ -124,9 +124,12 @@ describe("given an organization whose directory is syncing", () => {
       const fact = screen.getByTestId("members-outside-directory");
       // Two of the three were invited or admitted by a domain.
       expect(fact.textContent).toBe("2 of 3");
-      expect(fact.getAttribute("title")).toContain(
-        "removing them from your directory will not remove them here",
-      );
+      // The explanation is the tile's own visible line now, not a hover.
+      expect(
+        screen.getByText(
+          /removing them from your directory will not remove them here/,
+        ),
+      ).toBeInTheDocument();
     });
 
     /** @scenario The page leads with whether it is working */

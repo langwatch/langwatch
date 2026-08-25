@@ -58,28 +58,44 @@ export function BuiltinRoleCard({
       width="full"
       height="full"
       borderWidth="1px"
-      borderColor="border"
-      borderLeftWidth="3px"
+      borderColor="border.muted"
       colorPalette={TIER_TONE[tier]}
-      borderLeftColor="colorPalette.emphasized"
       data-testid={`builtin-role-${tier}`}
     >
-      <Card.Body display="flex" flexDirection="column" gap={3} padding={5}>
-        <HStack width="full" align="baseline">
-          <Text fontWeight="semibold" fontSize="md">
+      <Card.Body display="flex" flexDirection="column" gap={2.5} padding={4}>
+        <HStack width="full" align="baseline" gap={2}>
+          {/* The tier's tone lives in one quiet dot rather than a painted
+              edge: the ladder is the information, and a coloured spine made
+              three peers read as three alerts. */}
+          <Box
+            width="7px"
+            height="7px"
+            borderRadius="full"
+            backgroundColor="colorPalette.solid"
+            alignSelf="center"
+            flexShrink={0}
+          />
+          <Text fontWeight="semibold" fontSize="sm">
             {copy.name}
           </Text>
           <Spacer />
           <PeopleCount people={people} />
         </HStack>
 
-        <Text fontSize="sm" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
           {copy.summary}
         </Text>
 
         <Spacer />
 
-        <VStack align="start" gap={2} width="full">
+        <VStack
+          align="start"
+          gap={2}
+          width="full"
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          paddingTop={2.5}
+        >
           <Text fontSize="xs" color="fg.subtle">
             {copy.inheritsFrom
               ? `Everything ${BUILTIN_TIER_COPY[copy.inheritsFrom].name} has, and:`
@@ -93,8 +109,10 @@ export function BuiltinRoleCard({
 
         <Button
           size="xs"
-          variant="outline"
+          variant="ghost"
+          color="fg.muted"
           alignSelf="start"
+          marginLeft={-2}
           onClick={onOpenDetail}
         >
           See what it can do

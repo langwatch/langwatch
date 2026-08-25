@@ -40,10 +40,10 @@ export function PermissionToken({
         gap={0}
         paddingX={1.5}
         paddingY={0.5}
-        borderRadius="sm"
+        borderRadius="md"
         borderWidth="1px"
-        borderColor="border"
-        background="bg.muted"
+        borderColor="border.muted"
+        background="bg.subtle"
         fontFamily="mono"
         fontSize="xs"
         lineHeight="1.4"

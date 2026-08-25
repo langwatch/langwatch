@@ -59,7 +59,7 @@ export function DirectoryMembersSection({
 
   return (
     <VStack gap={2} align="start" width="full">
-      <Heading size="md">People your directory manages</Heading>
+      <Heading size="sm">People your directory manages</Heading>
       <Text color="fg.muted" fontSize="sm">
         Your identity provider created these accounts and decides whether they
         stay.

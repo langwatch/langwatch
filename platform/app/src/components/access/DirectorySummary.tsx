@@ -12,6 +12,7 @@ import {
   DirectorySourceChips,
 } from "~/features/directory/components/DirectoryFacts";
 import { useDirectoryFacts } from "~/features/directory/hooks/useDirectoryFacts";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 
 /**
@@ -71,60 +72,62 @@ export function DirectorySummary({
 
   return (
     <VStack align="stretch" gap={3} width="full">
-      <Card.Root width="full" data-testid="directory-summary">
-        <Card.Body>
-          <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={6}>
-            <Fact label="Sources connected">
-              <DirectorySourceChips connections={facts.connections} />
-            </Fact>
-            <Fact label="Last sync">
-              {/* A date the directory has never written is not a date, so it
-                  is set in the muted ink the other "nothing yet" states use
-                  rather than in the weight a real timestamp earns. */}
-              <Text
-                fontSize="sm"
-                fontWeight={facts.lastPushedAtMs === null ? 400 : 500}
-                color={facts.lastPushedAtMs === null ? "fg.muted" : undefined}
-                truncate
-              >
-                {facts.lastPushedAtMs === null
-                  ? "No push yet"
-                  : new Date(facts.lastPushedAtMs).toLocaleString()}
-              </Text>
-            </Fact>
-            <Fact label="People it manages">
-              <Text fontSize="sm" fontWeight={500}>
-                {facts.managedPeople}
-              </Text>
-            </Fact>
-            <Fact label="Groups it sent">
-              <DirectoryFactUnavailable
-                canRead={canReadMembership}
-                read={groups}
-              >
-                <Text fontSize="sm" fontWeight={500}>
-                  {facts.directoryGroups.length}
-                </Text>
-              </DirectoryFactUnavailable>
-            </Fact>
-            <Fact label="Members it does not manage">
-              <DirectoryFactUnavailable
-                canRead={canReadMembership}
-                read={provenance}
-              >
-                <Text
-                  fontSize="sm"
-                  fontWeight={500}
-                  title="People your identity provider did not create. A colleague invited them or a matching domain admitted them, so removing them from your directory will not remove them here."
-                  data-testid="members-outside-directory"
-                >
-                  {facts.outsideDirectory} of {facts.members.length}
-                </Text>
-              </DirectoryFactUnavailable>
-            </Fact>
-          </SimpleGrid>
-        </Card.Body>
-      </Card.Root>
+      <SimpleGrid
+        columns={{ base: 1, sm: 2, lg: 5 }}
+        gap={3}
+        data-testid="directory-summary"
+      >
+        <Fact label="Sources connected">
+          {/* The names ARE the value here: an administrator with two sources
+              is not asking how many they have, they are asking which one is
+              the one that stopped. */}
+          <DirectorySourceChips connections={facts.connections} />
+        </Fact>
+        <Fact label="Last sync">
+          {/* A date the directory has never written is not a date, so it
+              is set in the muted ink the other "nothing yet" states use
+              rather than in the weight a real timestamp earns. */}
+          <Text
+            fontSize="lg"
+            lineHeight="1.3"
+            fontWeight={facts.lastPushedAtMs === null ? 400 : 600}
+            letterSpacing="-0.01em"
+            color={facts.lastPushedAtMs === null ? "fg.muted" : undefined}
+            title={
+              facts.lastPushedAtMs === null
+                ? undefined
+                : new Date(facts.lastPushedAtMs).toLocaleString()
+            }
+            truncate
+            maxWidth="full"
+          >
+            {facts.lastPushedAtMs === null
+              ? "No push yet"
+              : formatTimeAgo(facts.lastPushedAtMs)}
+          </Text>
+        </Fact>
+        <Fact label="People it manages">
+          <FactNumber>{facts.managedPeople}</FactNumber>
+        </Fact>
+        <Fact label="Groups it sent">
+          <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
+            <FactNumber>{facts.directoryGroups.length}</FactNumber>
+          </DirectoryFactUnavailable>
+        </Fact>
+        <Fact
+          label="Members it does not manage"
+          hint="Invited by a colleague or admitted by a domain, so removing them from your directory will not remove them here."
+        >
+          <DirectoryFactUnavailable
+            canRead={canReadMembership}
+            read={provenance}
+          >
+            <FactNumber data-testid="members-outside-directory">
+              {facts.outsideDirectory} of {facts.members.length}
+            </FactNumber>
+          </DirectoryFactUnavailable>
+        </Fact>
+      </SimpleGrid>
 
       {/* Neither of these takes the band down: the three facts that came from
           the sync itself are still on screen and still true. */}
@@ -145,34 +148,81 @@ export function DirectorySummary({
 }
 
 /**
- * One fact: what it is called, and what it says.
+ * One fact as its own quiet tile: what it is called on top, what it says
+ * underneath, and at most one small line after that.
  *
- * The five cells hold three different kinds of thing — chips, a date, bare
- * numbers — and they were free to set their own type, so the band read as
- * five unrelated little widgets that happened to be in a row. The label is
- * fixed here and the value row is given ONE height, so a cell holding a chip
- * and a cell holding a number put their contents on the same line. That is
- * the whole difference between a row of facts and a row of oddments.
+ * A tile each rather than five cells in one card, because the facts are
+ * glanced at independently — "is it syncing" and "how many people" are
+ * different questions on different visits — and a shared card made every
+ * glance read the other four. The label is fixed here and the value row is
+ * given ONE height, so a tile holding chips and a tile holding a number put
+ * their contents on the same line.
  */
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  /** One small line under the value; on hover it says the whole of it. */
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
-    <VStack align="start" gap={1.5} minWidth={0}>
-      <Text
-        fontSize="xs"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="0.04em"
-        fontWeight={500}
-        lineHeight="1.3"
-      >
-        {label}
-      </Text>
-      {/* The chip is the tallest thing any cell can hold, so every cell
-          reserves its height. Without it the four text cells sat two pixels
-          higher than the one with a chip in it. */}
-      <HStack minHeight="6" align="center" minWidth={0}>
-        {children}
-      </HStack>
-    </VStack>
+    <Card.Root borderRadius="xl" minWidth={0}>
+      <Card.Body paddingX={4} paddingY={3}>
+        <VStack align="start" gap={1.5} minWidth={0}>
+          <Text
+            fontSize="xs"
+            color="fg.muted"
+            fontWeight={500}
+            lineHeight="1.3"
+          >
+            {label}
+          </Text>
+          {/* The chip is the tallest thing any tile can hold, so every tile
+              reserves its height. Without it the text tiles sat two pixels
+              higher than the one with a chip in it. */}
+          <HStack minHeight="7" align="center" minWidth={0} maxWidth="full">
+            {children}
+          </HStack>
+          {hint && (
+            <Text
+              fontSize="11px"
+              color="fg.muted"
+              lineHeight="1.35"
+              title={hint}
+              lineClamp={2}
+            >
+              {hint}
+            </Text>
+          )}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+/** A fact that is a number: the tile's big, tabular figure. */
+function FactNumber({
+  children,
+  "data-testid": testId,
+}: {
+  children: ReactNode;
+  "data-testid"?: string;
+}) {
+  return (
+    <Text
+      fontSize="lg"
+      lineHeight="1.3"
+      fontWeight={600}
+      letterSpacing="-0.01em"
+      fontVariantNumeric="tabular-nums"
+      truncate
+      maxWidth="full"
+      data-testid={testId}
+    >
+      {children}
+    </Text>
   );
 }

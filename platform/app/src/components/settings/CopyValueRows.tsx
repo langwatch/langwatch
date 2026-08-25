@@ -1,6 +1,6 @@
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Copy } from "lucide-react";
-import { toaster } from "../../ui/toaster";
+import { toaster } from "../ui/toaster";
 
 /**
  * A short list of values the customer carries somewhere else — into a DNS

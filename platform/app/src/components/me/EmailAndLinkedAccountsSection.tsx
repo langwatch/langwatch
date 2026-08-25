@@ -35,7 +35,7 @@ export function EmailAndLinkedAccountsSection() {
     <SettingsSection
       anchorId="email-and-linked-accounts"
       icon={<AtSign size={18} />}
-      title="Email addresses and linked accounts"
+      title="Linked Accounts"
       description="The addresses this account is known by, and the identity providers that vouch for it."
       testId="email-and-linked-accounts-settings-section"
     >

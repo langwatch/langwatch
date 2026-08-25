@@ -19,15 +19,15 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import type { AccountIdentifier } from "~/server/app-layer/identity/account-identifiers.service";
 import { api } from "~/utils/api";
-import { useResendBackoff } from "../hooks/useResendBackoff";
-import { lastUsedLabel } from "../logic/lastUsed";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { useResendBackoff } from "../hooks/useResendBackoff";
 import {
   forgetAddressVerifier,
   mintAddressCeremony,
   readAddressVerifier,
   rememberAddressVerifier,
 } from "../logic/addressCeremony";
+import { lastUsedLabel } from "../logic/lastUsed";
 import { refusalCopy } from "../logic/refusalCopy";
 
 /**
@@ -262,14 +262,14 @@ export function EmailIdentifiersSection({
       <VStack width="full" align="stretch" gap={3}>
         <HStack
           width="full"
-          // The two clusters sit a step further apart than the buttons within
-          // each, which is what makes them read as two groups. The hairline
-          // then has a gap to live in rather than crowding the buttons on
-          // either side of it.
           gap={4}
           flexWrap="wrap"
           align="center"
-          justify="flex-end"
+          // The two clusters hold the row's two edges — the add button flush
+          // left, the provider offers flush right — so the row spans exactly
+          // the measure of the lists above it instead of drifting toward one
+          // end with an accidental-looking gap.
+          justify="space-between"
           data-testid="identifier-action-row"
         >
           <AddAddressButton
@@ -278,7 +278,7 @@ export function EmailIdentifiersSection({
             onCancel={draft.close}
           />
           {trailingActions ? (
-            <>
+            <HStack gap={4} align="center" flexWrap="wrap">
               {/* Two families on one row: what this account is reached at, and
                   who vouches for it. Set on the emphasized border so it holds
                   in the dark theme, where the muted one all but vanished and
@@ -296,7 +296,7 @@ export function EmailIdentifiersSection({
                 aria-hidden="true"
               />
               {trailingActions}
-            </>
+            </HStack>
           ) : null}
         </HStack>
 
