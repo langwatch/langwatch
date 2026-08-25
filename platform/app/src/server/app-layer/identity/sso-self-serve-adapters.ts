@@ -617,11 +617,20 @@ export class EmailSsoDomainReproofNotifier implements SsoDomainReproofNotifier {
  * cannot tick this box by clicking a button" true by construction rather
  * than by a check somebody could delete.
  *
- * The organization is confirmed rather than assumed: the account names a
- * user, and a user who is not a member of this organization signing in
- * through its provider is not this organization's test. `SsoConnection` is
- * cross-tenant by design, so the membership join is what keeps the answer
- * org-scoped.
+ * THE CONNECTION IS WHAT SCOPES THIS, NOT THE SIGNER'S MEMBERSHIP. It used to
+ * require that the person who came back is already a member of the
+ * organization, and that is the one thing a test sign-in cannot promise: the
+ * step exists to prove the connection carries a real person BEFORE anybody is
+ * provisioned through it, and on a connection that is not live yet nobody is.
+ * So the customer signed in successfully, came back, and the step still read
+ * "do this next" — with the screen insisting nothing was wrong.
+ *
+ * Dropping the join costs nothing, because `SsoConnection.organizationId`
+ * means a connection belongs to exactly one organization: an account whose
+ * `provider` is this connection's id came through this organization's
+ * provider and no other. The organization is still CONFIRMED rather than
+ * assumed — the connection is looked up under it first, so a connection id
+ * from another tenant answers null exactly as it did before.
  */
 export class PrismaSsoTestSignInLookup implements SsoTestSignInLookup {
   constructor(private readonly prisma: PrismaClient) {}
@@ -633,13 +642,16 @@ export class PrismaSsoTestSignInLookup implements SsoTestSignInLookup {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoTestSignIn | null> {
+    // The connection under THIS organization, which is what makes the account
+    // lookup below org-scoped without asking anything of the signer.
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: { id: connectionId, organizationId },
+      select: { id: true },
+    });
+    if (!connection) return null;
+
     const account = await this.prisma.account.findFirst({
-      where: {
-        provider: connectionId,
-        user: {
-          orgMemberships: { some: { organizationId, disabledAt: null } },
-        },
-      },
+      where: { provider: connectionId },
       select: { id: true, userId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });

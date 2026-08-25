@@ -108,9 +108,20 @@ export function JoinPolicyCard({
                 <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
               )}
             </HStack>
+            {/* WHICH PEOPLE THIS IS ABOUT. The first sentence alone reads as
+                if it covered everybody on the domain, including the ones an
+                identity provider already admits — and it does not: where a
+                connection is live for a domain, its own provisioning is the
+                way in and this is deliberately not offered beside it. So this
+                setting governs exactly the arrivals single sign-on does not
+                catch, and saying so is the difference between an
+                administrator understanding the control and guessing at it. */}
             <Text color="fg.muted" fontSize="sm">
               Colleagues who verify an address on your company domain can find
-              you instead of starting a workspace of their own.
+              you instead of starting a workspace of their own. This is for
+              people who arrive without single sign-on — where an identity
+              provider already admits a domain, it is the way in and this is
+              not offered alongside it.
             </Text>
             {lock.locked && (
               <HStack gap={2} paddingTop={1} data-testid="join-policy-notice">

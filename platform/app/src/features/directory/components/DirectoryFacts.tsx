@@ -1,4 +1,4 @@
-import { Box, HStack, Skeleton, Text } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
@@ -41,18 +41,30 @@ export function DirectorySourceChips({
     // band full of numbers is answering a question rather than decorating a
     // gap. Neutral, because nothing here has gone wrong: an organization that
     // has not connected a directory is not an organization with a broken one.
+    // THE STATE, THE REASON, AND THE WAY OUT. "Not set up yet" on its own is
+    // a label with nowhere to take it: a reader learns their directory is
+    // empty and is left to work out both why it is empty and where the fix
+    // lives. The reason is one clause and it belongs on screen, not on a
+    // hover somebody has to discover, and the door is named rather than
+    // drawn as a bare plus — there is nothing here yet to add one MORE to.
     return (
-      <HStack gap={1} flexWrap="wrap">
+      <VStack align="start" gap={1}>
         <IdentityChip
           label="Not set up yet"
           title="No identity provider is connected, so nothing is provisioned here automatically."
           data-testid="directory-source-chip"
         />
-        <ConnectAnotherSource
-          href={addHref}
-          label="Connect an identity provider"
-        />
-      </HStack>
+        <Text fontSize="xs" color="fg.muted">
+          Nobody is provisioned here automatically.
+        </Text>
+        {addHref ? (
+          <Box asChild fontSize="xs" color="colorPalette.fg">
+            <RouterLink href={addHref} data-testid="connect-identity-provider">
+              Connect an identity provider →
+            </RouterLink>
+          </Box>
+        ) : null}
+      </VStack>
     );
   }
 
