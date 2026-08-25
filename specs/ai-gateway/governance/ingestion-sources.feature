@@ -226,6 +226,65 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       And a destination outside it, reaching the API by any other route,
         is refused at write time with the destination named as the reason
 
+  Rule: A source routes only the events it recognises as its own conversations
+
+    The destination picker is offered only to sources that carry
+    conversations, but the destination itself is an ordinary stored
+    setting, and nothing at the moment it is written checks what kind of
+    source it was written on. So the run cannot treat the picker as the
+    only way a destination arrives. It decides for itself, per source,
+    which of that source's events are conversations, and routes nothing
+    else.
+
+    This is what keeps a source that pulls counts from turning billing
+    rows into readable conversations if a destination reaches it by some
+    other route. Such a source has no conversation events at all, so the
+    honest outcome is that nothing is routed — not that its totals are
+    rendered as though someone had said them.
+
+    Each source also names the agent that answered, and states which
+    source the conversation came from. Both travel with the conversation
+    rather than being assumed, because a second source reusing the first
+    one's labels would file its conversations under a product the
+    customer does not have.
+
+    The agent name is an identity, not a model anyone is billed for, and
+    a source may only name an agent from the set the platform knows. It
+    cannot supply the name of a real model, because a name that matched
+    a price would put a charge on a conversation nobody was charged for.
+
+    @unit
+    Scenario: A counts-pulling source with a destination still routes nothing
+      Given an "Anthropic Admin API (usage & cost)" source has a
+        destination project stored on it, which its own drawer never
+        offered and nothing on the way in refused
+      When a run pulls its usage and cost totals
+      Then nothing is routed to that project, because none of those
+        totals is a conversation
+
+    @unit
+    Scenario: A run routes only the events belonging to its own source
+      Given a "Databricks AI/BI Genie" source lands in "Analytics"
+      When a run hands over both its questions and events belonging to
+        another kind of source
+      Then only the Genie questions reach "Analytics"
+
+    @unit
+    Scenario: A second kind of source routes its own conversations
+      Given a source that recognises its own conversations, which are not
+        Genie questions, lands in "Support"
+      When a run pulls those conversations
+      Then they reach "Support"
+      And each one names that source as where it came from, and that
+        source's agent as what answered — neither of them Genie's
+
+    @unit
+    Scenario: A source cannot name a real model as its agent
+      When a source is set up to route conversations
+      Then the agent it names must be one the platform already knows
+      And a real model's name cannot be used as an agent name, so no
+        routed conversation can be given a price by naming one
+
   @unit
   Scenario: The configured-source list groups under the same two headings
     Given configured sources of push, pull, and s3 modes exist

@@ -39,7 +39,11 @@ import {
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
-import { mapGenieEventsToTraceRequest } from "./genieTraceMapper";
+import {
+  type ConversationRoutingProfile,
+  GENIE_ROUTING_PROFILE,
+  mapGenieEventsToTraceRequest,
+} from "./genieTraceMapper";
 import {
   type NormalizedPullEvent,
   type PullResult,
@@ -358,6 +362,23 @@ async function writePulledEvents({
  * the run on those would stall the audit pull on the exact history the door
  * exists to let through.
  */
+/**
+ * The source types that carry conversations, and what each contributes to
+ * the ones it routes. A type absent from here routes nothing — which is the
+ * honest answer for a source that pulls totals rather than conversations.
+ *
+ * The composer keeps its own list (`routesConversations` in
+ * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
+ * all. The two are deliberately separate: that one shapes a form, this one
+ * decides what reaches a customer's project.
+ */
+const CONVERSATION_ROUTING_PROFILES: Record<
+  string,
+  ConversationRoutingProfile | undefined
+> = {
+  databricks_genie: GENIE_ROUTING_PROFILE,
+};
+
 export async function routeConversationsToTraceDestination({
   events,
   source,
@@ -367,10 +388,19 @@ export async function routeConversationsToTraceDestination({
 }): Promise<void> {
   if (!source.traceProjectId) return;
 
+  // A destination is an ordinary stored column: the write path checks the
+  // project is this org's and live, never that this kind of source carries
+  // conversations at all — only the composer declines to offer the picker.
+  // So the source type has to earn its way in here, and one we have no
+  // conversation shape for routes nothing rather than being guessed at.
+  const profile = CONVERSATION_ROUTING_PROFILES[source.sourceType];
+  if (!profile) return;
+
   const request = mapGenieEventsToTraceRequest(events, {
     ingestionSourceId: source.id,
     organizationId: source.organizationId,
     sourceType: source.sourceType,
+    profile,
   });
   if (!request) return;
 

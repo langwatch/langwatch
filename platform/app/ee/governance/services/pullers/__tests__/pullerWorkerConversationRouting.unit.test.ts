@@ -123,6 +123,70 @@ describe("given a source with a live trace destination", () => {
     expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     expect(projectFindFirst).not.toHaveBeenCalled();
   });
+
+  /** @scenario "A run routes only the events belonging to its own source" */
+  it("routes only its own source's events when the batch also carries another kind", async () => {
+    await routeConversationsToTraceDestination({
+      events: [
+        genieEvent(),
+        { ...genieEvent(), source_event_id: "rep-1", action: "cost_report" },
+      ],
+      source: SOURCE,
+    });
+
+    const [, request] = handleOtlpTraceRequest.mock.calls[0]!;
+    expect(request.resourceSpans[0].scopeSpans[0].spans).toHaveLength(1);
+  });
+});
+
+/**
+ * A destination is an ordinary stored column and nothing on the write path
+ * checks the source type against it (`ingestionSource.service.ts` asserts the
+ * project is this org's and live, and that a pull URL is allowed — never that
+ * this kind of source routes conversations at all). So the run cannot treat
+ * the composer's picker as the only way a destination arrives, and decides
+ * for itself which sources have conversations to route.
+ *
+ * Without this, an Anthropic Admin source that acquired a destination by any
+ * route would have its billing rows rendered as messages someone said, in a
+ * customer's project, permanently — `mapMessage` builds a span with no guard
+ * and `frameOf` labels it "unknown_conversation".
+ */
+describe("given a counts-pulling source that has a destination anyway", () => {
+  beforeEach(() => {
+    projectFindFirst.mockResolvedValue({ id: "proj-dest" });
+  });
+
+  /** @scenario "A counts-pulling source with a destination still routes nothing" */
+  it.each([
+    "cost_report",
+    "usage_report",
+  ])("routes no %s row, because a total is not a conversation", async (action) => {
+    await routeConversationsToTraceDestination({
+      events: [{ ...genieEvent(), action }],
+      source: { ...SOURCE, sourceType: "anthropic_admin" },
+    });
+    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A source type nobody has taught the worker to route is the same case as a
+ * counts-pulling one: it has no conversations the worker can recognise, so a
+ * destination on it routes nothing rather than guessing.
+ */
+describe("given a source type the worker has no conversation shape for", () => {
+  beforeEach(() => {
+    projectFindFirst.mockResolvedValue({ id: "proj-dest" });
+  });
+
+  it("routes nothing, even for an event that would suit another source", async () => {
+    await routeConversationsToTraceDestination({
+      events: [genieEvent()],
+      source: { ...SOURCE, sourceType: "s3_custom" },
+    });
+    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe("given a source without a destination", () => {
