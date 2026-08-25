@@ -15,7 +15,6 @@ import {
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
 } from "~/server/annotations/annotationAnchor";
-import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
@@ -373,8 +372,7 @@ export const annotationRouter = createTRPCRouter({
       // this trace", which the has-annotation filter in search reads, and a
       // comment on one of its spans means yes.
       try {
-        const app = getApp();
-        await app.traces.addAnnotation({
+        await ctx.app.traces.addAnnotation({
           tenantId: input.projectId,
           traceId: input.traceId,
           annotationId: createdAnnotation.id,
@@ -547,8 +545,7 @@ export const annotationRouter = createTRPCRouter({
 
       // Best-effort ClickHouse sync (see create mutation comment above).
       try {
-        const app = getApp();
-        await app.traces.removeAnnotation({
+        await ctx.app.traces.removeAnnotation({
           tenantId: input.projectId,
           traceId: deletedAnnotation.traceId,
           annotationId: deletedAnnotation.id,
