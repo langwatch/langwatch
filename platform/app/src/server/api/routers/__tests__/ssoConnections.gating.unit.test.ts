@@ -6,6 +6,7 @@
  *
  * Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { ssoConnectionsRouter } from "../ssoConnections";
@@ -61,6 +62,12 @@ vi.mock(
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
+  // `betterAuth()` builds its adapter EAGERLY at module load, and this
+  // suite's import graph reaches it through the router. It has to be real
+  // enough to initialise; better-auth's own memory engine over an empty
+  // store is exactly that, and holds nothing this suite could assert
+  // against by accident.
+  identityStorageAdapter: () => memoryAdapter({}),
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -121,9 +128,17 @@ describe("the back-office single sign-on surface", () => {
       // message that names nothing — no resource, no id, no surface. A
       // message naming the back office would tell a prober it exists and they
       // merely lack the session.
+      // `then` with both arms rather than `catch`: the success arm throws, so
+      // a call that stopped being denied fails here instead of handing the
+      // assertions below an `undefined` to read properties off.
       const denial = await caller
         .attestDomain({ ...TARGET, domain: "acme.com" })
-        .catch(
+        .then(
+          () => {
+            throw new Error(
+              "attestDomain resolved: the back office gate let the call through",
+            );
+          },
           (error: unknown) =>
             error as {
               code: string;
@@ -221,7 +236,14 @@ describe("the back-office single sign-on surface", () => {
           issuer: null,
           allowsJit: false,
         })
-        .catch((error: unknown) => error as { message: string });
+        .then(
+          () => {
+            throw new Error(
+              "register resolved: SAML was accepted as self-serve",
+            );
+          },
+          (error: unknown) => error as { message: string },
+        );
 
       // The wire message for a handled error IS the code; the words the
       // reader sees come from the registry keyed by it.

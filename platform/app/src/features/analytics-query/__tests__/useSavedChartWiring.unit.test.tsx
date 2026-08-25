@@ -102,6 +102,7 @@ function fakeQuery(): UseLangWatchQLQuery {
       draft = { ...draft, parameters };
     },
     setTimeWindow: vi.fn(),
+    setGranularity: vi.fn(),
     runQuery: vi.fn(),
     reload: vi.fn(),
     cancelQuery: vi.fn(),

@@ -392,6 +392,40 @@ describe("Autosave evaluation state", () => {
       });
       expect(mockMutateAsync).not.toHaveBeenCalled();
     });
+
+    /** @scenario "A refused save names who holds the newer version" */
+    it("keeps who wrote the newer version, so the banner can name them", async () => {
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: { currentVersion: 9, actorLabel: "langy" },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+        serverVersion: 9,
+        actorLabel: "langy",
+      });
+    });
   });
 
   // The silent reconciliation path reloads a clean workbench, and the server

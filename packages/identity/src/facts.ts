@@ -62,6 +62,38 @@ export const identifierAttachedPayloadSchema = z.object({
    *  exists (an email alias attached for routing has none). */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
+  /** better-auth's OWN provider id, verbatim, when a protocol row backs
+   *  this identifier. `provider` above is the folded vocabulary — every
+   *  generic OAuth and enterprise IdP collapses into `oidc` and microsoft
+   *  into `azure-ad` — so it cannot answer a callback that asks for
+   *  `auth0`. `Account` is a projection of this log (ADR-116), and the
+   *  column it keys its uniqueness by is this one. Null for an identifier
+   *  no protocol row backs (the email adopted from `User.email`). */
+  providerId: z.string().min(1).nullable(),
+  /**
+   * WHO asserted the subject below — the other half of the account key, and
+   * the half that makes the subject mean anything.
+   *
+   * A subject is unique only WITHIN an issuer, so `providerAccountId` alone
+   * names nobody: two enterprise IdPs minting the same `sub` are two
+   * different people. `providerId` has stood in for the issuer until now,
+   * and only because there is currently exactly one connection per
+   * configured provider — a stand-in the projection's own unique index
+   * warns is temporary, because every customer connecting their own IdP
+   * directly breaks it.
+   *
+   * better-auth 1.7 keys an account by `(issuer, accountId)` and hands this
+   * value to the ceremony on the row it is about to write, so the fact
+   * carries what the library itself decided rather than a reconstruction.
+   * For a provider that declares no issuer of its own the library
+   * synthesises one; for a real OIDC connection it is the IdP's, and that is
+   * a fact about the customer's identity we cannot derive from anything
+   * else we hold.
+   *
+   * Null exactly when `providerId` is: an identifier no protocol row backs
+   * has no issuer to name.
+   */
+  issuer: z.string().min(1).nullable(),
   /** The provider's own subject for this user - `sub` for OIDC, the
    *  mailbox for `email`. It is what an IdP callback arrives holding, so
    *  the projection has to carry it to answer "who is this?" without the
@@ -217,6 +249,13 @@ export interface IdentifierFact {
   /** `hmac:`-prefixed; null once erased or when no key existed at attach. */
   identifierHash: string | null;
   accountId: string | null;
+  /** better-auth's own provider id (ADR-116), verbatim and unfolded - what
+   *  the projected `Account` row is keyed by. Null when no protocol row
+   *  backs the identifier. */
+  providerId: string | null;
+  /** Who asserted the subject — the account key's other half (see the
+   *  attached payload). Null exactly when `providerId` is. */
+  issuer: string | null;
   /** The provider's own subject (ADR-116) - the IdP callback's lookup key. */
   providerAccountId: string | null;
   connectionId: string | null;
@@ -310,6 +349,11 @@ export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
   /** The better-auth protocol row, when one exists. */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
+  /** better-auth's own provider id, verbatim — see the fact payload. */
+  providerId: z.string().min(1).nullable(),
+  /** The account key's other half, as better-auth decided it — see the
+   *  fact payload. Null exactly when `providerId` is. */
+  issuer: z.string().min(1).nullable(),
   /** The provider's own account id (OAuth `providerAccountId`) — part of
    *  the identifier's deterministic identity when present, and from
    *  ADR-116 stated on the fact so the projection can answer an IdP

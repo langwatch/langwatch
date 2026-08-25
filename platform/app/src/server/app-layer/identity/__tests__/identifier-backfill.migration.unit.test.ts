@@ -33,6 +33,10 @@ describe("the identifier backfill migration", () => {
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
       expect(migration.requiresOperatorConfirmation).toBe(false);
       expect(migration.runsAutomaticallyOnSelfHosted).toBe(false);
+      // Still paced by enrollment on cloud: the identity rollout has not
+      // finished, so deploying it must keep changing nothing until an
+      // operator enrolls an organization.
+      expect(migration.enrolledAutomatically).toBe(false);
     });
   });
 });

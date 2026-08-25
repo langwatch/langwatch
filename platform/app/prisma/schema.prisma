@@ -26,6 +26,11 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
+  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
+  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
+  /// so the column could be added to a populated table; every write path
+  /// supplies it and the migration backfilled every existing row.
+  issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
   access_token      String?   @db.Text
@@ -41,6 +46,53 @@ model Account {
   updatedAt         DateTime  @default(now()) @updatedAt
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // uniqueness that matters is already enforced above, and every issuer here
+  // is derived from `provider`, so this pair is unique exactly when that one
+  // is. See migration 20260825030000.
+  @@index([issuer, providerAccountId])
+}
+
+// The credential half of the old `Account` row (ADR-116 §1). Row-truth
+// permanently: ADR-101's payload rule bars secrets from the event log, and
+// OAuth refresh rewrites these on a cadence no event log should carry. The
+// LINKAGE half - who holds which sign-in method - is `Identifier`, built by
+// the fold.
+//
+// `id` IS the pinned account id: the KSUID an attach pins, which
+// `Identifier.accountId` carries and which doubles as the `Account` row's id
+// while the bridge table exists. Nothing is re-keyed, and better-auth's
+// account id keeps its meaning after `Account` is dropped.
+//
+// Column names are better-auth's own canonical field names rather than
+// `Account`'s NextAuth-era snake_case, so the identity branch needs no field
+// mapping of its own. `provider` is a denormalized copy of the identifier's
+// and is read-side only: it answers "whose row is this?" without a second
+// read.
+//
+// `userId` relates to `User` and CASCADES, exactly as `Account` does. The
+// identity branch deletes these rows itself on unlink (ADR-116 §8), but a
+// user deleted outside it - by an unlatched path, an operator, a test - must
+// not leave their password hash and provider tokens behind with nothing left
+// to reap them. Under `relationMode = "prisma"` the cascade is the client's,
+// not the database's, so it needs no FK in the migration.
+// Spec: specs/identity/identity-storage-adapter.feature.
+model AccountCredential {
+  id                    String    @id
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider              String
+  password              String?   @db.Text
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
   @@index([userId])
 }
 
@@ -88,6 +140,7 @@ model User {
   /// it is true. The lifecycle - and the history - lives on MfaEnrollment.
   twoFactorEnabled              Boolean                  @default(false)
   accounts                      Account[]
+  accountCredentials            AccountCredential[]
   sessions                      Session[]
   twoFactors                    TwoFactor[]
   passkeys                      Passkey[]
@@ -175,6 +228,19 @@ model Identifier {
   domain            String?
   identifierHash    String?
   accountId         String?
+  // better-auth's own provider id, verbatim (ADR-116). `provider` above is
+  // the folded identifier vocabulary - auth0/okta/custom OIDC all collapse
+  // into `oidc`, microsoft into `azure-ad` - so it cannot answer a callback
+  // that asks for `auth0`. `Account` is a projection of the same log, and
+  // this is the column its uniqueness is keyed by. Null for an identifier no
+  // protocol row backs.
+  providerId        String?
+  // WHO asserted the subject below - the other half of better-auth 1.7's
+  // account key, and event truth rather than a derivation. A subject is
+  // unique only WITHIN an issuer, so `providerId` has only ever stood in for
+  // this while there is exactly one connection per configured provider. Null
+  // exactly when `providerId` is.
+  issuer            String?
   // The provider's own subject (ADR-116). What an IdP callback arrives
   // holding, so the projection can answer "who is this?" without the legacy
   // Account row.
@@ -192,7 +258,64 @@ model Identifier {
   @@index([value])
   @@index([domain])
   @@index([provider, providerAccountId])
+  @@index([issuer, providerAccountId])
   @@index([accountId])
+  // A PARTIAL UNIQUE INDEX on (providerId, providerAccountId), over the live
+  // states only, is added by migration 20260824120004 - Prisma cannot express
+  // a partial index, so it is raw SQL there and this comment is its home in
+  // the model.
+  //
+  // Unique where `value` is not, and the difference is what the columns mean.
+  // One user legitimately holds several proven identifiers carrying the same
+  // ADDRESS, so address uniqueness is not a row-level rule. A provider
+  // SUBJECT is different: it names exactly one account at exactly one IdP, so
+  // two live identifiers sharing it are always either a duplicate or a
+  // takeover. `Account` has enforced exactly this globally all along; the
+  // identity branch dropped the guarantee until this index restored it.
+  //
+  // FORWARD CONSTRAINT, and it is load-bearing: the real invariant is that a
+  // subject is unique PER CONNECTION. `providerId` stands in for the
+  // connection today only because there is exactly one connection per
+  // configured provider (auth0, okta, cognito, onelogin, oidc). When
+  // connections become data (D04, and the Auth0 exit is what brings it), every
+  // connection MUST get its own distinct provider id, or this index MUST be
+  // extended to include `connectionId`. Many customer connections sharing one
+  // provider id - `oidc` being the one to watch - re-opens a cross-tenant
+  // sign-in, because subjects are then customer-chosen and collide.
+  //
+  // Deliberately no unique constraint on `value`: ONE user legitimately holds
+  // several proven identifiers carrying the same address (a credential
+  // sign-in and a Google sign-in are two rows with one email, both VERIFIED),
+  // so "one USER per proven address" is not a row-level rule. It lives in
+  // `IdentifierReservation`, claimed before any fact is stated.
+}
+
+// The address lock (ADR-116 §6). ROW-TRUTH, and deliberately not a projection:
+// it is a lock, not a record of who holds what. `Identifier` answers that.
+//
+// One user may hold a proven address, and "check the projection, then state
+// the fact" cannot decide two concurrent claims - both reads pass before
+// either write lands. So a claim is taken here first, atomically, BEFORE the
+// verification proof is consumed and BEFORE any fact is appended: the loser is
+// refused synchronously with `identity_email_in_use`, and the event log never
+// records a verification that did not hold.
+//
+// The primary key IS the constraint. A claim is released by the fold when the
+// identifier stops holding the value (detached, dead-ended, erased), and a
+// claim whose append never landed is reaped by the identity sweep.
+// Spec: specs/identity/identity-storage-adapter.feature.
+model IdentifierReservation {
+  normalizedValue String   @id
+  userId          String
+  identifierId    String
+  // The command that claimed it. A retry of the SAME command is not a
+  // collision - it is the same claim arriving twice, which the staged re-run
+  // of every ceremony guarantees will happen.
+  commandId       String
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([identifierId])
 }
 
 // One row per user: the identity fold's event cursor (the AuthzProjectionCursor

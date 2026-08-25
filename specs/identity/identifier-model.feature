@@ -12,9 +12,9 @@ Feature: The identifier model - identity as an event-sourced pipeline
   # The truth split - no table mixes truths, ADR-022/015 stand unamended:
   #
   #   ClickHouse event_log ──fold──► Identifier (PG, pure event-truth,
-  #        │  (waited append, then       whole-row replay, born clean)
-  #        │   staged onto the queue;
-  #        │   the fold is the queue's)
+  #        │  (the command is staged        whole-row replay, born clean)
+  #        │   onto the queue; the queued
+  #        │   run appends AND folds)
   #        └── never carries secrets; emails yes (erasure wipes them, R11)
   #
   #   Session / VerificationToken (PG) - pure row-truth protocol tables
@@ -80,20 +80,20 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then both emissions carry the idempotency key "idcmd_1:0"
 
   @unit
-  Scenario: An identity ceremony appends durably and stages its fold
+  Scenario: An identity ceremony stages its command and waits for the fold
     Given "sam"'s identifier backfill has latched
     When an attach ceremony commits its facts
-    Then the ClickHouse append is waited on before anything else happens
-    And the command is staged onto "sam"'s queue lane
+    Then the command is staged onto "sam"'s queue lane
+    And the staged run is what appends, so exactly one event lands per fact
     And the ceremony waits, bounded, for the fold to move the projection cursor
-    But the ceremony never writes the projection itself
+    But the ceremony never appends or writes the projection itself
 
   @unit
   Scenario: A ceremony whose command cannot be staged fails
     Given the group queue cannot accept the staged command
     When an attach ceremony commits its facts
-    Then the ceremony fails, because nothing else would fold the appended facts
-    But the append stays durable, and the backfill restates what the heads lack
+    Then the ceremony fails, because nothing would append or fold its facts
+    And no event is written, so a retry states the same facts once
 
   @unit
   Scenario: A lagging fold does not fail the ceremony
@@ -133,10 +133,47 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the Identifier row for "work" remains with state DETACHED and a detachedAt timestamp
 
   @unit
-  Scenario: Concurrent verification races dead-end the loser
+  Scenario: A verification refused because another user holds the address
     Given another user already holds a VERIFIED identifier for "sam.j@acme.com"
     When a verify_identifier command is handled for "sam"'s ATTACHED identifier with the same value
-    Then the identifier dead-ends instead of verifying
+    Then the command is refused with the handled code "identity_email_in_use"
+    And no event is emitted
+
+  @unit
+  Scenario: Two concurrent verifications of one address: the loser is refused before any fact
+    Given two users hold an ATTACHED identifier for the same address
+    And the first verification has taken the address lock
+    When the second verification is handled
+    Then it is refused with the handled code "identity_email_in_use"
+    And no event is emitted for it, so the log records no losing verification
+
+  @unit
+  Scenario: A retried verification holds the lock it already took
+    Given a verification took the address lock and is retried under the same command id
+    When the retry is handled
+    Then the lock reads as this command's own and the identifier verifies
+
+  @unit
+  Scenario: Two VERIFIED arrivals for one address: exactly one holds it
+    Given two users' identity providers call back with the same address
+    And neither user's projection yet carries the other's identifier
+    When both arrivals are handled
+    Then exactly one of them ends VERIFIED
+    And the other dead-ends, so no address has two proven holders
+    And replaying both emissions reaches the same two states
+
+  @unit
+  Scenario: A VERIFIED arrival that loses the address lock dead-ends
+    Given another user holds the address lock for "sam.j@acme.com"
+    When an OAuth identifier arrives VERIFIED for "sam" with the same value
+    Then the identifier arrives ATTACHED and dead-ends in the same emission
+    And no refusal is raised, because an IdP callback has no caller to act on one
+
+  @unit
+  Scenario: An email attach takes no address lock
+    When an email identifier is attached for "sam"
+    Then no address lock is taken
+    And nobody can hold an address by attaching it unverified
 
   @unit
   Scenario: Replay rebuilds the Identifier projection identically
@@ -282,6 +319,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the fold writes no other column
 
   @integration
+  Scenario: The projected Account row keeps better-auth's own provider id
+    Given "sam" holds a live identifier attached through the provider "auth0"
+    And the identifier vocabulary folds that provider into "oidc"
+    When the identity fold stores the projection
+    Then the Account row's provider is still "auth0"
+    And better-auth's own lookup by provider and subject finds the row
+
+  @integration
   Scenario: A replay never overwrites a credential the fold cannot know
     Given an Account row holds an access token better-auth refreshed
     When the fold re-asserts that row from the event log
@@ -296,11 +341,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And no row is created for a tombstone
 
   @integration
-  Scenario: The fold says nothing about a user who is gone
-    Given "sam" has been deleted, so their Account rows cascaded away
+  Scenario: The fold reports a user it cannot find, and projects anyway
+    Given the log carries "sam"'s linkage but no User row carries "sam"
     When the identity fold stores the projection
-    Then it creates no Account row
-    And the delete is not undone by a projection
+    Then the projection rows are written, so it stays complete
+    And the anomaly is reported, rather than being a branch nobody can see
 
   @unit
   Scenario: The gate costs nothing before anyone is enrolled

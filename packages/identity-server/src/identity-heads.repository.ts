@@ -1,6 +1,5 @@
 import type {
   IdentifierFact,
-  IdentifierProvider,
   IdentityHeads,
 } from "@langwatch/identity";
 
@@ -37,10 +36,19 @@ export interface IdentityHeadsRepository {
    * user's live identifiers on the same provider — used only when that
    * names exactly ONE identifier; two or more is ambiguous and answers null
    * rather than a guess; so does no match.
+   *
+   * The fallback keys on better-auth's OWN `providerId`, never the folded
+   * `provider` vocabulary. Folding collapses auth0, okta and every custom
+   * OIDC connection into `oidc`, so a user holding one live identifier under
+   * that bucket and unlinking a DIFFERENT enterprise account matched the one
+   * they still use and detached it — losing them a working sign-in. Keying on
+   * the verbatim id makes the fallback strictly narrower: an identifier the
+   * backfill adopted carries it, so the historical rows this exists for are
+   * still found.
    */
   findIdentifierIdForAccount(args: {
     userId: string;
     accountId: string;
-    provider: IdentifierProvider;
+    providerId: string;
   }): Promise<string | null>;
 }

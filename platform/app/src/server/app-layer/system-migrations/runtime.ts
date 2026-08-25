@@ -27,6 +27,8 @@ import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migr
 import {
   connectionGrandfatherMigration,
   identifierBackfillMigration,
+  identityNewbornReconciliation,
+  identitySecretHealMigration,
 } from "../identity/runtime";
 import {
   migrationRunsOnThisInstallation,
@@ -107,6 +109,7 @@ function declarationOf({
     description: migration.description,
     requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    enrolledAutomatically: migration.enrolledAutomatically,
     tenant,
   };
 }
@@ -145,7 +148,11 @@ export function registeredMigrations(): SystemMigration[] {
  * the tenant axis differs.
  */
 export function registeredUserMigrations(): SystemMigration[] {
-  return [identifierBackfillMigration()];
+  // The heal pass rides beside the backfill rather than inside it: the user
+  // it repairs is FINALIZED, and the runner skips a terminal record, so a
+  // step inside the backfill would never run for exactly the population that
+  // needs it (ADR-116 §4).
+  return [identifierBackfillMigration(), identitySecretHealMigration()];
 }
 
 const senders = async () => (await authzGrantsCommands()).commands;
@@ -229,53 +236,91 @@ const authzEngineLedger: AuthzEngineLedger = {
 };
 
 /**
+ * Which registered migrations admit every cloud tenant with no enrollment
+ * row, by name. Read from the migrations themselves so the declaration and
+ * the cohort can never disagree; a name nothing registered answers to is
+ * absent, which reads as "not automatic" - the safe side.
+ */
+function automaticallyEnrolledMigrationNames(): Set<string> {
+  return new Set(
+    [...registeredMigrations(), ...registeredUserMigrations()]
+      .filter((migration) => migration.enrolledAutomatically)
+      .map((migration) => migration.name),
+  );
+}
+
+/**
  * The runner's cohort for one pass, per (tenant, migration). On cloud every
  * enrollment is read ONCE here, fresh at the start of every pass - one
  * query instead of one per tenant per migration, and an enrollment or
- * withdrawal takes effect on the very next pass with no restart.
- * Self-hosted includes every organization for every migration the
- * installation runs at all.
+ * withdrawal takes effect on the very next pass with no restart. A migration
+ * declaring `enrolledAutomatically` admits every organization without
+ * consulting that read at all - including one running a private data plane,
+ * whose organization-rooted appends the event store already places on its
+ * own instance. Self-hosted includes every organization for every migration
+ * the installation runs at all.
  */
 export async function migrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => boolean
 > {
   const isSaaS = env.IS_SAAS === true;
+  const automatic = automaticallyEnrolledMigrationNames();
+  // Still read on cloud, and still fresh: the migrations that have not
+  // declared themselves automatic are paced by exactly these rows.
   const enrolledByMigration = isSaaS
     ? await enrollmentRepository.findEnrolledOrganizationIdsByMigration()
     : new Map<string, Set<string>>();
   return ({ tenantId, migrationName }) =>
     organizationMigrates({
       isSaaS,
+      enrolledAutomatically: automatic.has(migrationName),
       enrolled: enrolledByMigration.get(migrationName)?.has(tenantId) ?? false,
     });
 }
 
 /**
- * The user-rooted pass's cohort. Enrollment stays the one pacing lever
- * (ADR-110: a switch, not a programme): the ops page enrolls ORGANIZATIONS,
- * and a user is in a user-rooted migration's cohort when any organization
- * they belong to is enrolled for it. Self-hosted admits every user, as it
- * admits every organization. Enrollment is read once, fresh, at the start of
- * each pass; membership is answered per candidate user with two cheap
- * indexed reads rather than materializing every enrolled organization's
- * member list into memory (the runner visits each user once per pass).
- * Members of private-dataplane organizations are excluded exactly as those
- * organizations are. A user outside every organization has nothing
- * to enroll them on cloud and stays on the legacy path until they join one;
- * their sign-in is unaffected (the write gate answers false; the D03 read
- * fork falls back to legacy routing).
+ * The user-rooted pass's cohort. For a migration still paced by enrollment -
+ * every user-rooted migration registered today - the ops page enrolls
+ * ORGANIZATIONS, and a user is in the cohort when any organization they
+ * belong to is enrolled for it. Self-hosted admits every user, as it admits
+ * every organization. Enrollment is read once, fresh, at the start of each
+ * pass; membership is answered per candidate user with two cheap indexed
+ * reads rather than materializing every enrolled organization's member list
+ * into memory (the runner visits each user once per pass). Members of
+ * private-dataplane organizations are excluded exactly as those
+ * organizations are. A user outside every organization has nothing to enroll
+ * them on cloud and stays on the legacy path until they join one; their
+ * sign-in is unaffected (the write gate answers false; the D03 read fork
+ * falls back to legacy routing).
+ *
+ * A user-rooted migration declaring `enrolledAutomatically` admits every
+ * user instead, private-dataplane members still excepted - the same rule the
+ * organization cohort applies, on this axis.
  */
 export async function userMigrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => Promise<boolean>
 > {
   if (env.IS_SAAS !== true) return async () => true;
+  const automatic = automaticallyEnrolledMigrationNames();
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
   // The same exclusion the organization cohort applies: a private-dataplane
   // organization is never swept up, and neither are its members - a user's
   // identity events would otherwise land in the shared platform log while
-  // the organization's own data stays on its private instance.
+  // the organization's own data stays on its private instance. It survives
+  // an automatic enrollment too: that declaration widens WHO the rollout
+  // reaches, and this exclusion is not pacing but where the events land.
   const privateOrganizationIds = [...getPrivateClickHouseUrls().keys()];
+  const belongsToPrivateDataplane = async (
+    userId: string,
+  ): Promise<boolean> => {
+    if (privateOrganizationIds.length === 0) return false;
+    const membership = await prisma.organizationUser.findFirst({
+      where: { userId, organizationId: { in: privateOrganizationIds } },
+      select: { userId: true },
+    });
+    return membership !== null;
+  };
   const enrolledPublicByMigration = new Map<string, string[]>();
   for (const migration of registeredUserMigrations()) {
     enrolledPublicByMigration.set(
@@ -286,18 +331,12 @@ export async function userMigrationPassCohort(): Promise<
     );
   }
   return async ({ tenantId, migrationName }) => {
+    if (automatic.has(migrationName)) {
+      return !(await belongsToPrivateDataplane(tenantId));
+    }
     const organizationIds = enrolledPublicByMigration.get(migrationName) ?? [];
     if (organizationIds.length === 0) return false;
-    if (privateOrganizationIds.length > 0) {
-      const privateMembership = await prisma.organizationUser.findFirst({
-        where: {
-          userId: tenantId,
-          organizationId: { in: privateOrganizationIds },
-        },
-        select: { userId: true },
-      });
-      if (privateMembership !== null) return false;
-    }
+    if (await belongsToPrivateDataplane(tenantId)) return false;
     const enrolledMembership = await prisma.organizationUser.findFirst({
       where: { userId: tenantId, organizationId: { in: organizationIds } },
       select: { userId: true },
@@ -328,6 +367,10 @@ function mergeSummaries(
     alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
     alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
     claimed: a.claimed + b.claimed,
+    // Summed like any other count: the convergence loop stops when a whole
+    // pass - both legs - moved nothing, so one leg still advancing has to
+    // keep the merged answer non-zero.
+    advanced: a.advanced + b.advanced,
   };
 }
 
@@ -354,11 +397,10 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
  * The same per-organization claim as a full pass (so a targeted run can
  * never double-drive an organization a pass is working through; a summary
  * counting the organization as claimed is what the service turns into a
- * retry-shaped refusal), the same cohort read (enrollment stays the pacing
- * source of
- * truth even here - the service refuses unenrolled organizations before
- * composing this, and the cohort would skip them anyway), a tenant source
- * of exactly one id, and the migration list cut to the one asked for.
+ * retry-shaped refusal), the same cohort read (the cohort stays the source
+ * of truth even here - the service refuses an organization outside it before
+ * composing this, and the cohort would skip it anyway), a tenant source of
+ * exactly one id, and the migration list cut to the one asked for.
  */
 export async function runSystemMigrationTargetedPass({
   organizationId,
@@ -372,8 +414,8 @@ export async function runSystemMigrationTargetedPass({
   const redis = tryGetApp()?.redis ?? null;
   // A user-rooted migration's targeted run keeps the operator's org-shaped
   // lever: the named organization's MEMBERS are the tenants (the service
-  // already refused an unenrolled organization, so every member the source
-  // yields is the cohort).
+  // already refused an organization outside the cohort, so every member the
+  // source yields is the cohort).
   const userMigration = userMigrationsForThisInstallation().find(
     (migration) => migration.name === migrationName,
   );
@@ -381,8 +423,9 @@ export async function runSystemMigrationTargetedPass({
     // The same exclusion `userMigrationPassCohort` applies: a
     // private-dataplane organization's members are never swept up - their
     // identity events would land in the shared platform log while the
-    // organization's own data stays on its private instance - and enrollment
-    // alone does not carry that rule, so the targeted run refuses outright.
+    // organization's own data stays on its private instance - and neither
+    // enrollment nor an automatic declaration carries that rule, so the
+    // targeted run refuses outright.
     if (
       env.IS_SAAS === true &&
       getPrivateClickHouseUrls().has(organizationId)
@@ -464,7 +507,10 @@ export async function runSystemMigrationPass(args?: {
   const userCohort =
     userMigrations.length === 0 ? null : await userMigrationPassCohort();
   const organizationSummary = await runner.runPass({ signal: args?.signal });
-  if (userCohort === null) return organizationSummary;
+  if (userCohort === null) {
+    await sweepAbandonedNewborns();
+    return organizationSummary;
+  }
   const userRunner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
@@ -472,8 +518,36 @@ export async function runSystemMigrationPass(args?: {
     cohort: userCohort,
     migrations: userMigrations,
   });
-  return mergeSummaries(
+  const summary = mergeSummaries(
     organizationSummary,
     await userRunner.runPass({ signal: args?.signal }),
   );
+  await sweepAbandonedNewborns();
+  return summary;
+}
+
+/**
+ * The born-finalized entrance's reconciliation sweep (ADR-116 §3), on the
+ * same cadence as the passes and never terminal — a required companion to the
+ * entrance rather than optional hygiene.
+ *
+ * A LEG of the pass rather than a registered `SystemMigration`, because what
+ * it hunts has no tenant a runner could visit. The runner drives the tenants
+ * a source enumerates, and the user tenant source enumerates `User` rows; an
+ * abandoned entrance is precisely a claim with no user row behind it, so a
+ * per-tenant migration would never reach one.
+ *
+ * Its failure is never the pass's: the sweep removes rows the pass did not
+ * write, and a pass that reported nothing because a sweep threw would hide
+ * the migration outcome an operator asked for.
+ */
+async function sweepAbandonedNewborns(): Promise<void> {
+  try {
+    await identityNewbornReconciliation().runPass();
+  } catch (error) {
+    logger.warn(
+      { error },
+      "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+    );
+  }
 }

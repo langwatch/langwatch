@@ -48,6 +48,7 @@ function serviceWith({
         description: name,
         requiresOperatorConfirmation: false,
         runsAutomaticallyOnSelfHosted: false,
+        enrolledAutomatically: false,
       })),
     isSaaS: () => isSaaS,
     enrollments: {

@@ -11,7 +11,9 @@
  */
 import { IdentityVerificationInvalidError } from "@langwatch/identity";
 import type { TRPCError } from "@trpc/server";
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as IdentityRuntime from "~/server/app-layer/identity/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityRouter } from "../identity";
 
@@ -19,19 +21,80 @@ const { mockComplete } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
-// The router reaches the runtime for the ceremony; the module graph behind
-// it (auth -> better-auth) reaches the same module for the hooks, so the
-// whole composition root is stubbed rather than a slice of it.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
-  identityCeremonies: () => ({
-    beforeAccountCreate: async () => undefined,
-    beforeAccountDelete: async () => undefined,
-    beforeUserDelete: async () => undefined,
-  }),
-  identityEmail: () => ({ resolveEmail: async () => null }),
-  isLatched: async () => false,
+/**
+ * The router reaches the runtime for the ceremony; the module graph behind
+ * it (auth -> better-auth) reaches the same module for the hooks and for
+ * better-auth's whole `database:` entry, so the composition root is stubbed
+ * WHOLE rather than a slice of it.
+ *
+ * The return type is what keeps it whole. A missing export is a module-load
+ * crash ("No X export is defined on the mock") that only shows up in the
+ * suite that happens to trip it; typed as the runtime's own key set, the
+ * same drift is a typecheck failure on this file instead. The VALUES stay
+ * deliberately partial — each stub answers only what this suite drives.
+ */
+/**
+ * The tRPC mutation pipeline audits every mutation, and the audit writer
+ * reaches Prisma — which in a unit test is a connection refusal, not a
+ * behaviour. Stubbed the way every other audited router suite stubs it; the
+ * audit trail's own content is not this suite's claim.
+ */
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
 }));
+
+vi.mock(
+  "~/server/app-layer/identity/runtime",
+  (): Record<keyof typeof IdentityRuntime, unknown> => ({
+    verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
+    identityCeremonies: () => ({
+      beforeAccountCreate: async () => undefined,
+      beforeAccountDelete: async () => undefined,
+      beforeUserDelete: async () => undefined,
+    }),
+    identityEmail: () => ({ resolveEmail: async () => null }),
+    identityService: () => ({}),
+    identityGuards: () => ({}),
+    identityProjectionStore: () => ({}),
+    identityBridgeCeremonies: () => ({
+      beforeAccountCreate: async () => undefined,
+      beforeAccountDelete: async () => undefined,
+    }),
+    identityBackfill: () => ({}),
+    identifierBackfillMigration: () => ({}),
+    identityBirth: () => ({}),
+    identityNewbornReconciliation: () => ({}),
+    identitySecretCarry: () => ({}),
+    identitySecretHealMigration: () => ({}),
+    isLatched: async () => false,
+    isAnyoneLatched: async () => false,
+    // A value, not a factory: the runtime exports the birth-aware gate itself
+    // so the adapter and the databaseHooks bridge fork on one closure.
+    routesToIdentityBranch: async () => false,
+    // `betterAuth()` builds its adapter EAGERLY at module load, so this one
+    // has to be real enough to initialise. better-auth's own memory engine
+    // over an empty store is exactly that, and it holds nothing this suite
+    // could accidentally assert against.
+    identityStorageAdapter: () => memoryAdapter({}),
+    // The rest of the runtime's surface, named because the mock's own return
+    // type is `Record<keyof typeof IdentityRuntime, unknown>` — a new export
+    // that is not listed here fails the typecheck rather than silently
+    // resolving to `undefined` at the call site. None of these are reached:
+    // this suite calls `completeEmailVerification` and nothing else, so they
+    // stay inert rather than being modelled.
+    connectionGrandfatherMigration: () => ({}),
+    joinRequests: () => ({}),
+    joinRequestsService: () => ({}),
+    // These two are re-exported from ./signin-method-policy rather than built
+    // here, so they are the functions themselves, not factories returning one.
+    deploymentIsFederationCapable: () => false,
+    resolveSignInMethodPolicy: async () => ({}),
+    signInDomainRoutingPort: () => ({}),
+    signInRouter: () => ({}),
+    signUpVerification: () => ({}),
+    ssoConnections: () => ({}),
+  }),
+);
 
 /** A syntactically valid RFC 7636 verifier (43-128 unreserved characters). */
 const VERIFIER = "a".repeat(43);

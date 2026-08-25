@@ -95,16 +95,31 @@ export class ExperimentTypeMismatchError extends HandledError {
  *
  * `currentVersion` rides in `meta` because reloading is the whole remedy and a
  * client that already holds the newer state can act on the number without a
- * second round trip.
+ * second round trip. `actorLabel` rides with it so the page can name who wrote
+ * the newer version instead of telling the reader it came from "somewhere
+ * else" when it came from Langy, in that very tab.
  */
 export class StaleWorkbenchStateError extends HandledError {
   declare readonly code: "experiment_stale_workbench_state";
 
-  constructor({ currentVersion }: { currentVersion: number }) {
+  constructor({
+    currentVersion,
+    actorLabel,
+  }: {
+    currentVersion: number;
+    actorLabel?: string;
+  }) {
     super(
       "experiment_stale_workbench_state",
       "This evaluation changed since you loaded it",
-      { httpStatus: 409, fault: "customer", meta: { currentVersion } },
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: {
+          currentVersion,
+          ...(actorLabel !== undefined ? { actorLabel } : {}),
+        },
+      },
     );
     this.name = "StaleWorkbenchStateError";
   }

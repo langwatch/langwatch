@@ -141,6 +141,11 @@ describe("the legacy sso string columns", () => {
           // Prisma's own generated model module names every write method for
           // every table; it is the client, not a caller.
           if (file.startsWith("generated/")) continue;
+          // Scaffolding shared between suites. It lives outside `__tests__`
+          // so several of them can import it, but it is no more a production
+          // writer than they are -- and prose that spells the call it is
+          // explaining it does NOT make reads as a caller to this scanner.
+          if (file.startsWith("test-utils/")) continue;
           if (writes.test(readFileSync(join(root, file), "utf8"))) {
             offenders.push(file);
           }

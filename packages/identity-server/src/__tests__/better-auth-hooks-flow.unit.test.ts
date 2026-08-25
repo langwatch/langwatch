@@ -40,7 +40,12 @@ import { newIdentityCommandId } from "../identity-command-id";
 import type { IdentityLedger } from "../identity-ledger";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import { IdentityService } from "../identity.service";
+import {
+  InMemoryIdentityEventStore,
+  inMemoryIdentityLedger,
+} from "./support/in-memory-event-store";
 import { InMemoryHeads, T0 } from "./support/in-memory-heads";
+import { InMemoryReservations } from "./support/in-memory-reservations";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 
@@ -52,21 +57,10 @@ function harness() {
   const commands: IdentityCommand[] = [];
   const gateOpen = { value: false };
 
-  /** The ledger, folding straight into the heads: what the app's pipeline
-   *  does once ClickHouse holds the append and the projection catches up. */
-  const ledger: IdentityLedger = {
-    async commit({
-      command,
-      facts,
-    }: {
-      command: IdentityCommand;
-      facts: IdentityFactInput[];
-    }): Promise<IdentityFact[]> {
-      commands.push(command);
-      heads.fold((command.data as { userId: string }).userId, facts, T0);
-      return facts.map((f) => ({ ...f, occurredAt: T0 }) as IdentityFact);
-    },
-  };
+  /** The event store the ledger appends through, idempotency and all: the
+   *  same double every in-memory identity stack runs on. */
+  const events = new InMemoryIdentityEventStore();
+  const ledger = inMemoryIdentityLedger({ heads, events, commands });
 
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},
@@ -74,9 +68,17 @@ function harness() {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
+    async findUserIdByEmail({ normalizedValue }) {
+      const row = db.user?.find(
+        (candidate) =>
+          typeof candidate.email === "string" &&
+          candidate.email.toLowerCase() === normalizedValue.toLowerCase(),
+      );
+      return typeof row?.id === "string" ? row.id : null;
+    },
   };
 
-  const identity = new IdentityService(new IdentityGuards(heads), ledger);
+  const identity = new IdentityService(new IdentityGuards(heads, users, new InMemoryReservations()), ledger);
   const ceremonies = new IdentityCeremonies(
     heads,
     users,
@@ -230,6 +232,9 @@ describe("better-auth over the databaseHooks seam", () => {
         ).internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          // better-auth 1.7 keys an account by `(issuer, accountId)`, and
+          // synthesises this issuer for a provider with none of its own.
+          issuer: "local:oauth:google",
           accountId: "sub-google-1",
         });
 

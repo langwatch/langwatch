@@ -1,3 +1,4 @@
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { trackServerEvent } from "~/server/posthog";
 
@@ -32,6 +33,10 @@ export async function createCredentialUser({
         userId: user.id,
         type: "credential",
         provider: "credential",
+        // better-auth 1.7 looks a credential row up by `(issuer, accountId)`.
+        // A row written without the issuer is a row it cannot see, so the
+        // account created here would be told its own password is wrong.
+        issuer: issuerForProviderId("credential"),
         providerAccountId: user.id,
         password: passwordHash,
       },
@@ -76,6 +81,7 @@ export async function createPasskeyUser({
         userId: user.id,
         type: "credential",
         provider: "credential",
+        issuer: issuerForProviderId("credential"),
         providerAccountId: user.id,
         password: null,
       },

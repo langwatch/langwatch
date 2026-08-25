@@ -176,6 +176,15 @@ A flagged sign-up (the opt-in sign-in page → backend feature-flag check, per
 organization/allowlist) sets a request-scoped marker at the auth route
 boundary (AsyncLocalStorage).
 
+The reach of that boundary is narrower than it looks today, and saying so is
+part of the decision: the product's own sign-up posts to the tRPC
+`user.register` procedure, which writes the `User` row through Prisma and
+never calls `auth.api.signUpEmail`, so it does not pass the entrance at all.
+The entrance is reachable only by a client calling better-auth's sign-up route
+directly. Routing `user.register` through `auth.api.signUpEmail` is future
+work, and it is a precondition of the general rollout this entrance is
+hardened for.
+
 **The marker governs every routed write in that request**, not only the
 `user` create. better-auth creates the user and then, in the same request,
 the credential account; that second write is routed by the gate, and the
@@ -193,15 +202,46 @@ an **idempotent sequence with retries**, not an atomic ceremony.
 Ids are minted once per sign-up and reused by every retry: the `commandId`
 is the event store's idempotency key (D01 — a retried command dedupes rather
 than appending twice), the identifier id is deterministic (D01), and the
-newborn's user id is pinned to the flow. The legs, in order:
+newborn's user id is pinned to the flow.
 
-1. the **waited idempotent append** of the attach facts;
-2. **one Postgres transaction** over the row writes — the user row, the
-   `AccountCredential` row and the `finalized` migration-state row. These
+Before any leg runs, the entrance **claims** the newborn's tenant: its
+migration-state row is written at `migrated`, carrying a born report. Only
+`finalized` opens the write gate, so the claim grants nothing; what it
+leaves behind is a handle, and the residual below is what needs one. The
+legs, in order:
+
+1. the **idempotent attach command, staged** onto the per-user queue. The
+   queued run is the sole appender (ADR-110's shape: appending on the calling
+   path as well and staging afterwards writes every fact twice, because the
+   staged run re-executes the guard against heads the fold has not advanced
+   yet). Staging is what fails loudly when the engine is unavailable, and it
+   happens before any row exists on either branch;
+2. **one Postgres transaction** over the row writes the entrance itself
+   performs — the user row and the `finalized` migration-state row. These
    *can* share a transaction: they are one store;
-3. the **fold staged onto the queue**, with the ceremonies' bounded wait.
-   The fold skips harmlessly and retries while the user row is not yet
-   visible.
+3. the **bounded wait** on the fold. The fold skips harmlessly and retries
+   while the user row is not yet visible.
+
+Nothing after leg two may fail the sign-up. Once the transaction commits, the
+user exists and is `finalized`; a throw from the observation that follows
+would leave a user nothing owns, since the runner skips terminal tenants and
+the sweep hunts claims with no user row behind them.
+
+The pinned user id is a convergence key for a RETRY of one birth, never a
+claim on a user who already exists. Normalization strips plus-tags, so
+`sam+x@acme.com` derives the id `sam@acme.com` was born under; adopting
+whatever row stands at that id would hand the second signer a session as the
+first. An occupied pinned id is refused with `identity_email_in_use` before
+any fact is stated.
+
+The `AccountCredential` row sits outside that transaction, and better-auth
+is what puts it there. `signUpEmail` runs `createUser` and then
+`linkAccount`, with `databaseHooks.user.create.after` firing between them —
+and this application's after-create hook writes rows that FK the user. The
+user row therefore cannot be deferred past its own create to join a later
+transaction, so the credential row is written by the account create that
+follows, on the identity branch, routed there by the marker. Both rows
+exist when sign-up returns, which is what the spec pins.
 
 If any leg fails, the sign-up fails and the retry re-executes **every** leg.
 Already-done legs are no-ops — the append dedupes on the command id, the row
@@ -213,7 +253,10 @@ row commit leaves facts under a tenant that never gained a user row. Nothing
 serves them — the fold declines to project a user that does not exist, and
 resolution reads resolve nothing — and a **reconciliation sweep removes
 orphaned newborn streams**. That sweep is a required companion to this
-entrance, not optional hygiene.
+entrance, not optional hygiene, and the claim is what it hunts by: the event
+store exposes no aggregate enumeration, and an entrance that dies before the
+row commit staged no fold either — so without the claim the orphan would
+leave nothing anything could find it by.
 
 This deliberately re-couples flagged sign-up to engine availability — the
 coupling the authz programme removed ("born-on-engine"). It is accepted
@@ -257,11 +300,20 @@ against a stale `Account` row and wrongly reject their sign-in.
 
 *Reverse:* a finalized user's secret write can land on the legacy branch
 anyway — deterministically for up to `IDENTITY_WRITE_GATE_TTL_MS` per pod
-immediately after their latch, and during any gate-cache failure. So the
-heal pass gains a **secrets leg**: where an `Account` row's secret columns
-are newer than the matching `AccountCredential` row (`updatedAt`
-comparison), they are copied back. Without the reverse leg, a password
-changed in that window is rejected forever.
+immediately after their latch, and during any gate-cache failure. So a
+**secrets leg** runs: where an `Account` row's secret columns are newer than
+the matching `AccountCredential` row (`updatedAt` comparison), they are
+copied back. Without the reverse leg, a password changed in that window is
+rejected forever.
+
+It runs as its own identity migration pass rather than as a step of the
+backfill, and the runner is why. `finalized` is terminal and the runner
+skips terminal tenants, so a step inside the backfill would visit held users
+and never the latched population this leg exists for — which is precisely
+the population whose secrets can still land on the legacy branch. The heal
+therefore carries its own state row and never finalizes it: it reports
+`migrated` on every pass, the runner's existing shape for work that is never
+done.
 
 With both legs, either branch authenticates a user correctly at any moment,
 and "fail closed toward legacy" keeps meaning "sign-in never breaks". The
@@ -320,6 +372,24 @@ verified identifiers through the resolution read, so it cannot claim one.
 Unverified (`ATTACHED`) identifiers block nobody — verify is the choke
 point both ways, so there is no squatting.
 
+**Those are reads, and a read cannot decide a race**, so a Postgres row-truth
+**address lock** (`IdentifierReservation`, keyed by the normalized value)
+decides it. The claim is taken atomically before the verification proof is
+consumed and before any fact is appended: the loser is refused synchronously
+with `identity_email_in_use`, and the event log never records a verification
+that did not hold. The born-finalized entrance claims through the same lock,
+so the two entrances contend on one constraint. It is a LOCK, not a truth
+table — `Identifier` remains the record of who holds which sign-in method —
+so the fold RELEASES a claim when its identifier stops carrying the value
+(detached, dead-ended, erased), and the identity sweep reaps a claim whose
+fact never landed.
+
+The lock is the only place this can live. A unique constraint on
+`Identifier.value` is unsound at any width: one user legitimately holds
+several proven identifiers carrying one address — a credential sign-in and a
+Google sign-in are two VERIFIED rows with the same email — so "one USER per
+proven address" is not a row-level rule about that table.
+
 **The account model's id is the identifier's pinned account id.** The
 identity branch presents `Identifier.accountId` — the KSUID pinned at
 attach, or carried across by adoption — as the `account` model's id,
@@ -335,6 +405,67 @@ presentation registry; `identity_engine_unavailable`,
 registry with the adapter. On the change-email path the guard refusal runs
 **before** the verification proof is consumed, so a refusal never burns the
 token.
+
+### 6b. A provider subject is unique per connection
+
+The IdP callback's lookup keys on better-auth's own `providerId`, verbatim,
+paired with the provider's subject — never on `Identifier.provider`, which is
+the FOLDED vocabulary that collapses auth0, okta and every custom OIDC
+connection into `oidc`. An OIDC `sub` is unique only *within* an issuer, so
+matching the fold let one enterprise IdP's subject resolve another IdP's
+user: a cross-tenant sign-in, and a regression against legacy, where
+`Account` has always been unique on the verbatim pair. A partial unique index
+on `(providerId, providerAccountId)` over the live states now enforces the
+same guarantee on `Identifier`.
+
+It is unique where `value` is not, and the asymmetry is not an oversight. One
+user legitimately holds several proven identifiers carrying the same
+*address* — a password sign-in and a Google sign-in are two rows with one
+email — which is why address uniqueness lives in `IdentifierReservation`
+rather than in a column constraint. A provider *subject* names exactly one
+account at exactly one IdP, so two live identifiers sharing one are always
+either a duplicate or a takeover.
+
+**The forward constraint, which is load-bearing.** The real invariant is that
+a subject is unique **per connection**. `providerId` stands in for the
+connection today only because there is exactly one connection per configured
+provider — `auth0`, `okta`, `cognito`, `onelogin`, `oidc`. That is about to
+stop being a safe assumption: Auth0 is a broker today, and it namespaces
+every enterprise customer behind one `providerId: "auth0"`, which is why
+collisions are currently rare. After the exit (D09/D10) each customer
+connects to us directly, minting subjects however their own IdP does —
+sequential integers and email addresses included — and the count of distinct
+connections goes from a handful to one per enterprise customer.
+
+So when connections become data (D04), **every connection MUST get its own
+distinct provider id, or the index MUST be extended to include
+`connectionId`.** A world in which many customer connections share one
+provider id — `oidc`, built from the `OIDC_*` env vars, is the one to watch —
+re-opens exactly the cross-tenant sign-in this closes. Until then the
+invariant is pinned by a test asserting that no two configured providers
+collapse onto the same provider id.
+
+The fold stays total if the constraint is ever violated anyway: the incumbent
+keeps the subject and the newcomer is parked with a WARN naming both
+identifier ids and both users, rather than the projection stopping for
+everybody. What that costs the losing user depends on where they are, and
+only one case is contained. A user still being backfilled is revisited every
+pass, the missing identifier shows up as a parity diff, and they stay HELD
+with a report — the system saying "not right yet". A user who has already
+`finalized` is NOT revisited: `finalized` is terminal and the runner
+short-circuits on it, so a latched user linking a new enterprise account whose
+subject collides ends up with that identifier permanently absent from the
+projection and nothing scheduled that would notice. Their `Account` bridge row
+is still written, so what covers them is the legacy fallback this ADR exists
+to retire, and the WARN is the only signal. (An unlatched user cannot reach
+this at all — their ceremonies state no facts.)
+
+Closing that second case means refusing the collision at COMMAND time instead
+of parking it at fold time: a subject lock mirroring `IdentifierReservation`'s
+address lock, so the attach is refused synchronously and the customer is told
+at link time. Follow-up rather than a blocker, because the unique index makes
+the collision unreachable from the data we have — the park is a net, not a
+hole.
 
 ### 7. Upgrade discipline — the honest cost
 

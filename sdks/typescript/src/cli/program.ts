@@ -749,6 +749,65 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }
   });
 
+  // `langwatch ingest context`: the agent declares the repository and branch
+  // it is working on, run from inside the checkout. Visible, because its
+  // audience IS the agent reading `--help`: the always-loaded guidance the
+  // CLI installs names this command, and the agent runs it when it switches
+  // repository, branch or worktree mid-session. Renders its own result (one
+  // plain line) and never exits non-zero, so a declaration can never be why
+  // a session broke.
+  rendersOwnResult(
+    ingestCmd
+      .command("context")
+      .description(
+        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
+      )
+      .option(
+        "--session-id <id>",
+        "declare for this session instead of resolving the live one",
+      )
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex or opencode",
+      ),
+  ).action(async (options: { sessionId?: string; agent?: string }) => {
+    try {
+      const { contextCommand } = await import("./commands/ingestion/context.js");
+      await contextCommand(options);
+    } catch {
+      // Never break the session the agent runs this from.
+    }
+  });
+
+  // `langwatch ingest guidance <tool>`: prints the declare-your-context
+  // guidance as SessionStart additionalContext JSON. Hidden: nobody types
+  // this, the session-hooks install writes it into claude's settings for
+  // installs without plugin support (the plugin carries its own copy).
+  rendersOwnResult(
+    ingestCmd
+      .command("guidance <tool>", { hidden: true })
+      .description(
+        "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
+      ),
+  ).action(async (tool: string) => {
+    try {
+      if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
+      const { SESSION_CONTEXT_GUIDANCE } = await import(
+        "./utils/governance/session-guidance.js"
+      );
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: SESSION_CONTEXT_GUIDANCE,
+          },
+        })}\n`,
+      );
+    } catch {
+      // A hook is never allowed to be why a session broke.
+    }
+  });
+
   const governanceCmd = program
     .command("governance")
     .description(
@@ -2897,6 +2956,167 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteGraphCommand: impl } = await import("./commands/graphs/delete.js");
       return impl(id);
+    },
+  );
+
+  // Add chart command group — saved LangWatchQL workbench charts
+  const chartCmd = program
+    .command("chart")
+    .description("Manage saved LangWatchQL charts and place them on dashboards");
+
+  emitsResult(
+    chartCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write chart SQL against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { chartSchemaCommand: impl } = await import("./commands/charts/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("list")
+      .description("List the project's saved charts")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listChartsCommand: impl } = await import("./commands/charts/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("get <id>")
+      .description("Get a saved chart by ID — its SQL, parameters, specification and placement")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getChartCommand: impl } = await import("./commands/charts/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("create")
+      .description("Save a LangWatchQL chart from a statement, parameters and an optional Vega-Lite specification")
+      .requiredOption("--name <name>", "Chart name")
+      .option("--sql <sql>", "The LangWatchQL statement")
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      sql?: string;
+      sqlFile?: string;
+      param?: string[];
+      specFile?: string;
+      project?: string;
+    }) => {
+      const { createChartCommand: impl } = await import("./commands/charts/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("update <id>")
+      .description("Update a saved chart's name or definition")
+      .option("--name <name>", "New chart name")
+      .option("--sql <sql>", "New LangWatchQL statement")
+      .option("--sql-file <path>", "Read the new statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "New Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        sql?: string;
+        sqlFile?: string;
+        param?: string[];
+        specFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateChartCommand: impl } = await import("./commands/charts/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("delete <id>")
+      .description("Delete a saved chart")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteChartCommand: impl } = await import("./commands/charts/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("run <id>")
+      .description("Run a saved chart's statement and print the result")
+      .option("--start <datetime>", "Period start for statements declaring {period_start:DateTime}")
+      .option("--end <datetime>", "Period end for statements declaring {period_end:DateTime}")
+      .option("--granularity <seconds>", "Datapoint step for statements declaring {period_granularity_seconds:UInt32}")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: { start?: string; end?: string; granularity?: string; project?: string },
+    ) => {
+      const { runChartCommand: impl } = await import("./commands/charts/run.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("place <id>")
+      .description("Place a saved chart on a dashboard")
+      .requiredOption("--dashboard-id <id>", "Dashboard to place the chart on")
+      .option("--grid-column <n>", "Grid column")
+      .option("--grid-row <n>", "Grid row (allocated automatically when omitted)")
+      .option("--col-span <n>", "Column span")
+      .option("--row-span <n>", "Row span")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        dashboardId?: string;
+        gridColumn?: string;
+        gridRow?: string;
+        colSpan?: string;
+        rowSpan?: string;
+        project?: string;
+      },
+    ) => {
+      const { placeChartCommand: impl } = await import("./commands/charts/place.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("unplace <id>")
+      .description("Remove a saved chart from its dashboard")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
+      return impl(id, options);
     },
   );
 

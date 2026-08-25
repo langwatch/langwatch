@@ -16,6 +16,7 @@ import type {
   BackfillUserRow,
 } from "../identity-backfill.repository";
 import { IdentityBackfillService } from "../identity-backfill.service";
+import { IdentitySecretCarryService } from "../identity-secret-carry.service";
 
 const USER = "user_sam";
 const USER_CREATED_AT = Date.UTC(2023, 2, 14, 9, 30);
@@ -36,6 +37,9 @@ function googleAccount(): BackfillAccountRow {
   return {
     id: "acc_google",
     provider: "google",
+    // The row's own issuer, which the adoption carries onto the fact rather
+    // than re-deriving — Google's is a real URL, not a synthetic form.
+    issuer: "https://accounts.google.com",
     providerAccountId: "google-sub-123",
     createdAtMs: ACCOUNT_CREATED_AT,
   };
@@ -105,6 +109,7 @@ function harness(options?: {
     return [];
   });
 
+  const carried: string[] = [];
   const service = new IdentityBackfillService(
     {
       findUser: async () => user,
@@ -115,15 +120,36 @@ function harness(options?: {
       storeUserHashKeyIfMissing: async (args) => {
         minted.push(args);
       },
-      // The backfill never reads it - the plan takes the email off the user
-      // row it already read - but the double is the whole port.
+      // The backfill never reads either of these - the plan takes the email
+      // off the user row it already read, and the collision guard is the one
+      // asking who holds an address - but the double is the whole port.
       findEmail: async () => user?.email ?? null,
+      findUserIdByEmail: async () => null,
     },
     { attachIdentifier, verifyIdentifier, detachIdentifier },
+    // The latch's secret carry (ADR-116 §4). Recorded rather than performed:
+    // WHEN it runs is this pass's contract — only for a user the proof
+    // finalized — and WHAT it copies is its own suite's.
+    new IdentitySecretCarryService({
+      findAccountSecretPairs: async () => {
+        carried.push("looked");
+        return [];
+      },
+      insertCredentialIfMissing: async () => true,
+      overwriteCredential: async () => undefined,
+    }),
     { now: () => 1_800_000_000_000 },
   );
 
-  return { service, rows, minted, attachIdentifier, verifyIdentifier, detachIdentifier };
+  return {
+    service,
+    rows,
+    minted,
+    carried,
+    attachIdentifier,
+    verifyIdentifier,
+    detachIdentifier,
+  };
 }
 
 describe("the identifier backfill pass", () => {
@@ -166,6 +192,18 @@ describe("the identifier backfill pass", () => {
         .map(([data]) => data.commandId);
       expect(secondIds).toEqual(firstIds);
     });
+
+    it("carries the user's secrets across only once the proof finalizes them", async () => {
+      const { service, carried } = harness();
+
+      await service.migrateUser({ userId: USER });
+
+      // ADR-116 §4: before the latch every secret they can sign in with
+      // lives only in `Account`; after the gate opens their sign-in reads
+      // `AccountCredential`. A finalization without this step latches a user
+      // whose very next sign-in verifies against an empty credential row.
+      expect(carried).toEqual(["looked"]);
+    });
   });
 
   describe("when an adopted Account row is gone on a later pass", () => {
@@ -206,7 +244,7 @@ describe("the identifier backfill pass", () => {
 
   describe("when the fold-built rows disagree with what the live rows imply", () => {
     it("holds the user at migrated with a diff report, never finalizes", async () => {
-      const { service } = harness({ applyCeremonies: false });
+      const { service, carried } = harness({ applyCeremonies: false });
 
       const outcome = await service.migrateUser({ userId: USER });
 
@@ -215,6 +253,10 @@ describe("the identifier backfill pass", () => {
       const diffs = (outcome.report as { diffs: Array<{ kind: string }> }).diffs;
       expect(diffs.length).toBeGreaterThan(0);
       expect(diffs[0]?.kind).toBe("identifier_missing");
+      // A held user's `Account` rows are still authoritative, so their
+      // secrets stay where they are: carrying them would be writing the
+      // identity branch's half of a split the proof has not agreed to.
+      expect(carried).toEqual([]);
     });
 
     it("a dead-ended email identifier holds the user instead of parking them", async () => {

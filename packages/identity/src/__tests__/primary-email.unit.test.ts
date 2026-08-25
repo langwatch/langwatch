@@ -14,6 +14,8 @@ function identifier(overrides: Partial<IdentifierFact>): IdentifierFact {
     domain: "acme.com",
     identifierHash: "hmac:a",
     accountId: null,
+    providerId: null,
+    issuer: null,
     providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",

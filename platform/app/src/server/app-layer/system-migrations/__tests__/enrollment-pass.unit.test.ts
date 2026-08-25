@@ -35,17 +35,6 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
   }
 
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
-    return [...this.rows.values()].some(
-      (row) =>
-        row.migrationName === migrationName && row.status === "finalized",
-    );
-  }
-
   async upsertRecordUnlessRolledBack(
     record: TenantMigrationRecord,
   ): Promise<boolean> {
@@ -59,6 +48,22 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     if (existing?.status === "rolled_back") return false;
     await this.upsertRecord(record);
     return true;
+  }
+
+  /**
+   * The per-tenant gate's global short-circuit. Answered from the same rows
+   * the pass writes, so a suite about who gets processed never has to keep a
+   * second source of truth in agreement with the first.
+   */
+  async hasFinalizedTenant({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<boolean> {
+    return [...this.rows.values()].some(
+      (row) =>
+        row.migrationName === migrationName && row.status === "finalized",
+    );
   }
 
   tenantIdsWithRecords(): string[] {
@@ -90,9 +95,11 @@ function tenantSourceOf(ids: string[]) {
 function migrationOf({
   name,
   runsAutomaticallyOnSelfHosted,
+  enrolledAutomatically = false,
 }: {
   name: string;
   runsAutomaticallyOnSelfHosted: boolean;
+  enrolledAutomatically?: boolean;
 }): SystemMigration & { migrateTenant: ReturnType<typeof vi.fn> } {
   return {
     name,
@@ -100,13 +107,16 @@ function migrationOf({
     description: name,
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted,
+    enrolledAutomatically,
     migrateTenant: vi.fn(async () => ({ status: "finalized" as const })),
   };
 }
 
 /**
  * The pass, composed exactly as runtime.ts composes it: enrollment is per
- * (organization, migration), read into a map the cohort probes.
+ * (organization, migration), read into a map the cohort probes, and a
+ * migration's own `enrolledAutomatically` declaration is what lets it skip
+ * that map entirely.
  */
 function passOn({
   isSaaS,
@@ -121,6 +131,11 @@ function passOn({
   migrations: SystemMigration[];
   state: SystemMigrationStateRepository;
 }) {
+  const automatic = new Set(
+    migrations
+      .filter((migration) => migration.enrolledAutomatically)
+      .map((migration) => migration.name),
+  );
   return new SystemMigrationRunnerService({
     state,
     lease: grantedLease,
@@ -128,6 +143,7 @@ function passOn({
     cohort: ({ tenantId, migrationName }) =>
       organizationMigrates({
         isSaaS,
+        enrolledAutomatically: automatic.has(migrationName),
         enrolled: enrolled.get(migrationName)?.has(tenantId) ?? false,
       }),
     migrations: migrations.filter((migration) =>
@@ -139,7 +155,7 @@ function passOn({
   }).runPass();
 }
 
-describe("the migration pass under enrollment pacing", () => {
+describe("the migration pass under its cohort rules", () => {
   describe("given a self-hosted installation with a migration not yet released for it", () => {
     /** @scenario "A migration not yet released for self-hosting never runs there" */
     it("drives the released migrations for every organization and never attempts the unreleased one", async () => {
@@ -270,6 +286,35 @@ describe("the migration pass under enrollment pacing", () => {
           tenantId: "acme",
         }),
       ).toBeNull();
+    });
+  });
+
+  describe("given a cloud installation and a migration enrolled automatically", () => {
+    /** @scenario "An organization nobody enrolled migrates for an automatically enrolled migration" */
+    it("drives it for every organization, including one created after the rollout finished", async () => {
+      const automatic = migrationOf({
+        name: "authz-engine-like",
+        runsAutomaticallyOnSelfHosted: true,
+        enrolledAutomatically: true,
+      });
+      const state = new InMemoryStateRepository();
+
+      // "acme" is the organization an operator enrolled while the rollout was
+      // running; "born_later" is the one created since, which nothing enrolled
+      // and which used to sit on the legacy path indefinitely.
+      await passOn({
+        isSaaS: true,
+        tenants: ["acme", "born_later"],
+        enrolled: new Map([["authz-engine-like", new Set(["acme"])]]),
+        migrations: [automatic],
+        state,
+      });
+
+      expect(automatic.migrateTenant).toHaveBeenCalledTimes(2);
+      expect(state.tenantIdsWithRecords().sort()).toEqual([
+        "acme",
+        "born_later",
+      ]);
     });
   });
 });

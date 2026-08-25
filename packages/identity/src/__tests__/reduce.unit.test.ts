@@ -25,6 +25,8 @@ function attached(
       userId: USER,
       accountId: null,
       provider: "email",
+      providerId: null,
+      issuer: null,
       providerAccountId: null,
       value: "sam@acme.com",
       identifierHash: "hmac:abc",
@@ -45,9 +47,12 @@ function fold(facts: IdentityFact[]): IdentityHeads {
 }
 
 describe("reduceIdentity", () => {
-  describe("when the same history folds twice from scratch", () => {
-    /** @scenario "Replay rebuilds the Identifier projection identically" */
-    it("produces identical heads, row for row", () => {
+  describe("when a whole history folds", () => {
+    // Replay PARITY - the incrementally-maintained projection against a
+    // from-scratch rebuild - is proven where the row shape is, in
+    // app-layer/identity/__tests__/replay-parity.unit.test.ts. Folding one
+    // list twice here would prove only that a pure function is pure.
+    it("leaves each identifier in the state its last fact implies", () => {
       const history: IdentityFact[] = [
         attached("idf_google", { provider: "google", state: "VERIFIED" }),
         attached("idf_email", { occurredAt: T0 + 1000 }),
@@ -78,9 +83,7 @@ describe("reduceIdentity", () => {
       ];
 
       const live = fold(history);
-      const replayed = fold(history);
 
-      expect(replayed).toEqual(live);
       const states = Object.values(live.identifiers).map((head) => head.state);
       expect(states.sort()).toEqual(["DETACHED", "PRIMARY"]);
       expect(live.identifiers.idf_google?.detachedAtMs).toBe(T0 + 4000);

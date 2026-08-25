@@ -10,6 +10,7 @@
  * gate (`sso-gate.ts`) that decides whether a deployment may use it.
  */
 
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import type { BetterAuthOptions } from "better-auth";
 import {
   auth0,
@@ -504,5 +505,28 @@ export const buildGenericOAuthConfigs = (
     );
   }
 
-  return genericOAuthConfigs;
+  // Every generic-OAuth account keeps the namespace it already has.
+  //
+  // better-auth 1.7 re-keys an account from `(providerId, accountId)` to
+  // `(issuer, accountId)`, and for a config carrying a `discoveryUrl` it
+  // would otherwise adopt the DISCOVERED issuer — `https://tenant.auth0.com/`
+  // rather than `auth0`. Every `Account` row we already hold is keyed by the
+  // provider id, and `Account` is unique on exactly that pair, so letting the
+  // key change under a library upgrade would leave every existing enterprise
+  // account unfindable: the callback would look up an issuer no stored row
+  // carries, miss, and try to link a second row over the unique index.
+  //
+  // Pinning is what the option is for — better-auth's own contract calls it
+  // the way to "establish a stable account namespace" — and this one is
+  // already stable, already unique, and already what our data means. Moving
+  // to real issuer URLs is a deliberate re-keying with a backfill of its own,
+  // not something that should ride along on a version bump.
+  //
+  // `accountIssuer` beats `discoveryUrl` in the plugin's own precedence
+  // (`accountIssuer ?? issuer`), so this holds for auth0, okta and every
+  // `PLAIN_OIDC_PROVIDERS` entry without touching their discovery.
+  return genericOAuthConfigs.map((config) => ({
+    ...config,
+    accountIssuer: issuerForProviderId(config.providerId),
+  }));
 };

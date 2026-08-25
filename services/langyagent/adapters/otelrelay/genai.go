@@ -96,6 +96,13 @@ type genAICall struct {
 	start time.Time
 
 	status int
+	// paramsDropped is the gateway's own statement of which request options
+	// it removed before dispatch (the X-LangWatch-Params-Dropped header).
+	// Two production outages were invisible until a live probe because
+	// nothing langy-side recorded what the gateway dropped; carried onto the
+	// retold span so the next field pi starts sending shows up on the first
+	// turn, not as a dead card in production.
+	paramsDropped string
 	// isTransportFailure marks a call the proxy could never deliver (dial
 	// failure, upstream reset). No response ever arrives, so observeResponse
 	// never runs and the span has to be closed from the proxy's ErrorHandler.
@@ -156,8 +163,21 @@ func genAIOperation(path string) string {
 func (g *genAICall) observeResponse(resp *http.Response) {
 	g.status = resp.StatusCode
 	g.sse = strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
+	if dropped := resp.Header.Get(paramsDroppedHeader); dropped != "" {
+		g.paramsDropped = dropped
+		if g.entry.noteParamsDropped(dropped) {
+			clog.Get(g.relay.baseCtx).Info("gateway dropped params from a langy model call",
+				zap.String("conversation", g.entry.info.ConversationID),
+				zap.String("model", g.entry.info.Model),
+				zap.String("params_dropped", dropped))
+		}
+	}
 	resp.Body = &genAIBody{call: g, body: resp.Body}
 }
+
+// paramsDroppedHeader is the gateway's drop signal: the request options the
+// parameter policy removed before dispatch, comma separated.
+const paramsDroppedHeader = "X-LangWatch-Params-Dropped"
 
 // genAIBody is the pass-through reader: scan on Read, finish on EOF or Close
 // (whichever lands first, Close always does, ReverseProxy closes the body).
@@ -333,6 +353,9 @@ func (g *genAICall) forwardSpan() {
 	}
 	if g.cacheCreation1hTokens > 0 {
 		span.Attributes().PutInt(customertracebridge.AttrGenAIUsageCacheCreate1h, g.cacheCreation1hTokens)
+	}
+	if g.paramsDropped != "" {
+		span.Attributes().PutStr("langwatch.langy.params_dropped", g.paramsDropped)
 	}
 	// The gateway's gen_ai span is the meter for this same call; the retold
 	// copy is structure, not a second bill.

@@ -44,7 +44,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Routing ────────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An unlatched user's storage traffic is the stock adapter's, byte for byte
     Given a user "olga" whose identifier backfill has not finalized
     When better-auth creates, reads, updates and deletes "olga"'s account rows
@@ -52,7 +52,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no identity event is appended
     And no AccountCredential row is written
 
-  @unit @unimplemented
+  @unit
   Scenario: A latched user's account create states the fact instead of owning the row
     Given a user "sam" whose identifier backfill is finalized
     When better-auth creates an account for "sam" with provider "google"
@@ -61,14 +61,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the secret columns of the create land in an AccountCredential row
     And no secret appears in any event payload
 
-  @unit @unimplemented
+  @unit
   Scenario: Sessions and verifications take the stock branch for everyone
     Given a user "sam" whose identifier backfill is finalized
     When better-auth writes a session and a verification for "sam"
     Then both writes execute the stock Prisma behavior
     And no identity event is appended
 
-  @unit @unimplemented
+  @unit
   Scenario: A read that names no user routes by resolution, then by gate
     Given "sam" is finalized and "olga" is not
     When better-auth looks up each user by email
@@ -76,7 +76,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And "olga" misses the Identifier read and resolves via the legacy branch
     And each lookup returns exactly one user
 
-  @unit @unimplemented
+  @unit
   Scenario: A held user is served wholly by the legacy branch
     Given a user "ines" whose backfill state is migrated but not finalized
     And "ines" has Identifier rows the parity proof found disagreeing
@@ -84,7 +84,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then every operation takes the legacy branch
     And the next backfill pass heals her projection, not the adapter
 
-  @unit @unimplemented
+  @unit
   Scenario: Admin user searches are never routed
     Given "sam" is finalized and "olga" is not
     When the admin plugin searches users by a name fragment across both populations
@@ -94,7 +94,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── The reads the adapter must serve ───────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: The joined sign-in read is served from the identity tables
     Given a finalized user "sam" with a credential account
     When better-auth signs "sam" in by email with the account join
@@ -102,7 +102,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the account rows returned are assembled from Identifier and AccountCredential
     And sign-in succeeds with the password held in AccountCredential
 
-  @unit @unimplemented
+  @unit
   Scenario: Sign-in resolves by any verified email, not only the primary
     Given a finalized user "sam" with verified identifiers "sam@acme.com" and "sam@home.net"
     And "sam@acme.com" is the PRIMARY identifier
@@ -110,7 +110,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the identity branch resolves "sam"
     And the user record presents "sam@acme.com" as the email
 
-  @unit @unimplemented
+  @unit
   Scenario: A plus-addressed sign-in still resolves after the latch
     Given a finalized user "sam" whose identifier is "sam.j@acme.com"
     When better-auth looks up the user by "Sam.J+news@Acme.com"
@@ -118,7 +118,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And "sam" is resolved
     And the same address resolved the same user before she latched
 
-  @integration @unimplemented
+  @integration
   Scenario: The OAuth callback resolves the provider subject through the identity tables
     Given a finalized user "sam" with a google identifier whose provider subject is "g-123"
     When the callback looks up the account by "google" and "g-123" with its user join
@@ -128,7 +128,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Secrets stay row-truth ─────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A token refresh writes a credential row and states nothing
     Given a finalized user "sam" with a Google account on the identity branch
     When the provider rotates "sam"'s access and refresh tokens
@@ -136,7 +136,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no identity event is appended
     And a from-scratch replay reproduces the Identifier row and never touches the credential row
 
-  @unit @unimplemented
+  @unit
   Scenario: Bridge mirroring keeps the fail-closed direction safe
     Given a finalized user "sam" changes their password on the identity branch
     And the Account bridge table still exists
@@ -144,21 +144,21 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the same secret values are mirrored onto "sam"'s Account row
     And a later gate outage that falls "sam" back to the legacy branch still verifies the new password
 
-  @unit @unimplemented
+  @unit
   Scenario: A secret written on the legacy branch after latch is healed
     Given a finalized user "olga" whose password change landed on the legacy branch during the gate's cache window
     When the heal pass runs
     Then the newer Account secret columns are copied onto "olga"'s AccountCredential row
     And her next sign-in verifies the new password
 
-  @unit @unimplemented
+  @unit
   Scenario: An unreadable gate cache degrades writes to the legacy branch, never to an error
     Given the gate cache cannot be read
     When a user's account rows are written
     Then the adapter serves every routed write from the legacy branch
     And write outcomes are unchanged for the duration of the cache TTL
 
-  @unit @unimplemented
+  @unit
   Scenario: Resolution reads do not depend on the gate cache
     Given the gate cache cannot be read
     When a finalized user signs in with a secondary verified email
@@ -167,7 +167,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Born finalized ─────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A flagged sign-up is born finalized
     Given the sign-up request carries the identity-branch opt-in for its organization
     When better-auth creates the user
@@ -176,28 +176,67 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the user's migration-state row is finalized
     And the user's next write takes the identity branch
 
-  @unit @unimplemented
+  @unit
   Scenario: The whole flagged request routes to the identity branch
     Given the sign-up request carries the identity-branch opt-in
     When better-auth creates the user and then the credential account in the same request
     Then the account create states its fact and writes an AccountCredential row
     And no legacy Account write occurs for the newborn
 
-  @unit @unimplemented
+  @unit
+  Scenario: One writer states a latched user's account attach
+    Given the application's own composition, with the databaseHooks bound and the adapter live
+    And a user "sam" whose identifier backfill is finalized
+    When better-auth creates an account for "sam"
+    Then exactly one attach is stated for the identifier
+    And the hook defers to the adapter, which is the storage-level veto
+    But the hook still runs, and still does nothing, for an unlatched user
+
+  @unit
   Scenario: A retried flagged sign-up converges instead of duplicating
     Given a flagged sign-up appended its facts and failed before the rows committed
     When the sign-up is retried
     Then the event store dedupes on the idempotency key and exactly one fact set exists
     And exactly one Identifier row and one user row exist after the retry
 
-  @unit @unimplemented
+  @unit
+  Scenario: A flagged sign-up is refused when its pinned id is already someone's
+    Given a finalized user "sam" was born under the address "sam@acme.com"
+    When a flagged sign-up arrives for "sam+news@acme.com"
+    Then the sign-up is refused with the handled code "identity_email_in_use"
+    And no identity event is stated under "sam"'s tenant
+    And no credential is written against "sam"'s user
+
+  @unit
   Scenario: An abandoned flagged sign-up leaves no reachable identity
-    Given a flagged sign-up appended its facts and was never retried
+    Given a flagged sign-up staged its facts and was never retried
     When the address it used is looked up
     Then no user resolves on either branch
     And the reconciliation sweep removes the orphaned stream
 
-  @unit @unimplemented
+  @unit
+  Scenario: The reconciliation sweep runs on every migration pass
+    Given the born-finalized entrance is deployed
+    When a system migration pass runs
+    Then the abandoned-newborn sweep runs beside the user-rooted migrations
+    And a sweep that fails does not fail the pass
+
+  @unit
+  Scenario: The sweep finds an orphan behind a page of held users
+    Given more held users than one sweep page holds carry the same migrated status
+    And one abandoned newborn claim is older than all of them
+    When the sweep asks for a single candidate
+    Then the claim it returns is the abandoned newborn, never a held user
+
+  @unit
+  Scenario: A newborn whose rows committed is never failed by the fold wait
+    Given a flagged sign-up whose user row and finalized state row have committed
+    And the read-your-writes wait cannot complete
+    When the entrance finishes
+    Then the sign-up succeeds and returns the newborn's user row
+    And nothing leaves a finalized user for the sweep to own
+
+  @unit
   Scenario: A flagged sign-up fails loudly when the engine is unavailable
     Given the sign-up request carries the identity-branch opt-in
     And the event-sourcing engine cannot accept an append
@@ -206,7 +245,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no user row is created on either branch
     But an unflagged sign-up at the same moment succeeds on the legacy branch
 
-  @unit @unimplemented
+  @unit
   Scenario: An unflagged sign-up is untouched
     Given the sign-up request carries no identity-branch opt-in
     When better-auth creates the user
@@ -216,14 +255,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── One writer for User.email ──────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An email change on the identity branch is a command, not a column write
     Given a finalized user "sam"
     When better-auth updates "sam"'s email
     Then the update is dispatched as an identity command the guard evaluates
     And User.email is written only by the fold, from the PRIMARY identifier
 
-  @unit @unimplemented
+  @unit
   Scenario: A primary switch that collides is refused by the guard, not the database
     Given "sam@home.net" is already another user's User.email
     When "sam" promotes "sam@home.net" to PRIMARY
@@ -232,7 +271,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Collisions across both populations ─────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Verification is refused when a legacy user holds the address
     Given a legacy user "bob" whose User.email is "bob@acme.com"
     And a finalized user "sam" has attached "bob@acme.com"
@@ -241,14 +280,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no event is appended
     And "bob" still resolves by that address
 
-  @unit @unimplemented
+  @unit
   Scenario: A legacy sign-up cannot claim a latched user's verified address
     Given a finalized user "sam" with the verified secondary identifier "sam@home.net"
     When someone signs up on the legacy branch with "sam@home.net"
     Then the sign-up is refused as a duplicate address
     And no user is created
 
-  @unit @unimplemented
+  @unit
   Scenario: A guard refusal reaches the customer as named copy
     Given a finalized user "sam" verifying an address another user holds
     When the guard refuses the verification
@@ -256,9 +295,33 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the customer-facing copy comes from the presentation registry, never the raw code
     And the verification proof is not consumed by the refusal
 
+  @integration
+  Scenario: A superseded verification link can never complete
+    Given two verification mints for one identifier raced and both records landed
+    When the newer link is completed
+    Then the older record is reaped with it
+    And the older link cannot complete afterwards
+    And the older link could not have completed before it either
+
+  @unit
+  Scenario: A verification that loses a uniqueness race reports the collision
+    Given a finalized user "sam" completing verification for "shared@acme.com"
+    And another user verifies the same address first
+    When "sam"'s completion is processed
+    Then the completion fails with the handled code "identity_email_in_use"
+    And it never reports the identifier as verified
+    And the single-use proof is not consumed
+
+  @unit
+  Scenario: The sign-in screen renders a platform refusal from the registry
+    Given the auth response carries the handled code "identity_email_in_use"
+    When the sign-in screen renders the failure
+    Then the customer reads the registry's copy for that code
+    And neither the raw code nor a generic server-side sentence is shown
+
   # ── Unlink and erasure ─────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Unlink on the identity branch detaches the fact and the secrets together
     Given a finalized user "sam" with google and credential identifiers
     When better-auth lists "sam"'s accounts
@@ -267,6 +330,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then an identifier_detached event is appended
     And the fold tombstones the Identifier row
     And the AccountCredential row is deleted in the same operation
+    And the mirrored Account row is deleted with it, so no stale secret authenticates
+
+  @unit
+  Scenario: Deleting a user reaps the credentials of an unlatched one too
+    Given an unlatched user whose Account secrets were carried into AccountCredential
+    When their User row is deleted
+    Then their AccountCredential rows go with it
+    And no password hash or provider token outlives the user
 
   @unit @unimplemented
   Scenario: Deleting a user detaches every identifier and erases
@@ -277,9 +348,32 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And "sam"'s AccountCredential rows are deleted
     And "sam"'s sessions are deleted by the stock branch
 
+  @unit @unimplemented
+  Scenario: Erasing a user leaves no address anywhere in their history
+    Given a finalized user "sam" whose identity history names their email
+    When "sam" is erased
+    Then no event of "sam"'s carries the address any more
+    And a replay of "sam"'s history reproduces the tombstone and never the address
+    And a replay bounded to a moment before the erasure cannot restore it either
+
+  @unit
+  Scenario: Unlinking an address frees it for somebody else
+    Given a finalized user "sam" holding a verified secondary address
+    When "sam" unlinks it
+    Then the address lock "sam" held is released
+    And another user can verify that address afterwards
+
+  @unit
+  Scenario: An address lock whose fact never landed is reaped
+    Given a ceremony took the address lock and its fact never landed
+    And the claim is older than the sweep's horizon
+    When the identity sweep runs
+    Then the lock is released
+    And a lock younger than the horizon is left alone, because its ceremony may still be in flight
+
   # ── Latching an existing user ──────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Finalizing an existing user carries their secrets across once
     Given a user "olga" with Account rows holding a password and provider tokens
     When "olga"'s backfill finalizes
@@ -289,7 +383,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Upgrade discipline ─────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An account query shape the identity branch does not recognize fails loudly
     Given a finalized user "sam"
     When better-auth issues an account query with an operator the identity branch has not enumerated
@@ -298,9 +392,102 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no user-model query can raise it
     But the same query for an unlatched user executes on the legacy branch untouched
 
-  @integration @unimplemented
+  @unit
+  Scenario: An operator the branch has not enumerated never reads as an equality
+    Given a finalized user "sam" holding two sign-in methods
+    When better-auth issues an account delete for every row whose id is NOT the one it names
+    Then the operation fails with the handled code "identity_unsupported_storage_query"
+    And neither sign-in method is deleted
+
+  @unit
+  Scenario: A fleet with nobody latched never meets the loud failure
+    Given no user's identifier backfill has finalized
+    When better-auth issues an account query the identity branch has not enumerated
+    Then the query executes on the legacy branch untouched
+    And no unsupported-query failure occurs
+    And the same is true of a sort or an offset over the account model
+
+  @integration
   Scenario: The end-to-end suite is the upgrade net
     Given the real betterAuth library composed over the identity adapter
     When a user signs up, signs in with the account join, lists accounts, changes password, links a provider and deletes the account
     Then every operation succeeds on the identity branch
     And the suite fails if a better-auth upgrade introduces a query shape the branch does not serve
+
+  # ═══ Enterprise SSO ═══════════════════════════════════════════════════
+  # The population D02 moves across. `Identifier.provider` folds every
+  # enterprise IdP into `oidc`, while `Identifier.providerId` keeps
+  # better-auth's own id verbatim — and the verbatim one is what has to come
+  # back out, since `oidc` matches no configured provider.
+
+  @unit
+  Scenario: An enterprise SSO sign-in is served from the identity tables
+    Given a latched user holding an identifier that arrived from an enterprise IdP
+    And no legacy Account row for that user
+    When the IdP callback looks the account up by its provider and subject
+    Then the identity tables resolve the user
+    And the answer carries the provider id the IdP is configured under, not the folded vocabulary
+
+  # A provider subject is unique only WITHIN an issuer, so the lookup keys on
+  # the verbatim provider id — the pair Account is unique by — and never on
+  # the folded vocabulary that collapses every enterprise IdP into one.
+  @unit
+  Scenario: Two enterprise IdPs sharing a subject resolve to different users
+    Given two latched users at different customers
+    And each holds an identifier from a different enterprise IdP carrying the same subject string
+    When each IdP's callback looks its own account up
+    Then each resolves to its own user
+    And neither is served the other's account
+
+  # ── Erasing a user, versus unlinking one of their methods ──────────────
+  #
+  # better-auth deletes a user by fanning an account delete out per row
+  # BEFORE `user.delete.before` runs. Each of those rows meets the detach
+  # guards, which were written for somebody unlinking a method and keeping
+  # their account — so a user holding one way in could not be deleted at
+  # all. The erase says itself once, whole; the rows go quietly with it.
+
+  @unit
+  Scenario: Erasing a user removes the one way in they hold
+    Given a latched user whose only sign-in method is verified
+    When better-auth deletes that user
+    Then the user is erased, with their identifiers and credentials
+    And the strands refusal never answers, because nobody is left to strand
+
+  @unit
+  Scenario: Unlinking the last way in is still refused for a living user
+    Given a latched user whose only sign-in method is verified
+    When that one method is unlinked on its own
+    Then the removal is refused with the handled code "identity_detach_strands_user"
+    And the method still signs them in afterwards
+
+  # ── The account key: who asserted the subject ──────────────────────────
+  #
+  # better-auth 1.7 identifies an account by `(issuer, accountId)` rather
+  # than by `(providerId, accountId)`. That is not a rename: a subject is
+  # unique only WITHIN an issuer, and an issuer is not something we can work
+  # out from a provider id. Google's is its own URL, an enterprise OIDC
+  # connection's is the customer's, and only a provider that declares none
+  # gets the synthetic form. So the issuer is stated as a fact, carried by
+  # the identifier and projected onto the row — never computed at the edge.
+
+  @unit
+  Scenario: An attach states the issuer better-auth decided
+    Given a latched user signing in through a provider that declares its own issuer
+    When the account ceremony states the attach
+    Then the fact carries that issuer verbatim
+    And it is not replaced by one derived from the provider id
+
+  @unit
+  Scenario: An identifier attached without an issuer still answers better-auth
+    Given a latched user holding an identifier stated before the issuer was carried
+    When better-auth reads their account
+    Then the row carries the synthetic issuer the library would have minted
+    And the sign-in method is found
+
+  @unit
+  Scenario: A stored issuer is served in preference to a derived one
+    Given a latched user holding an identifier that carries a real issuer
+    When better-auth reads their account
+    Then the row carries the stored issuer
+    And never the synthetic form built from the provider id
