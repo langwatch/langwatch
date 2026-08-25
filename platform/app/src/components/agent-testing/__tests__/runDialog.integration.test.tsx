@@ -657,7 +657,7 @@ describe("run entries on the Test cases tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab onNewTestCase={vi.fn()} />, { wrapper: Wrapper });
+    render(<TestCasesTab />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
 
@@ -669,7 +669,7 @@ describe("run entries on the Test cases tab", () => {
   /** @scenario "A run started from the rail appears in the sidebar without a page change" */
   it("starts a suite run from the rail without changing the address, holding a place for it", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab onNewTestCase={vi.fn()} />, { wrapper: Wrapper });
+    render(<TestCasesTab />, { wrapper: Wrapper });
 
     await user.click(
       screen.getByRole("button", { name: "Actions for Refunds" }),

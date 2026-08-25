@@ -435,7 +435,6 @@ function casesPanelProps(
     isLoading: false,
     lastResults: new Map(),
     isLastResultsLoading: false,
-    authorNameById: {},
     suites: [],
     canManage: true,
     projectHasNoCases: false,
@@ -454,6 +453,8 @@ function casesPanelProps(
     onOpenLastRun: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
+    onEditSuite: vi.fn(),
+    onOpenExternalResults: vi.fn(),
     ...overrides,
   };
 }
