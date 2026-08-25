@@ -460,3 +460,34 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When that one method is unlinked on its own
     Then the removal is refused with the handled code "identity_detach_strands_user"
     And the method still signs them in afterwards
+
+  # ── The account key: who asserted the subject ──────────────────────────
+  #
+  # better-auth 1.7 identifies an account by `(issuer, accountId)` rather
+  # than by `(providerId, accountId)`. That is not a rename: a subject is
+  # unique only WITHIN an issuer, and an issuer is not something we can work
+  # out from a provider id. Google's is its own URL, an enterprise OIDC
+  # connection's is the customer's, and only a provider that declares none
+  # gets the synthetic form. So the issuer is stated as a fact, carried by
+  # the identifier and projected onto the row — never computed at the edge.
+
+  @unit
+  Scenario: An attach states the issuer better-auth decided
+    Given a latched user signing in through a provider that declares its own issuer
+    When the account ceremony states the attach
+    Then the fact carries that issuer verbatim
+    And it is not replaced by one derived from the provider id
+
+  @unit
+  Scenario: An identifier attached without an issuer still answers better-auth
+    Given a latched user holding an identifier stated before the issuer was carried
+    When better-auth reads their account
+    Then the row carries the synthetic issuer the library would have minted
+    And the sign-in method is found
+
+  @unit
+  Scenario: A stored issuer is served in preference to a derived one
+    Given a latched user holding an identifier that carries a real issuer
+    When better-auth reads their account
+    Then the row carries the stored issuer
+    And never the synthetic form built from the provider id

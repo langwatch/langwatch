@@ -144,17 +144,6 @@ export function identityEmail(): IdentityEmailService {
 }
 
 /**
- * The read fork for `User.email`. A module-level singleton rather than a
- * per-call composition: it holds no request state, and the session boundary
- * resolves it on every authenticated request.
- */
-const identityEmailService = new IdentityEmailService(identityHeads, isLatched);
-
-export function identityEmail(): IdentityEmailService {
-  return identityEmailService;
-}
-
-/**
  * The write surface. Composed per call like `grantsService()`: the ledger
  * writer resolves the pipeline handle lazily, so a ceremony composed before
  * the App exists (better-auth builds its options at module load) still
@@ -484,23 +473,6 @@ export function signUpVerification(): SignUpVerificationService {
     },
     buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
   });
-}
-
-/**
- * What better-auth's own `databaseHooks` call (ADR-101 §2): three methods
- * bound to `account.create.before`, `account.delete.before` and
- * `user.delete.before` in `server/better-auth/index.ts`, every one of which
- * returns having done nothing for a user whose backfill has not finalized.
- * The gate ships closed, so wiring them changes nothing on its own.
- */
-export function identityCeremonies(): IdentityCeremonies {
-  return new IdentityCeremonies(
-    identityHeads,
-    identityUsers,
-    identityService(),
-    isLatched,
-    { now: Date.now, newCommandId: newIdentityCommandId },
-  );
 }
 
 /**

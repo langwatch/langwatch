@@ -26,6 +26,11 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
+  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
+  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
+  /// so the column could be added to a populated table; every write path
+  /// supplies it and the migration backfilled every existing row.
+  issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
   access_token      String?   @db.Text
@@ -42,6 +47,11 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
+  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // uniqueness that matters is already enforced above, and every issuer here
+  // is derived from `provider`, so this pair is unique exactly when that one
+  // is. See migration 20260825030000.
+  @@index([issuer, providerAccountId])
 }
 
 // The credential half of the old `Account` row (ADR-116 §1). Row-truth
@@ -225,6 +235,12 @@ model Identifier {
   // this is the column its uniqueness is keyed by. Null for an identifier no
   // protocol row backs.
   providerId        String?
+  // WHO asserted the subject below - the other half of better-auth 1.7's
+  // account key, and event truth rather than a derivation. A subject is
+  // unique only WITHIN an issuer, so `providerId` has only ever stood in for
+  // this while there is exactly one connection per configured provider. Null
+  // exactly when `providerId` is.
+  issuer            String?
   // The provider's own subject (ADR-116). What an IdP callback arrives
   // holding, so the projection can answer "who is this?" without the legacy
   // Account row.
@@ -242,6 +258,7 @@ model Identifier {
   @@index([value])
   @@index([domain])
   @@index([provider, providerAccountId])
+  @@index([issuer, providerAccountId])
   @@index([accountId])
   // A PARTIAL UNIQUE INDEX on (providerId, providerAccountId), over the live
   // states only, is added by migration 20260824120004 - Prisma cannot express

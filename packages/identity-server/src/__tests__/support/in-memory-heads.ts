@@ -103,6 +103,7 @@ export function fact(overrides?: Partial<IdentifierFact>): IdentifierFact {
     identifierHash: "hmac:abc",
     accountId: null,
     providerId: null,
+    issuer: null,
     providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",
@@ -128,6 +129,11 @@ export function attachData(overrides?: Record<string, unknown>) {
     accountId: "acc_1",
     provider: "google" as const,
     providerId: "google",
+    // Google's REAL issuer, which is what better-auth keys a google account
+    // by — not the `local:oauth:google` a derivation would produce. Using
+    // the real one here is what keeps these fixtures honest about the fact
+    // that an issuer is stated, never computed.
+    issuer: "https://accounts.google.com",
     providerAccountId: "gid_123",
     // Mixed case AND a plus tag, because normalization treats them
     // differently and both halves are worth pinning: the case is folded, the

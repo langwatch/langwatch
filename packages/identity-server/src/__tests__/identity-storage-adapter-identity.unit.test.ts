@@ -46,6 +46,11 @@ type Stack = IdentityStack;
 const oauthIssuer = (providerId: string): string =>
   `local:oauth:${encodeURIComponent(providerId)}`;
 
+/** better-auth's issuer for its own password method. Note the namespace: an
+ *  internal method is `local:<id>`, NOT `local:oauth:<id>`. Getting that
+ *  wrong fails the credential filter exactly as a missing value does. */
+const CREDENTIAL_ISSUER = "local:credential";
+
 const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
 
 /** One user's id when a suite holds more than one of them. */
@@ -60,14 +65,24 @@ const statedIdentifiers = (stack: Stack) =>
 const accountRow = (stack: Stack, id: string) =>
   stack.db.account?.find((row) => row.id === id);
 
-/** The `Account` row the fold maintains during the bridge phase. The memory
- *  engine has no fold behind it, so a suite that wants to watch the mirror
- *  puts the row there itself. */
+/**
+ * The `Account` row the fold maintains during the bridge phase. The memory
+ * engine has no fold behind it, so a suite that wants to watch the mirror
+ * puts the row there itself.
+ *
+ * The issuer is not decoration. better-auth 1.7 finds a credential account by
+ * `(providerId, issuer, accountId)` and nothing else, so a bridge row without
+ * it is invisible to the legacy branch — which reads to the customer as a
+ * wrong password. This row carries what the fold's `upsertLiveAccount`
+ * writes, because the whole point of the row is to be what the fold left
+ * behind.
+ */
 function seedBridgeRow(stack: Stack, accountId: string): void {
   stack.db.account?.push({
     id: accountId,
     userId: userIdOf(stack),
     providerId: "credential",
+    issuer: CREDENTIAL_ISSUER,
     accountId: userIdOf(stack),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -340,6 +355,97 @@ describe("better-auth over the identity storage adapter", () => {
       });
     });
 
+    describe("when the account key names a real issuer", () => {
+      /**
+       * The issuer a provider brings itself. Google's is this URL, and it is
+       * hardcoded in better-auth's own provider rather than configurable, so
+       * `local:oauth:google` — what a derivation from the provider id would
+       * produce — is simply the wrong key for a Google account.
+       */
+      const GOOGLE_ISSUER = "https://accounts.google.com";
+
+      /** @scenario "An attach states the issuer better-auth decided" */
+      it("states the issuer verbatim rather than one derived from the provider id", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const before = stack.commands.length;
+
+        await (
+          await stack.auth.$context
+        ).internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+
+        const google = statedIdentifiers(stack).find(
+          (identifier) => identifier.providerId === "google",
+        );
+        expect(google?.issuer).toBe(GOOGLE_ISSUER);
+        // The derivation would have produced this instead, and it is what a
+        // fact that computed its own issuer would carry.
+        expect(google?.issuer).not.toBe(oauthIssuer("google"));
+        expect(
+          stack.commands.slice(before).map((command) => command.type),
+        ).toContain("lw.identity.attach_identifier");
+      });
+
+      /** @scenario "A stored issuer is served in preference to a derived one" */
+      it("serves the stored issuer back to better-auth, not the synthetic form", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+        // Nothing in the legacy table, so the row below is the identity
+        // branch's answer or there is no answer at all.
+        stack.db.account = [];
+
+        const listed = await context.internalAdapter.findAccounts(userId);
+
+        const google = listed.find((row) => row.providerId === "google");
+        expect(google?.issuer).toBe(GOOGLE_ISSUER);
+      });
+
+      /** @scenario "An identifier attached without an issuer still answers better-auth" */
+      it("falls back to the synthetic issuer for an identifier stated before one was carried", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+        // The shape of a fact stated before ADR-116 carried an issuer. The
+        // row still has to come back with one, or 1.7 cannot key it at all.
+        const google = statedIdentifiers(stack).find(
+          (identifier) => identifier.providerId === "google",
+        );
+        stack.heads.fold(userId, []);
+        const head = stack.heads.heads.get(userId);
+        if (head && google) {
+          head.identifiers[google.identifierId] = {
+            ...google,
+            issuer: null,
+          };
+        }
+        stack.db.account = [];
+
+        const listed = await context.internalAdapter.findAccounts(userId);
+
+        expect(
+          listed.find((row) => row.providerId === "google")?.issuer,
+        ).toBe(oauthIssuer("google"));
+      });
+    });
+
     describe("when the accounts are listed and unlinked", () => {
       /** @scenario "Unlink on the identity branch detaches the fact and the secrets together" */
       it("lists accounts by their pinned id and detaches the one it is given back", async () => {
@@ -389,9 +495,8 @@ describe("better-auth over the identity storage adapter", () => {
        * somebody unlinking their last method and locking themselves out.
        * Nobody is locked out of an account that is being erased, so a user
        * holding a single sign-in method could not be deleted at all.
-       *
-       * @scenario "Erasing a user removes the one way in they hold"
        */
+      /** @scenario "Erasing a user removes the one way in they hold" */
       it("erases them, rather than refusing to strand the person being erased", async () => {
         await signUp(stack.auth, EMAIL);
         const userId = userIdOf(stack);
@@ -419,9 +524,8 @@ describe("better-auth over the identity storage adapter", () => {
        * The other half, and the reason the fix is scoped to the erase rather
        * than to the guard: unlinking that same last method from a user who is
        * staying must still be refused.
-       *
-       * @scenario "Unlinking the last way in is still refused for a living user"
        */
+      /** @scenario "Unlinking the last way in is still refused for a living user" */
       it("still refuses to unlink that same method while the user stays", async () => {
         await signUp(stack.auth, EMAIL);
         const context = await stack.auth.$context;
@@ -1042,6 +1146,7 @@ function attachVerifiedAlias(
         accountId: null,
         provider: "email",
         providerId: null,
+        issuer: null,
         providerAccountId: null,
         value,
         identifierHash: null,

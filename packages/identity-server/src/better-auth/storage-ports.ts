@@ -35,10 +35,17 @@ export interface IdentityAccountRow {
   id: string;
   userId: string;
   providerId: string;
-  /** better-auth 1.7's account key half. Not stored — `Identifier` keys on
-   *  `providerId` — so the adapter stamps it on the way out and nothing
-   *  below this interface is asked to keep it. */
-  issuer?: string;
+  /**
+   * better-auth 1.7's account key half: WHO asserted `accountId` below.
+   *
+   * Stored, because it cannot be derived. better-auth synthesises an issuer
+   * for a provider that declares none (`local:credential`,
+   * `local:oauth:<id>`), but a real OIDC connection brings its own URL and
+   * so does Google — so the attach states whatever better-auth decided and
+   * the identifier keeps it. Optional only for a row attached before the
+   * fact carried one, where the adapter falls back to the synthetic form.
+   */
+  issuer?: string | null;
   accountId: string;
   password: string | null;
   accessToken: string | null;

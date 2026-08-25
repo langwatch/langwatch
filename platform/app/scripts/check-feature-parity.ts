@@ -450,10 +450,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
-  // ADR-116's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the identity storage adapter, and the adapter PR binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/identity/identity-storage-adapter.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
