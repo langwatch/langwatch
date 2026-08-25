@@ -22,6 +22,7 @@
  */
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
 import type { AgentService } from "@langwatch/agent-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
 import { getApp } from "~/server/app-layer/app";
@@ -62,6 +63,7 @@ type NavigateResolver = (a: {
   projectId: string;
   resourceId: string;
   agents?: AgentService;
+  evaluators?: EvaluatorService;
 }) => Promise<UrlForProjectSlug | null>;
 
 /** The prompts page (the playground) with that prompt's editor drawer open:
@@ -89,7 +91,7 @@ const evaluatorPath = (evaluatorId: string): string =>
  */
 const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
   scenariorun_: async ({ projectId, resourceId }) => {
-    const run = await getApp().simulations.runs.getScenarioRunData({
+    const run = await getApp().simulations.tryGetScenarioRunData({
       projectId,
       scenarioRunId: resourceId,
     });
@@ -160,8 +162,8 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       platformUrl({ projectSlug, path: monitorPath(monitor.id) });
   },
 
-  evaluator_: async ({ projectId, resourceId }) => {
-    const evaluator = await getApp().evaluators.tryGetById({
+  evaluator_: async ({ projectId, resourceId, evaluators }) => {
+    const evaluator = await evaluators?.tryGetById({
       id: resourceId,
       projectId,
     });
@@ -196,10 +198,12 @@ async function resolveUrlBuilder({
   projectId,
   resourceId,
   agents,
+  evaluators,
 }: {
   projectId: string;
   resourceId: string;
   agents?: AgentService;
+  evaluators?: EvaluatorService;
 }): Promise<((projectSlug: string) => string) | null> {
   const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
   if (pagePath) {
@@ -210,19 +214,26 @@ async function resolveUrlBuilder({
     resourceId.startsWith(prefix),
   )?.[1];
   if (!resolver) return null;
-  return resolver({ projectId, resourceId, agents }).catch(() => null);
+  return resolver({ projectId, resourceId, agents, evaluators }).catch(() => null);
 }
 
 export async function resolveNavigateFallbackUrl({
   projectId,
   resourceId,
   agents,
+  evaluators,
 }: {
   projectId: string;
   resourceId: string;
   agents?: AgentService;
+  evaluators?: EvaluatorService;
 }): Promise<string | null> {
-  const buildUrl = await resolveUrlBuilder({ projectId, resourceId, agents });
+  const buildUrl = await resolveUrlBuilder({
+    projectId,
+    resourceId,
+    agents,
+    evaluators,
+  });
   if (!buildUrl) return null;
 
   const project = await getApp()

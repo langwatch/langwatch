@@ -1,5 +1,5 @@
 import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "@langwatch/langy-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 /**
  * Ephemeral signals for a Langy conversation (ADR-046).

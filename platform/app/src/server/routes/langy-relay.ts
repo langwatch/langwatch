@@ -21,14 +21,15 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import {
+  LangyFrameDedupStore,
+  LangyResourceLinksStore,
+  LangyTurnHandoffStore,
+} from "@langwatch/langy-server";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { tryGetApp } from "~/server/app-layer/app";
-import { appFromContext } from "~/app/api/middleware/app-context";
-import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
-import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
 import { verifyLangyInternalSecret } from "./langy-internal";
@@ -69,12 +70,12 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
-  const handoffStore = createLangyTurnHandoffStore({ redis: connection });
+  const handoffStore = LangyTurnHandoffStore.create({ redis: connection });
+  const frameDedup = LangyFrameDedupStore.create({ redis: connection });
   const relay = new LangyTurnRelay({
-    conversations: appFromContext(c).langy,
+    conversations: c.app.langy,
     buffer: createLangyTokenBuffer({ redis: connection }),
-    reserveFrameNonce: createLangyFrameDedup({ redis: connection })
-      .reserveFrameNonce,
+    reserveFrameNonce: frameDedup.reserveFrameNonce.bind(frameDedup),
     // Authenticate frames against the synchronous per-turn handoff token first
     // (the exact one the worker signs with), so a first turn whose RunToken
     // projection is still landing isn't dropped as no-run-token. Empty token
@@ -88,11 +89,12 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
       if (!handoff || handoff.projectId !== projectId) return null;
       return handoff.runToken || null;
     },
-    resourceLinks: createLangyResourceLinkStore({ redis: connection }),
+    resourceLinks: LangyResourceLinksStore.create({ redis: connection }),
     resolveResourceUrl: (input) =>
       resolveNavigateFallbackUrl({
         ...input,
-        agents: appFromContext(c).agents,
+        agents: c.app.agents,
+        evaluators: c.app.evaluators,
       }),
     logger,
   });

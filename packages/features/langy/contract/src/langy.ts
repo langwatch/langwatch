@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const LANGY_FEATURE_ID = "langy" as const;
 
@@ -131,7 +131,8 @@ export type LangyCredentialSession = {
   };
 };
 
-export type LangyMirrorTier = "content" | "structural" | "skip";
+export const langyMirrorTierSchema = z.enum(["content", "structural", "skip"]);
+export type LangyMirrorTier = z.infer<typeof langyMirrorTierSchema>;
 
 /** Extracts the user-visible text carried by portable message parts. */
 export const extractLangyTextFromParts = (parts: unknown): string => {
@@ -147,20 +148,25 @@ export const extractLangyTextFromParts = (parts: unknown): string => {
 };
 
 /** Credentials injected into a Langy worker for one turn. */
-export type LangyWorkerCredentials = {
-  langwatchApiKey?: string;
-  langwatchApiKeyId?: string;
-  llmVirtualKey: string;
-  langwatchEndpoint: string;
-  gatewayBaseUrl: string;
-  organizationId: string;
-  githubToken?: string;
-  githubLogin?: string;
-  githubRepoScopeKey?: string;
-  egressAllowlist?: LangyEgressAllowlist;
-  mirrorTier?: LangyMirrorTier;
-  harness?: "opencode" | "pi";
-};
+export const langyWorkerCredentialsSchema = z
+  .object({
+    langwatchApiKey: z.string().min(1).optional(),
+    langwatchApiKeyId: z.string().min(1).optional(),
+    llmVirtualKey: z.string().min(1),
+    langwatchEndpoint: z.string().min(1),
+    gatewayBaseUrl: z.string().min(1),
+    organizationId: z.string().min(1),
+    githubToken: z.string().min(1).optional(),
+    githubLogin: z.string().min(1).optional(),
+    githubRepoScopeKey: z.string().min(1).optional(),
+    egressAllowlist: langyEgressAllowlistSchema.optional(),
+    mirrorTier: langyMirrorTierSchema.optional(),
+    harness: z.enum(["opencode", "pi"]).optional(),
+  })
+  .strict();
+export type LangyWorkerCredentials = z.infer<
+  typeof langyWorkerCredentialsSchema
+>;
 export type LangyCredentials = LangyWorkerCredentials;
 export type LangyConversationPage = {
   items: LangyConversation[];

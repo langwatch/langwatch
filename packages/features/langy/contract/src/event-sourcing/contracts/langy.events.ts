@@ -9,7 +9,7 @@
  * envelope carries server-domain branding (TenantId, AggregateType) that has
  * no business in a browser bundle.
  */
-import { z } from "zod/v4";
+import { z } from "zod";
 
 import {
   langyJsonValueSchema,

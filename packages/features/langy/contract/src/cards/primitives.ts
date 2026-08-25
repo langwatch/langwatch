@@ -14,7 +14,7 @@
  *
  * This package and its consumers share the repository-wide Zod 4 contract.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 
 /** How the traces API counts: total hits for the query, regardless of page size. */
 export const hitsPaginationSchema = z.looseObject({

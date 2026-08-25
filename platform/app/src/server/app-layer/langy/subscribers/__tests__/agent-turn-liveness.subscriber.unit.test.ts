@@ -6,7 +6,7 @@ import {
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { LangyTurnHandoff } from "@langwatch/langy-server";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 
 import {

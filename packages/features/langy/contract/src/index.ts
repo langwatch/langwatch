@@ -21,3 +21,4 @@ export * from "./langy.service";
 export * from "./langy.commands";
 export * from "./langy.errors";
 export * from "./langy.error-remediation";
+export * from "./conversation-update-visibility";

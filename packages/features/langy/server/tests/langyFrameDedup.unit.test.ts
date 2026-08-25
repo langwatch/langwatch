@@ -6,9 +6,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  createLangyFrameDedup,
+  LangyFrameDedupStore,
   type LangyFrameDedupRedis,
-} from "../langyFrameDedup";
+} from "@langwatch/langy-server";
 
 function fakeRedis(): LangyFrameDedupRedis & {
   sets: Map<string, Set<string>>;
@@ -31,11 +31,11 @@ function fakeRedis(): LangyFrameDedupRedis & {
 
 const at = { conversationId: "conv-1", turnId: "turn-1" };
 
-describe("createLangyFrameDedup", () => {
+describe("LangyFrameDedupStore", () => {
   describe("given a nonce never seen for this turn", () => {
     it("reserves it as fresh and arms the TTL", async () => {
       const redis = fakeRedis();
-      const dedup = createLangyFrameDedup({ redis, ttlSeconds: 60 });
+      const dedup = LangyFrameDedupStore.create({ redis, ttlSeconds: 60 });
       expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(
         true,
       );
@@ -46,7 +46,7 @@ describe("createLangyFrameDedup", () => {
   describe("given the same nonce a second time", () => {
     it("reports it as a duplicate and does NOT re-arm the TTL", async () => {
       const redis = fakeRedis();
-      const dedup = createLangyFrameDedup({ redis });
+      const dedup = LangyFrameDedupStore.create({ redis });
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       redis.expire.mockClear();
 
@@ -60,7 +60,7 @@ describe("createLangyFrameDedup", () => {
   describe("given the same nonce under a different turn", () => {
     it("is fresh — dedup is scoped per (conversation, turn)", async () => {
       const redis = fakeRedis();
-      const dedup = createLangyFrameDedup({ redis });
+      const dedup = LangyFrameDedupStore.create({ redis });
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       expect(
         await dedup.reserveFrameNonce({

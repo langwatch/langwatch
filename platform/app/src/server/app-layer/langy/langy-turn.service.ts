@@ -35,7 +35,6 @@ import {
   extractLangyTextFromParts,
   type LangyMessagePart,
   type LangyCredentials,
-  type LangyCredentialSession,
   stripGithubCredentials,
   type LangyConversationTurnCapability,
   type LangyCredentialTurnCapability,
@@ -61,10 +60,15 @@ import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
-import { LangyFinalPartsService, mintRunToken } from "@langwatch/langy-server";
+import {
+  LangyFinalPartsService,
+  mintRunToken,
+} from "@langwatch/langy-server";
+import type {
+  LangyTurnAccessStore,
+  LangyTurnHandoffStore,
+} from "@langwatch/langy-server";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "@langwatch/prompt-contract";

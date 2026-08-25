@@ -9,7 +9,7 @@
  * so `foldLangyConversationTurn` consumes it directly — the schema lives here,
  * with the other cross-runtime contracts, while the fold stays a pure reducer.
  */
-import { z } from "zod/v4";
+import { z } from "zod";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
 import {

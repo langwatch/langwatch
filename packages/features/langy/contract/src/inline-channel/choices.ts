@@ -11,7 +11,7 @@
  * timers, no wall-clock state — the same derivation replays identically in
  * time travel, which is what makes the card's state honest forever.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 
 /**
  * The structured half of an answer. `optionIds` carries the picked option(s)

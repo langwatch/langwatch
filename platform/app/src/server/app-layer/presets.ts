@@ -78,6 +78,10 @@ import { RedisConnectionService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
+import {
+  LangyTurnAccessStore,
+  LangyTurnHandoffStore,
+} from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
@@ -98,8 +102,6 @@ import {
 import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -1009,7 +1011,7 @@ export function initializeDefaultApp(options?: {
     agentUrl: langyAgentUrl ?? "",
     internalSecret: langyInternalSecret ?? "",
   });
-  const langyHandoffStore = createLangyTurnHandoffStore({ redis });
+  const langyHandoffStore = LangyTurnHandoffStore.create({ redis: redis! });
   const langyTokenBuffer = createLangyTokenBuffer({ redis });
   const langyTitleGenerator = createLangyConversationTitleGenerator({
     messages: langyPersistence.trustedMessages,
@@ -1694,7 +1696,7 @@ export function initializeDefaultApp(options?: {
             () => undefined,
           ),
         admission: ports.admission,
-        accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
+        accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
         handoffStore: redis ? langyHandoffStore : null,
         messages: ports.messages,
       }),

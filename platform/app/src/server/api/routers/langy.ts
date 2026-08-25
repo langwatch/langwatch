@@ -17,6 +17,7 @@ import type { App } from "~/server/app-layer/app";
 import {
   AGENT_CHAT_TIMEOUT_MS,
   ADOPTABLE_CONVERSATION_ID,
+  LangyTurnAccessStore,
 } from "@langwatch/langy-server";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
@@ -29,7 +30,6 @@ import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
 import {
@@ -233,7 +233,7 @@ async function canWatchTurn({
 }): Promise<boolean> {
   const connection = tryGetApp()?.redis ?? null;
   if (connection) {
-    const access = createLangyTurnAccessStore({ redis: connection });
+    const access = LangyTurnAccessStore.create({ redis: connection });
     if (
       await access.isTurnActor({ projectId, conversationId, turnId, userId })
     ) {

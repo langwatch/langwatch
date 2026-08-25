@@ -8,7 +8,7 @@ import {
   resolveActingGithubLogin,
   resolveLangyMirrorTier,
 } from "@langwatch/langy-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 import { LangyCredentialRepository } from "../repositories/langy-credential.repository";
 

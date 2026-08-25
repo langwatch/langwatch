@@ -12,7 +12,7 @@ import {
   langyTurnToolCallSchema,
   parseConversationTurnKey,
 } from "@langwatch/langy-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
 /**

@@ -8,9 +8,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  createLangyResourceLinkStore,
+  LangyResourceLinksStore,
   type LangyLinkRedis,
-} from "../langyResourceLinks";
+} from "@langwatch/langy-server";
 
 function fakeRedis() {
   const hashes = new Map<string, Map<string, string>>();
@@ -34,7 +34,7 @@ describe("langyResourceLinkStore", () => {
   describe("when a lookup surfaces links and a later turn resolves them", () => {
     it("resolves every id a remembered link was keyed under", async () => {
       const { redis } = fakeRedis();
-      const store = createLangyResourceLinkStore({ redis });
+      const store = LangyResourceLinksStore.create({ redis });
       const href =
         "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1";
       await store.remember({
@@ -55,7 +55,7 @@ describe("langyResourceLinkStore", () => {
 
     it("returns null for a resource this conversation never surfaced", async () => {
       const { redis } = fakeRedis();
-      const store = createLangyResourceLinkStore({ redis });
+      const store = LangyResourceLinksStore.create({ redis });
 
       expect(
         await store.resolve({ conversationId: "conv-1", id: "unknown" }),
@@ -66,7 +66,7 @@ describe("langyResourceLinkStore", () => {
   describe("when two conversations remember the same resource id", () => {
     it("keeps each conversation's links invisible to the other", async () => {
       const { redis } = fakeRedis();
-      const store = createLangyResourceLinkStore({ redis });
+      const store = LangyResourceLinksStore.create({ redis });
       await store.remember({
         conversationId: "conv-1",
         links: [{ id: "run_1", href: "https://app.langwatch.ai/a/x" }],
@@ -81,7 +81,7 @@ describe("langyResourceLinkStore", () => {
   describe("when links are written", () => {
     it("refreshes the conversation key's TTL on every write", async () => {
       const { redis } = fakeRedis();
-      const store = createLangyResourceLinkStore({ redis });
+      const store = LangyResourceLinksStore.create({ redis });
       await store.remember({
         conversationId: "conv-1",
         links: [{ id: "run_1", href: "https://app.langwatch.ai/a/x" }],
@@ -100,7 +100,7 @@ describe("langyResourceLinkStore", () => {
 
     it("writes nothing — and touches no TTL — for an empty link set", async () => {
       const { redis } = fakeRedis();
-      const store = createLangyResourceLinkStore({ redis });
+      const store = LangyResourceLinksStore.create({ redis });
       await store.remember({ conversationId: "conv-1", links: [] });
 
       expect(redis.hset).not.toHaveBeenCalled();

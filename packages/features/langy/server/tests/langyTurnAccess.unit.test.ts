@@ -9,7 +9,7 @@
  * POST, so the answer is there when the browser asks.
  */
 import { describe, expect, it } from "vitest";
-import { LangyTurnAccessStore } from "../langyTurnAccess";
+import { LangyTurnAccessStore } from "@langwatch/langy-server";
 
 /** An in-memory stand-in for the Redis surface the store needs. */
 function fakeRedis() {
@@ -19,7 +19,7 @@ function fakeRedis() {
     async get(key: string) {
       return store.get(key) ?? null;
     },
-    async set(key: string, value: string) {
+    async set(key: string, value: string, _mode: "EX", _ttl: number) {
       store.set(key, value);
       return "OK";
     },
@@ -37,7 +37,7 @@ describe("LangyTurnAccessStore", () => {
   describe("given the user who started the turn", () => {
     it("confirms them immediately — no fold to wait for", async () => {
       const redis = fakeRedis();
-      const store = new LangyTurnAccessStore(redis);
+      const store = LangyTurnAccessStore.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor(ACCESS)).toBe(true);
@@ -47,7 +47,7 @@ describe("LangyTurnAccessStore", () => {
   describe("given a different user", () => {
     it("does not confirm them — access is per-actor", async () => {
       const redis = fakeRedis();
-      const store = new LangyTurnAccessStore(redis);
+      const store = LangyTurnAccessStore.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor({ ...ACCESS, userId: "mallory" })).toBe(
@@ -57,7 +57,7 @@ describe("LangyTurnAccessStore", () => {
 
     it("does not confirm across projects, even for the same user", async () => {
       const redis = fakeRedis();
-      const store = new LangyTurnAccessStore(redis);
+      const store = LangyTurnAccessStore.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor({ ...ACCESS, projectId: "p2" })).toBe(
@@ -71,7 +71,7 @@ describe("LangyTurnAccessStore", () => {
       // `false` is NOT a denial — it means "no fast answer". A shared-conversation
       // viewer has no record here and must fall through to the fold, which is
       // exactly what enforces sharing.
-      const store = new LangyTurnAccessStore(fakeRedis());
+      const store = LangyTurnAccessStore.create({ redis: fakeRedis() });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
   });
@@ -80,7 +80,17 @@ describe("LangyTurnAccessStore", () => {
     it("fails closed", async () => {
       const redis = fakeRedis();
       redis.store.set("langy:turn-access:{conv-1}:turn-1", "not json");
-      const store = new LangyTurnAccessStore(redis);
+      const store = LangyTurnAccessStore.create({ redis });
+      expect(await store.isTurnActor(ACCESS)).toBe(false);
+    });
+
+    it("fails closed when valid JSON has the wrong shape", async () => {
+      const redis = fakeRedis();
+      redis.store.set(
+        "langy:turn-access:{conv-1}:turn-1",
+        JSON.stringify({ ...ACCESS, userId: 123 }),
+      );
+      const store = LangyTurnAccessStore.create({ redis });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
   });

@@ -12,7 +12,7 @@
  * `occurredAt`, `data` — which the server's full (branded-envelope) event types
  * satisfy structurally, and which a wire-parsed tail event satisfies exactly.
  */
-import { z } from "zod/v4";
+import { z } from "zod";
 
 import {
   LANGY_CONVERSATION_EVENT_TYPES,

@@ -1,5 +1,5 @@
 import type { LangyTitleSource } from "@langwatch/langy-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 /**
  * Langy conversation process manager (ADR-049 §4) — typed contracts for the

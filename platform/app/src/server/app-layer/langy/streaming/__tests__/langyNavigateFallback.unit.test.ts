@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentService } from "@langwatch/agent-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
 vi.mock("~/env.mjs", () => ({
   env: { BASE_HOST: "https://app.langwatch.ai" },
@@ -40,12 +41,11 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
-    simulations: { runs: { getScenarioRunData } },
+    simulations: { tryGetScenarioRunData: getScenarioRunData },
     projects: { tryGetById: getProjectById },
     experiments: { findById: findExperimentById },
     prompts: { tryGetPromptByIdOrHandle },
     dataset: { getBySlugOrId: getDatasetBySlugOrId },
-    evaluators: { tryGetById: getEvaluatorById },
     monitors: { tryGetMonitorById },
   }),
 }));
@@ -68,6 +68,7 @@ const resolve = (resourceId: string) =>
     projectId: "proj_1",
     resourceId,
     agents: { getById: getAgentByIdOrThrow } as unknown as AgentService,
+    evaluators: { tryGetById: getEvaluatorById } as unknown as EvaluatorService,
   });
 
 beforeEach(() => {

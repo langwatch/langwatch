@@ -16,7 +16,7 @@
  *
  * The resource list is the CLI's own, per `feature-map.json`.
  */
-import type * as z from "zod/v4";
+import type * as z from "zod";
 import {
   dashboardProbeSchema,
   evaluatorConfigProbeSchema,

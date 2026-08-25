@@ -49,7 +49,7 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "./langyRelayFrame";
-import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import type { LangyResourceLinkStore } from "@langwatch/langy-server";
 import { LANGY_EMPTY_TURN_FALLBACK } from "./langyTokenBuffer";
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an

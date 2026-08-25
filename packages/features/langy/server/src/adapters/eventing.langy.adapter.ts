@@ -31,7 +31,7 @@ import {
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const LangyConversationStartedEventSchema = EventSchema.extend({
   type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED),
