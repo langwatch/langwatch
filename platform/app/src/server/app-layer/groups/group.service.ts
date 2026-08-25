@@ -371,9 +371,7 @@ export class GroupRestService {
     });
     if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
-      throw new ScimManagedGroupError(
-        "Cannot manually remove members from a SCIM-managed group",
-      );
+      throw new ScimManagedGroupError(groupId);
     }
 
     await this.repo.removeMember({ groupId, organizationId, userId, actor });

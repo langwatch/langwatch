@@ -29,6 +29,7 @@ import {
 // both paths answer the customer with the same `scim_managed_group` code.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -1254,10 +1255,14 @@ export class RoleBindingService {
 
     // Removals first: the fail-safe direction. Their deny is enforced against
     // the projection before this returns, so an interrupted edit under-grants.
-    for (const userId of memberUserIdsToRemove) {
+    //
+    // One call, not one per user: the writer resolves the whole set in a single
+    // read and ends it in a single command batch, so an admin dropping fifty
+    // people bumps the authz epoch once instead of fifty times.
+    if (memberUserIdsToRemove.length > 0) {
       await this.writer.removeGroupMembersWhere({
         organizationId,
-        where: { groupId, userId },
+        where: { groupId, userId: memberUserIdsToRemove },
         actor,
         reason: "removed from group",
       });

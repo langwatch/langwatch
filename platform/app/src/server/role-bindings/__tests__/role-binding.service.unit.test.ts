@@ -424,10 +424,13 @@ describe("RoleBindingService applyGroupEdits", () => {
           actor,
         }),
       );
+      // One call carrying the whole set, not one call per user: the removal
+      // is a single read and a single epoch bump however many people it names.
+      expect(removeGroupMembersWhere).toHaveBeenCalledTimes(1);
       expect(removeGroupMembersWhere).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: "org_1",
-          where: { groupId: "group_1", userId: "user_removed" },
+          where: { groupId: "group_1", userId: ["user_removed"] },
         }),
       );
       // The mock call orders are process-wide monotonic counters, so a lower

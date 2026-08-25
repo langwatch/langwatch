@@ -513,8 +513,12 @@ export const groupRouter = createTRPCRouter({
             scopeId: z.string(),
           }),
         ),
-        memberUserIdsToAdd: z.array(z.string()),
-        memberUserIdsToRemove: z.array(z.string()),
+        // `.min(1)` on the elements, not on the arrays: an empty array is a
+        // legitimate "change nothing here", but a blank id inside one is not
+        // an id at all, and a blank reaching the membership writer would widen
+        // its filter rather than narrow it.
+        memberUserIdsToAdd: z.array(z.string().min(1)),
+        memberUserIdsToRemove: z.array(z.string().min(1)),
       }),
     )
     .permission("organization:manage")
