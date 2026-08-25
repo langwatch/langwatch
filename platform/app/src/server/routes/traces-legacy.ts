@@ -20,8 +20,6 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import type { Span, Trace } from "~/server/tracer/types";
@@ -33,8 +31,6 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "~/server/traces/trace-formatting";
-
-const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
 
@@ -71,7 +67,8 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: message, status: 401 as const, body: { message } };
   }
 
-  const resolved = await tokenResolver.resolve({
+  const apiKeys = c.app.apiKeys;
+  const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -93,7 +90,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
 
   const markUsed = () => {
     if (resolved.type === "apiKey") {
-      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 
@@ -184,7 +181,7 @@ secured.access(tracesShareAuth).post("/trace/:id/share", async (c) => {
 
   const traceId = c.req.param("id");
 
-  const share = await getApp().share.createShare({
+  const share = await c.app.share.createShare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
@@ -204,7 +201,7 @@ secured.access(tracesShareAuth).post("/trace/:id/unshare", async (c) => {
 
   const traceId = c.req.param("id");
 
-  await getApp().share.unshare({
+  await c.app.share.unshare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
