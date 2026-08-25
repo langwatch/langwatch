@@ -116,6 +116,13 @@ Feature: A dev stack does not outlive whoever started it
     Then the sentinel is what started it, so no window exists in which it had no guard
 
   @unit
+  Scenario: A sentinel that cannot be started does not stop the command
+    Given a dev stack started from a shell
+    When the sentinel cannot be started, or comes up and names no stack
+    Then the command runs anyway, unguarded against a killed supervisor but running
+    And the supervisor says the sentinel did not come up
+
+  @unit
   Scenario: A killed supervisor alone does not take a living launcher's stack
     Given a dev stack started from a shell
     When only the supervisor is killed outright

@@ -18,6 +18,7 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -245,12 +246,29 @@ function runAsGroupLeader(
 function runSupervised(
   args: string[],
   env: Record<string, string> = {},
+  { supervisor = SUPERVISOR }: { supervisor?: string } = {},
 ): { stdout: string; stderr: string; status: number | null } {
-  const r = spawnSync(process.execPath, [SUPERVISOR, ...args], {
+  const r = spawnSync(process.execPath, [supervisor, ...args], {
     encoding: "utf8",
     env: { ...process.env, ...FAST, ...env },
   });
   return { stdout: r.stdout, stderr: r.stderr, status: r.status };
+}
+
+/**
+ * A copy of the supervisor with one string replaced, for the failures that
+ * cannot be provoked from the outside: a sentinel that will not spawn, or one
+ * that comes up and names no stack. The copy is the real script otherwise, and
+ * it imports nothing but node builtins, so it runs anywhere.
+ */
+function supervisorWith(from: string, to: string): string {
+  const source = readFileSync(SUPERVISOR, "utf8");
+  if (!source.includes(from)) {
+    throw new Error(`dev-supervisor.mjs no longer contains ${from}`);
+  }
+  const file = path.join(scratch, `${marker}-supervisor.mjs`);
+  writeFileSync(file, source.replace(from, to), "utf8");
+  return file;
 }
 
 describe("dev stack supervisor", () => {
@@ -515,6 +533,45 @@ describe("dev stack supervisor", () => {
 
         expect(result.status).toBe(0);
         expect(result.stdout).toBe(`${marker}-unsupervised\n`);
+      });
+
+      /** @scenario "A sentinel that cannot be started does not stop the command" */
+      it("runs the command anyway when the sentinel will not spawn", () => {
+        // spawn hands back a child and only then emits `error`, so this is the
+        // asynchronous failure: an unheard one takes the supervisor down with
+        // it, which is the one thing supervision must never do.
+        const result = runSupervised(
+          ["sh", "-c", `echo ${marker}-ran`],
+          {},
+          {
+            supervisor: supervisorWith(
+              "      process.execPath,\n      [\n        SELF,",
+              '      "/definitely-not-node",\n      [\n        SELF,',
+            ),
+          },
+        );
+
+        expect(result.stdout).toBe(`${marker}-ran\n`);
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("sentinel did not come up");
+      });
+
+      /** @scenario "A sentinel that cannot be started does not stop the command" */
+      it("runs the command anyway when the sentinel names no stack", () => {
+        const result = runSupervised(
+          ["sh", "-c", `echo ${marker}-ran`],
+          {},
+          {
+            supervisor: supervisorWith(
+              "async function runSentinel(args, env) {",
+              "async function runSentinel(args, env) {\n  return 1;",
+            ),
+          },
+        );
+
+        expect(result.stdout).toBe(`${marker}-ran\n`);
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("sentinel did not come up");
       });
 
       /** @scenario "A command still runs when it cannot be supervised" */

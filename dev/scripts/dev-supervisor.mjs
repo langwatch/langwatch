@@ -303,11 +303,12 @@ async function runSentinel(args, env) {
 }
 
 /**
- * Starts the sentinel, which starts the stack. Returns null when it could not
- * be started, which is never a gate: the caller falls back to running the
- * command itself, unguarded against its own SIGKILL but running.
+ * Starts the sentinel, which starts the stack, and waits for it to say which
+ * pid the stack got. Returns null when it never does, so the caller can run
+ * the command itself: an unguarded run is the cost of a sentinel that will not
+ * start, and a dev server that refuses to come up is not.
  */
-function startSentinel({ leader, argv, env }) {
+async function startSentinel({ leader, argv, env }) {
   let proc = null;
   try {
     proc = spawn(
@@ -335,24 +336,47 @@ function startSentinel({ leader, argv, env }) {
   // The handshake pipe is what keeps us alive while the stack runs.
   proc.unref();
 
-  let resolvePid = null;
-  const pid = new Promise((r) => {
-    resolvePid = r;
-  });
-  let onExit = () => {};
-  readHandshake(proc.stdio[HANDSHAKE_FD], {
-    onPid: (value) => resolvePid(value),
-    onExit: (value) => onExit(value ?? exitCodeFor(null)),
+  // spawn reports some failures only after it has handed back a child, and an
+  // "error" nobody listens for takes this process down with it — which is the
+  // one thing supervision must never do to the command it is supervising.
+  let failure = null;
+  const failed = new Promise((resolve) => {
+    proc.on("error", (err) => {
+      failure = err;
+      resolve();
+    });
   });
 
+  let stackPid = null;
+  let onExit = null;
+  let exitBeforeAsked = null;
+  const deliver = (code) => {
+    if (onExit === null) exitBeforeAsked = code;
+    else onExit(code);
+  };
+  const reported = new Promise((resolve) => {
+    readHandshake(proc.stdio[HANDSHAKE_FD], {
+      onPid: (value) => {
+        stackPid = value;
+        resolve();
+      },
+      onExit: (value) => deliver(value ?? exitCodeFor(null)),
+    });
+  });
+
+  await Promise.race([reported, failed]);
+  if (stackPid === null) {
+    const why = failure === null ? "it named no stack" : failure.message;
+    stderr(`${PREFIX} the sentinel did not come up (${why}), running on.\n`);
+    return null;
+  }
+
   return {
-    target: async () => {
-      const stackPid = await pid;
-      return stackPid === null ? null : -stackPid;
-    },
+    target: async () => -stackPid,
     onFailed: () => {},
     onExit: (cb) => {
       onExit = cb;
+      if (exitBeforeAsked !== null) cb(exitBeforeAsked);
     },
   };
 }
@@ -430,9 +454,9 @@ function watchLauncher({ leader, env, onGone }) {
  * command here. A sentinel that cannot be started falls back to the direct
  * run rather than failing the command.
  */
-function startRun(argv, env, { detached, leader }) {
+async function startRun(argv, env, { detached, leader }) {
   if (detached) {
-    const sentinel = startSentinel({ leader, argv, env });
+    const sentinel = await startSentinel({ leader, argv, env });
     if (sentinel !== null) return sentinel;
   }
   return startDirect(argv, env, detached);
@@ -442,11 +466,11 @@ function startRun(argv, env, { detached, leader }) {
  * Runs the command and returns its exit code. With `detached`, the stack leads
  * a process group of its own and every takedown targets that group.
  */
-function passThrough(argv, env, { detached, leader = null }) {
-  const run = startRun(argv, env, { detached, leader });
-  if (run === null) return Promise.resolve(127);
+async function passThrough(argv, env, { detached, leader = null }) {
+  const run = await startRun(argv, env, { detached, leader });
+  if (run === null) return 127;
 
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     let watch = null;
     let takingDown = false;
     let settled = false;
