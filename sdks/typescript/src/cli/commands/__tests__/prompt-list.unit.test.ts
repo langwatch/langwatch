@@ -100,10 +100,12 @@ describe("given a project with 44 prompts", () => {
       async (limit) => {
         const exit = vi
           .spyOn(process, "exit")
-          .mockImplementation((code?: string | number | null | undefined) => {
+          .mockImplementation((code?: string | number | null) => {
             throw new Error(`process.exit(${String(code)})`);
           });
-        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const error = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => undefined);
 
         await expect(listCommand({ limit })).rejects.toThrow("process.exit(1)");
         expect(error.mock.calls[0]?.[0]).toContain("--limit takes");
