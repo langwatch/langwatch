@@ -1,16 +1,16 @@
 import { Text } from "@chakra-ui/react";
 
-interface MatchCounterProps {
+type FindMatchCounterProps = {
   isSearching: boolean;
   matchCount: number;
   currentIndex: number;
-}
+};
 
-export function MatchCounter({
+export function FindMatchCounter({
   isSearching,
   matchCount,
   currentIndex,
-}: MatchCounterProps) {
+}: FindMatchCounterProps) {
   const label = isSearching
     ? "…"
     : matchCount === 0

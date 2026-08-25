@@ -1,10 +1,10 @@
 import { create } from "zustand";
 
-interface FindState {
+type FindState = {
   isOpen: boolean;
   open: () => void;
   close: () => void;
-}
+};
 
 export const useFindStore = create<FindState>((set) => ({
   isOpen: false,

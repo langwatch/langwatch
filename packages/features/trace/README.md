@@ -27,9 +27,10 @@ reader until that complete migration.
 `web` owns browser-safe trace presentation components and helpers: ANSI and
 preview formatting, prompt/SDK/origin labels, time and URL display state, the
 input/output and media-strip views, and the billed-versus-bundled cost split.
-The app keeps thin compatibility adapters while page composition,
-authentication, data fetching, and every trace transport response remain in the
-app.
+It also owns the loaded-trace find index, match cycling, browser highlighting,
+and find-bar presentation. The app keeps thin compatibility adapters while
+page composition, authentication, data fetching, and every trace transport
+response remain in the app.
 
 See [ADR-001](./adrs/001-trace-read-boundary.md) and the
 [read contract](./specs/trace-read-service.feature).

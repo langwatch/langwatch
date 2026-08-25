@@ -21,7 +21,9 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
-    "react": "^19.2.7"
+    "lucide-react": "^1.22.0",
+    "react": "^19.2.7",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

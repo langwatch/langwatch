@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFindStore } from "../../stores/findStore";
+import { useFindStore } from "@langwatch/trace-web";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 

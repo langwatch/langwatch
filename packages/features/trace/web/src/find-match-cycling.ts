@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-export function useMatchCycling(matches: string[]): {
+export function useFindMatchCycling(matches: string[]): {
   currentIndex: number;
   currentId: string | null;
   next: () => void;
-  prev: () => void;
+  previous: () => void;
 } {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -14,18 +14,18 @@ export function useMatchCycling(matches: string[]): {
 
   const next = useCallback(() => {
     if (matches.length === 0) return;
-    setCurrentIndex((i) => (i + 1) % matches.length);
+    setCurrentIndex((index) => (index + 1) % matches.length);
   }, [matches.length]);
 
-  const prev = useCallback(() => {
+  const previous = useCallback(() => {
     if (matches.length === 0) return;
-    setCurrentIndex((i) => (i - 1 + matches.length) % matches.length);
+    setCurrentIndex((index) => (index - 1 + matches.length) % matches.length);
   }, [matches.length]);
 
   return {
     currentIndex,
     currentId: matches[currentIndex] ?? null,
     next,
-    prev,
+    previous,
   };
 }

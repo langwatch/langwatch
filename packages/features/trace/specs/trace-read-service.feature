@@ -39,3 +39,9 @@ Feature: Trace span-tree read service
     When it is consumed by the app trace explorer
     Then it does not fetch, authorize, or reshape a trace response
     And existing route payload fields and nullability remain authoritative in the app
+
+  Scenario: Loaded-trace find remains a browser-owned presentation behaviour
+    Given the app supplies the currently loaded trace rows to the Trace browser package
+    When the viewer searches, cycles, or closes the find bar
+    Then matching rows are indexed and highlighted without another trace request
+    And the app retains only query, shortcut, and visual-skin composition

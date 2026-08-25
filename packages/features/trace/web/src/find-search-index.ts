@@ -1,13 +1,33 @@
 import { useMemo, useRef } from "react";
-import type { TraceListItem } from "../../types/trace";
+
+export type TraceSearchItem = {
+  traceId: string;
+  name: string;
+  serviceName: string;
+  input: string | null;
+  output: string | null;
+  error?: string;
+  errorSpanName?: string;
+  conversationId?: string;
+  userId?: string;
+  traceName?: string;
+  models: string[];
+  evaluations: Array<{
+    evaluatorName: string | null;
+    label: string | null;
+  }>;
+  events: {
+    groups: Array<{ name: string }>;
+  };
+};
 
 const MIN_QUERY_LENGTH = 2;
 
-function buildSearchableText(trace: TraceListItem): string {
+function buildSearchableText(trace: TraceSearchItem): string {
   const evaluationText = trace.evaluations
-    .map((e) => `${e.evaluatorName ?? ""} ${e.label ?? ""}`)
+    .map((evaluation) => `${evaluation.evaluatorName ?? ""} ${evaluation.label ?? ""}`)
     .join(" ");
-  const eventText = trace.events.groups.map((e) => e.name).join(" ");
+  const eventText = trace.events.groups.map((event) => event.name).join(" ");
 
   return [
     trace.traceId,
@@ -24,7 +44,7 @@ function buildSearchableText(trace: TraceListItem): string {
     evaluationText,
     eventText,
   ]
-    .filter((v): v is string => typeof v === "string" && v.length > 0)
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(" ")
     .toLowerCase();
 }
@@ -33,11 +53,11 @@ export function useTraceSearchIndex({
   traces,
   query,
 }: {
-  traces: TraceListItem[];
+  traces: TraceSearchItem[];
   query: string;
 }): string[] {
   const cacheRef = useRef<{
-    traces: TraceListItem[];
+    traces: TraceSearchItem[];
     map: Map<string, string>;
   }>({ traces: [], map: new Map() });
 
@@ -52,12 +72,12 @@ export function useTraceSearchIndex({
     const cache = cacheRef.current.map;
     const matches: string[] = [];
     for (const trace of traces) {
-      let text = cache.get(trace.traceId);
-      if (text === undefined) {
-        text = buildSearchableText(trace);
-        cache.set(trace.traceId, text);
+      let searchableText = cache.get(trace.traceId);
+      if (searchableText === void 0) {
+        searchableText = buildSearchableText(trace);
+        cache.set(trace.traceId, searchableText);
       }
-      if (text.includes(needle)) matches.push(trace.traceId);
+      if (searchableText.includes(needle)) matches.push(trace.traceId);
     }
     return matches;
   }, [traces, query]);
