@@ -13,6 +13,7 @@ import {
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
+import { resolveSeriesLabel, type TriggerActionParams } from "@langwatch/automation-web";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -20,8 +21,6 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
-import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
-import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { TriggerKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";

@@ -58,6 +58,7 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
+import { deriveSeriesIdentifier } from "@langwatch/automation-contract";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -73,7 +74,6 @@ import {
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
-import { deriveSeriesIdentifier } from "../../../../components/analytics/seriesIdentifier";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterIconWithBadge } from "../../../../components/filters/FilterIconWithBadge";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";

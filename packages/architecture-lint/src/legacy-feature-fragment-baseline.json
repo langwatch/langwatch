@@ -483,16 +483,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/logic/seriesOptions.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/logic/triggerActionParams.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/logic/useGraphAlertLabels.ts",
       "kind": "legacy-implementation"
     },

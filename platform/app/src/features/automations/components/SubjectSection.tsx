@@ -34,6 +34,7 @@ import {
   dailyCapAdvice,
   estimateFiringRate,
   estimateRatePerDay,
+  deriveSeriesOptionsFromGraph,
 } from "@langwatch/automation-web";
 import {
   type AutomationDraft,
@@ -43,7 +44,6 @@ import {
   type ReportSourceKind,
   subjectIsSet,
 } from "../logic/draftReducer";
-import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";

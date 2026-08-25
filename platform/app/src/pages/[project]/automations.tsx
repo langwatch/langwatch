@@ -31,7 +31,11 @@ import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { AutomationHistory, AutomationUseCaseStrip } from "@langwatch/automation-web";
+import {
+  AutomationHistory,
+  AutomationUseCaseStrip,
+  type TriggerActionParams,
+} from "@langwatch/automation-web";
 import {
   AlertRuleCell,
   AlertSubjectCell,
@@ -46,7 +50,6 @@ import {
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
-import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";

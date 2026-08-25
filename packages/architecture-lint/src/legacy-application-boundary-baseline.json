@@ -999,9 +999,6 @@
       "platform/app/src/features/automations/logic/reportSchedule.ts": [
         "~/server/app-layer/automations/report.builder"
       ],
-      "platform/app/src/features/automations/logic/triggerActionParams.ts": [
-        "~/server/app-layer/automations/graph-alert.builder"
-      ],
       "platform/app/src/features/automations/providers/dataset/client.tsx": [
         "~/server/datasets/types"
       ],

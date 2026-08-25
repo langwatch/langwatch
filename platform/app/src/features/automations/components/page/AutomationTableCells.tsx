@@ -13,14 +13,13 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import { resolveSeriesLabel, type TriggerActionParams } from "@langwatch/automation-web";
 import { HelpCircle, Plus } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
-import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
-import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 

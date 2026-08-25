@@ -1,6 +1,6 @@
 import { useMemo } from "react";
+import { resolveSeriesLabel } from "@langwatch/automation-web";
 import { api } from "~/utils/api";
-import { resolveSeriesLabel } from "./seriesOptions";
 
 /**
  * Resolves the human-facing names a graph alert renders with — the graph's

@@ -13,11 +13,13 @@ history, report schedules, delivery policy, and project email suppression.
   candidate decisions. It receives analytics, ClickHouse, provider, and source
   lookup ports at construction; Trigger/CustomGraph/TriggerSent persistence is
   private to the service.
-- The contract owns graph-alert threshold/no-data policy and series-name
-  parsing shared by event and heartbeat dispatch.
-- `web/` owns browser-safe authoring helpers, template variable catalogues,
-  Liquid JSON substitution, cadence UI, overview presentation, and the browser
-  transport client.
+- The contract owns graph-alert threshold/no-data policy, series-name parsing,
+  and canonical persisted series identifiers shared by event and heartbeat
+  dispatch.
+- `web/` owns browser-safe authoring helpers, graph-series presentation and
+  display action parameters, template variable catalogues, Liquid JSON
+  substitution, cadence UI, overview presentation, and the browser transport
+  client.
 
 The process-owned composition root is
 `platform/app/src/runtime/app/features/automation.ts` (`AppAutomationRuntime`).
