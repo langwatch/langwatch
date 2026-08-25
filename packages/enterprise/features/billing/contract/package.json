@@ -13,6 +13,7 @@
   "dependencies": {
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }

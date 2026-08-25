@@ -20,11 +20,11 @@ export abstract class IngestionTemplateRepository {
   abstract listAdminVisible(
     organizationId: string,
   ): Promise<IngestionTemplate[]>;
-  abstract findVisible(input: {
+  abstract tryFindVisible(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null>;
-  abstract findPlatform(id: string): Promise<IngestionTemplate | null>;
+  abstract tryFindPlatform(id: string): Promise<IngestionTemplate | null>;
   abstract createWithAudit(input: {
     template: NewIngestionTemplate;
     callerUserId: string;

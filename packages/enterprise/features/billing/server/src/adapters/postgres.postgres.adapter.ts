@@ -1,15 +1,12 @@
-import { PrismaBillingOrganizationRepository } from "../repositories/prisma/prisma.billing-organization.repository";
 import { PostgresNotificationAdapter } from "@langwatch/notification-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaOrganizationPricingRepository } from "../repositories/prisma/prisma.organization-pricing.repository";
 import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository";
-import type { BillingOrganizationRepository } from "../ports/billing-organization.port";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationPricingRepository } from "../ports/organization-pricing.port";
 import type { BillingSubscriptionRepository } from "../ports/subscription.port";
 
 export type PostgresBillingPersistence = {
-  organizations: BillingOrganizationRepository;
   notifications: NotificationService;
   organizationPricing: OrganizationPricingRepository;
   subscriptions: BillingSubscriptionRepository;
@@ -25,7 +22,6 @@ export class PostgresBillingAdapter {
 
   build(): PostgresBillingPersistence {
     return {
-      organizations: PrismaBillingOrganizationRepository.create(this.database),
       notifications: PostgresNotificationAdapter.create({
         database: this.database,
       }).build(),

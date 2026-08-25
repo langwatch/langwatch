@@ -161,10 +161,14 @@ export abstract class IngestionTemplatesService {
   abstract listForOrgAdmin(input: {
     organizationId: string;
   }): Promise<IngestionTemplate[]>;
-  abstract findByIdForOrg(input: {
+  abstract tryFindByIdForOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null>;
+  abstract getByIdForOrg(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate>;
   abstract createOrgTemplate(
     input: CreateIngestionTemplateInput,
   ): Promise<IngestionTemplate>;

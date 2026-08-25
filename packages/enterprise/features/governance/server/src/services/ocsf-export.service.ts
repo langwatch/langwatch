@@ -29,7 +29,7 @@ export class DefaultGovernanceOcsfExportService extends GovernanceOcsfExportServ
 
   async list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage> {
     const parsed = governanceOcsfExportInputSchema.parse(input);
-    const tenantId = await this.repository.resolveGovernanceTenantId(
+    const tenantId = await this.repository.tryResolveGovernanceTenantId(
       parsed.organizationId,
     );
     if (!tenantId) {

@@ -19,11 +19,7 @@
  */
 
 import {
-  IngestionSourceNotFoundError,
-  IngestionSourceService,
-  SUPPORTED_SOURCE_TYPES,
-} from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import {
+  GOVERNANCE_INGESTION_SOURCE_TYPES,
   getStarterTemplate,
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
@@ -34,7 +30,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const sourceTypeSchema = z.enum(
-  SUPPORTED_SOURCE_TYPES as readonly [string, ...string[]],
+  GOVERNANCE_INGESTION_SOURCE_TYPES,
 );
 
 const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
@@ -97,7 +93,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionSources;
       const rows = await service.list(input.organizationId);
       return rows.map(toDto);
     }),
@@ -107,15 +103,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
-      const row = await service.findById(input.id, input.organizationId);
-      if (!row) {
-        // Same named failure the mutations raise, so the detail page reads
-        // one channel: a code the registry has copy for, not a bare 404 the
-        // client has to sniff out of the tRPC envelope.
-        throw new IngestionSourceNotFoundError(input.id);
-      }
-      return toDto(row);
+      const service = ctx.app.governance.ingestionSources;
+      return toDto(await service.getById(input.id, input.organizationId));
     }),
 
   /**
@@ -138,11 +127,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
     )
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionSources;
       const created = await service.createSource({
         organizationId: input.organizationId,
         teamId: input.teamId ?? null,
-        sourceType: input.sourceType as (typeof SUPPORTED_SOURCE_TYPES)[number],
+        sourceType: input.sourceType,
         name: input.name,
         description: input.description ?? null,
         parserConfig: input.parserConfig,
@@ -171,7 +160,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     )
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionSources;
       const updated = await service.updateSource({
         id: input.id,
         organizationId: input.organizationId,
@@ -193,7 +182,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionSources;
       const rotated = await service.rotateSecret(
         input.id,
         input.organizationId,
@@ -208,7 +197,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionSourceService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionSources;
       const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),

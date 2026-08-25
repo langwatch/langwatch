@@ -50,7 +50,7 @@ export class IngestionPullLifecycleService {
         sourceId: source.id,
         cron: source.pullSchedule,
         configVersion,
-        cursor: this.cursorOf(source.pollerCursor),
+        cursor: this.tryCursorOf(source.pollerCursor),
       });
       return;
     }
@@ -87,7 +87,7 @@ export class IngestionPullLifecycleService {
     return { reconciled, failed };
   }
 
-  private cursorOf(cursor: unknown): string | null {
+  private tryCursorOf(cursor: unknown): string | null {
     if (typeof cursor === "string") return cursor;
     return cursor == null ? null : JSON.stringify(cursor);
   }

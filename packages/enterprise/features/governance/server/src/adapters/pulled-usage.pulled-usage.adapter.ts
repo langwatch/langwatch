@@ -18,8 +18,8 @@ import {
 } from "@langwatch/eventing";
 import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
-  PulledUsageLedgerProcessService,
-} from "../services/pulled-usage-ledger-process.service";
+  PulledUsageLedgerProcess,
+} from "../processes/pulled-usage-ledger.process";
 
 type PulledUsageEvent = PulledUsageObservedEvent & Event;
 
@@ -43,12 +43,12 @@ const RecordPulledUsageCommand = defineCommand({
 
 export class PulledUsageEventingAdapter {
   private constructor(
-    private readonly ledger: PulledUsageLedgerProcessService | undefined,
+    private readonly ledger: PulledUsageLedgerProcess | undefined,
   ) {}
 
   static create(
     options: {
-      ledger?: PulledUsageLedgerProcessService;
+      ledger?: PulledUsageLedgerProcess;
     } = {},
   ): PulledUsageEventingAdapter {
     return new PulledUsageEventingAdapter(options.ledger);

@@ -44,7 +44,7 @@ export class BillableEventsQueryService {
     return [startDate, `${endYear}-${endMonth}-01 00:00:00.000`];
   }
 
-async queryBillableEventsTotal({
+async tryQueryBillableEventsTotal({
   organizationId,
   billingMonth,
 }: {
@@ -69,7 +69,7 @@ async queryBillableEventsTotal({
  * Approximate count of distinct billable events for an org in a billing month.
  * Uses HyperLogLog (~1% error, constant memory).
  */
-async queryBillableEventsTotalUniq({
+async tryQueryBillableEventsTotalUniq({
   organizationId,
   billingMonth,
 }: {
@@ -98,7 +98,7 @@ async queryBillableEventsTotalUniq({
  * Approximate count of distinct trace events for an org in a current month.
  * Uses HyperLogLog (~1% error, constant memory).
  */
-async queryTraceSummariesTotalUniq({
+async tryQueryTraceSummariesTotalUniq({
   projectIds,
   billingMonth,
 }: {

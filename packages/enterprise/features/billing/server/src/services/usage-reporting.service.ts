@@ -264,7 +264,9 @@ export class StripeUsageReportingService implements UsageReportingService {
     stripeCustomerId: string;
     startTime: number;
     endTime: number;
-  }) {
+  }): Promise<
+    Awaited<ReturnType<Stripe["billing"]["meters"]["listEventSummaries"]>>
+  > {
     try {
       return await this.stripe.billing.meters.listEventSummaries(this.meterId, {
         customer: stripeCustomerId,

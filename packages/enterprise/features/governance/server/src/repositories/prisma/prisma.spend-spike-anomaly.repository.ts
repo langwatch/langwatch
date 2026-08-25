@@ -32,7 +32,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return rows.map((row) => anomalyRuleSchema.parse(row));
   }
 
-  async resolveGovernanceTenantId(
+  async tryResolveGovernanceTenantId(
     organizationId: string,
   ): Promise<string | null> {
     const project = await this.prisma.project.findFirst({

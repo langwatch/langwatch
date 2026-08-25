@@ -113,7 +113,7 @@ export class StripeCustomerCurrencyService {
  * bug this whole preflight exists to prevent. Callers must invoke this before
  * any write: every failure here is one no database change can help.
  */
-  require(
+  getCurrency(
   resolution: CheckoutCurrencyResolution,
   ): CurrencyType {
   switch (resolution.status) {

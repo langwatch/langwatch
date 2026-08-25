@@ -67,7 +67,7 @@ class MemoryAnomalyRepository extends SpendSpikeAnomalyRepository {
     return this.rules;
   }
 
-  async resolveGovernanceTenantId(): Promise<string | null> {
+  async tryResolveGovernanceTenantId(): Promise<string | null> {
     return this.tenantId;
   }
 

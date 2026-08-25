@@ -58,11 +58,20 @@ export class IngestionTemplateService extends IngestionTemplatesService {
     return this.repository.listAdminVisible(input.organizationId);
   }
 
-  findByIdForOrg(input: {
+  tryFindByIdForOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null> {
-    return this.repository.findVisible(input);
+    return this.repository.tryFindVisible(input);
+  }
+
+  async getByIdForOrg(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate> {
+    const template = await this.repository.tryFindVisible(input);
+    if (!template) throw new TemplateNotFoundError(input.id);
+    return template;
   }
 
   async createOrgTemplate(
@@ -126,7 +135,7 @@ export class IngestionTemplateService extends IngestionTemplatesService {
     input: CloneIngestionTemplateInput,
   ): Promise<IngestionTemplate> {
     const parsed = cloneIngestionTemplateInputSchema.parse(input);
-    const source = await this.repository.findPlatform(parsed.sourceTemplateId);
+    const source = await this.repository.tryFindPlatform(parsed.sourceTemplateId);
     if (!source) throw new TemplateNotFoundError(parsed.sourceTemplateId);
     return this.createOrgTemplate({
       organizationId: parsed.organizationId,

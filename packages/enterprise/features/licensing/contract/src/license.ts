@@ -73,6 +73,35 @@ export const signedLicenseSchema = z.object({
 
 export type SignedLicense = z.infer<typeof signedLicenseSchema>;
 
+export const platformLicenseInspectionSchema = z.discriminatedUnion("valid", [
+  z.object({
+    source: z.enum(["instance", "organization"]),
+    organizationId: z.string().optional(),
+    valid: z.literal(false),
+    reason: z.enum(["invalid_format", "invalid_signature"]),
+  }),
+  z.object({
+    source: z.enum(["instance", "organization"]),
+    organizationId: z.string().optional(),
+    valid: z.literal(true),
+    expiresAt: z.string(),
+    organizationName: z.string(),
+    expired: z.boolean(),
+  }),
+]);
+
+export const platformLicenseAccessSchema = z.object({
+  allowed: z.boolean(),
+  inspections: z.array(platformLicenseInspectionSchema),
+});
+
+export type PlatformLicenseInspection = z.infer<
+  typeof platformLicenseInspectionSchema
+>;
+export type PlatformLicenseAccess = z.infer<
+  typeof platformLicenseAccessSchema
+>;
+
 /** Compatibility aliases retained while callers migrate schema casing. */
 export const LicensePlanLimitsSchema = licensePlanLimitsSchema;
 export const LicenseDataSchema = licenseDataSchema;

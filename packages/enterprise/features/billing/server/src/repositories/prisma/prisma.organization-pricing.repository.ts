@@ -8,7 +8,7 @@ export class PrismaOrganizationPricingRepository extends OrganizationPricingRepo
     return new PrismaOrganizationPricingRepository(database as PrismaClient);
   }
 
-  async getPricingModel(organizationId: string): Promise<string | null> {
+  async tryGetPricingModel(organizationId: string): Promise<string | null> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { pricingModel: true },

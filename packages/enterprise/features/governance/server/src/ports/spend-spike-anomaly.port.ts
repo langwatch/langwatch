@@ -21,7 +21,7 @@ export abstract class AnomalySpendReaderPort {
 
 export abstract class SpendSpikeAnomalyRepository {
   abstract listActiveRules(): Promise<AnomalyRule[]>;
-  abstract resolveGovernanceTenantId(
+  abstract tryResolveGovernanceTenantId(
     organizationId: string,
   ): Promise<string | null>;
   abstract hasOpenAlert(input: {

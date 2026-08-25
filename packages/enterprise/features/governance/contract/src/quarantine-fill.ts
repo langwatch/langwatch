@@ -30,3 +30,7 @@ export const quarantineFillStatsSchema = z
   })
   .strict();
 export type QuarantineFillStats = z.infer<typeof quarantineFillStatsSchema>;
+
+export abstract class GovernanceQuarantineFillService {
+  abstract evaluate(input: QuarantineFillInput): Promise<QuarantineFillStats>;
+}

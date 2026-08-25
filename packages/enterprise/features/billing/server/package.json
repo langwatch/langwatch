@@ -17,6 +17,7 @@
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/notification-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "geoip-country": "^5.0.202607010001",
     "nanoid": "^5.1.6",

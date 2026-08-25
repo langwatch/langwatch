@@ -1,16 +1,12 @@
 export {
-  PostgresSsoAdapter,
-  type PostgresSsoAdapterOptions,
-} from "./adapters/postgres.postgres.adapter";
-export type { SsoDatabase } from "./ports/sso-database.port";
+  LicensingSsoAdapter,
+  type LicensingSsoAdapterOptions,
+} from "./adapters/licensing.sso.adapter";
 export {
   SsoGateLogger,
   SsoGateService,
   SsoProviderMountInspector,
   type SsoGateServiceOptions,
-  type SsoLicenseInspection,
-  SsoLicenseRepository,
-  SsoLicenseVerifier,
 } from "./services/sso-gate.service";
 export {
   BetterAuthSsoAdapter,

@@ -27,7 +27,7 @@ export class GovernanceSignalService {
   ): Promise<void> {
     if (!this.port.available()) return;
     try {
-      const tenantId = await this.port.resolveLifecycleTenant({
+      const tenantId = await this.port.tryResolveLifecycleTenant({
         organizationId: signal.virtualKey.organizationId,
         preferredProjectId: signal.virtualKey.traceProjectId,
       });
@@ -62,7 +62,7 @@ export class GovernanceSignalService {
       const now = this.port.now();
       const resolved = await this.port.resolveBudgetCrossings(candidates, now);
       for (const crossing of resolved) {
-        const data = this.crossingData(crossing, now);
+        const data = this.tryCrossingData(crossing, now);
         if (data) await this.port.appendBudgetCrossing(data);
       }
     } catch (error) {
@@ -73,7 +73,7 @@ export class GovernanceSignalService {
     }
   }
 
-  private crossingData(
+  private tryCrossingData(
     resolved: GovernanceResolvedBudgetCrossing,
     now: Date,
   ): GovernanceBudgetCrossingData | null {

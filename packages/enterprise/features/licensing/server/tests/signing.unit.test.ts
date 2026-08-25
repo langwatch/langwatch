@@ -13,7 +13,7 @@ import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../src/testing";
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const encodeLicenseKey = cryptography.encodeLicenseKey.bind(cryptography);
 const generateLicenseId = cryptography.generateLicenseId.bind(cryptography);
-const parseLicenseKey = cryptography.parseLicenseKey.bind(cryptography);
+const parseLicenseKey = cryptography.tryParseLicenseKey.bind(cryptography);
 const signLicense = cryptography.signLicense.bind(cryptography);
 const verifySignature = cryptography.verifySignature.bind(cryptography);
 

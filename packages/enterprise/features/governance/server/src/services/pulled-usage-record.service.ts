@@ -75,7 +75,7 @@ export class PulledUsageRecordService {
     return new PulledUsageRecordService(pricing);
   }
 
-  build({
+  tryBuild({
     event,
     source,
     observedAt,

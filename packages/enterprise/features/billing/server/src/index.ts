@@ -11,7 +11,6 @@ export {
 export { StripeErrorTranslatorPort } from "./ports/stripe-error-translator.port";
 export { BillingErrorReporter, NullBillingErrorReporter } from "./ports/error-reporter.port";
 export { NullUsageLimitEmailAdapter, UsageLimitEmailAdapter } from "./ports/usage-limit-email.port";
-export { BillingOrganizationRepository } from "./ports/billing-organization.port";
 export {
   BillableEventsRepository,
   type BillableEventsWindow,

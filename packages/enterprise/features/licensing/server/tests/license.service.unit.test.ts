@@ -24,8 +24,17 @@ class MemoryLicenseRepository extends LicenseRepository {
   readonly stored = new Map<string, StoredLicense>();
   memberCount = 3;
   membersLiteCount = 2;
+  listCalls = 0;
 
-  async readLicense(organizationId: string): Promise<string | null> {
+  async findOrganizationsWithLicense() {
+    this.listCalls++;
+    return [...this.stored].map(([organizationId, license]) => ({
+      organizationId,
+      licenseKey: license.licenseKey,
+    }));
+  }
+
+  async tryReadLicense(organizationId: string): Promise<string | null> {
     return this.stored.get(organizationId)?.licenseKey ?? null;
   }
 
@@ -124,6 +133,46 @@ describe("LicenseService", () => {
     await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(
       UNLIMITED_PLAN,
     );
+  });
+
+  it("lets a valid instance license satisfy platform access without listing organizations", async () => {
+    const result = await service.inspectPlatformAccess({
+      instanceLicenseKey: VALID_LICENSE_KEY,
+    });
+
+    expect(result).toMatchObject({
+      allowed: true,
+      inspections: [{ source: "instance", valid: true }],
+    });
+    expect(repository.listCalls).toBe(0);
+  });
+
+  it("scans organization licenses after an invalid instance candidate and accepts a signed expired license", async () => {
+    repository.stored.set(ORGANIZATION_ID, {
+      licenseKey: EXPIRED_LICENSE_KEY,
+      expiresAt: new Date("2000-01-01T00:00:00.000Z"),
+      validatedAt: new Date("1999-01-01T00:00:00.000Z"),
+    });
+
+    const result = await service.inspectPlatformAccess({
+      instanceLicenseKey: TAMPERED_LICENSE_KEY,
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.inspections).toEqual([
+      expect.objectContaining({
+        source: "instance",
+        valid: false,
+        reason: "invalid_signature",
+      }),
+      expect.objectContaining({
+        source: "organization",
+        organizationId: ORGANIZATION_ID,
+        valid: true,
+        expired: true,
+      }),
+    ]);
+    expect(repository.listCalls).toBe(1);
   });
 
   it("stores a valid signed license before provisioning missing retention", async () => {

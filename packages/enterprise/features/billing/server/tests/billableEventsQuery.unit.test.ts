@@ -57,7 +57,7 @@ describe("queryTraceSummariesTotalUniq", () => {
     it("queries with tenant-scoped and month-bounded params and returns the total", async () => {
       findTraceSummariesTotalUniq.mockResolvedValue(42);
 
-      const result = await service().queryTraceSummariesTotalUniq({
+      const result = await service().tryQueryTraceSummariesTotalUniq({
         projectIds: ["proj-1", "proj-2"],
         billingMonth: "2026-02",
       });
@@ -77,7 +77,7 @@ describe("queryTraceSummariesTotalUniq", () => {
 
       const result = await BillableEventsQueryService.create(
         null,
-      ).queryTraceSummariesTotalUniq({
+      ).tryQueryTraceSummariesTotalUniq({
         projectIds: ["proj-1"],
         billingMonth: "2026-02",
       });
@@ -88,7 +88,7 @@ describe("queryTraceSummariesTotalUniq", () => {
 
   describe("when projectIds is empty", () => {
     it("returns 0 without resolving a repository", async () => {
-      const result = await service().queryTraceSummariesTotalUniq({
+      const result = await service().tryQueryTraceSummariesTotalUniq({
         projectIds: [],
         billingMonth: "2026-02",
       });

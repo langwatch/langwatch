@@ -52,7 +52,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     );
   }
 
-  async findById(id: string): Promise<AnomalyRule | null> {
+  async tryFindById(id: string): Promise<AnomalyRule | null> {
     return this.rows.get(id) ?? null;
   }
 
@@ -128,7 +128,7 @@ describe("AnomalyRuleService", () => {
     });
 
     await expect(
-      service.findById("rule-1", "organization-2"),
+      service.tryFindById("rule-1", "organization-2"),
     ).resolves.toBeNull();
   });
 

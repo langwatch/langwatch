@@ -11,6 +11,7 @@ export {
 } from "./ports/license-usage.port";
 export {
   LicenseRepository,
+  type OrganizationLicenseCandidate,
   type StoredLicense,
 } from "./repositories/license.repository";
 export { LicenseGenerationService } from "./services/license-generation.service";

@@ -51,7 +51,7 @@ export class SubscriptionItemCalculatorService {
     tracesToAdd: number;
     membersToAdd: number;
   }): SubscriptionItemUpdate[] {
-    const planConfig = this.getPlanConfig(input.plan);
+    const planConfig = this.tryGetPlanConfig(input.plan);
     const updates: SubscriptionItemUpdate[] = [];
     let tracesItem: Stripe.SubscriptionItem | undefined;
     let userItem: Stripe.SubscriptionItem | undefined;
@@ -86,7 +86,7 @@ export class SubscriptionItemCalculatorService {
     else if (totalMembers > 0 && planConfig) updates.push({ price: this.prices[planConfig.userPriceKey], quantity: totalMembers });
     if (planItem) updates.push({ id: planItem.id, quantity: 1 });
     else {
-      const basePrice = this.getBasePrice(input.plan);
+      const basePrice = this.tryGetBasePrice(input.plan);
       if (basePrice) updates.push({ price: basePrice, quantity: 1 });
     }
     for (const item of deleteItems) updates.push({ id: item.id, deleted: true });
@@ -105,7 +105,7 @@ export class SubscriptionItemCalculatorService {
   }
 
   createItemsToAdd(plan: PlanType, traces: { quantity: number }, users: { quantity: number }): SubscriptionItemUpdate[] {
-    const config = this.getPlanConfig(plan);
+    const config = this.tryGetPlanConfig(plan);
     const limits = PLAN_LIMITS[plan];
     if (!config || !limits) return [];
     const updates: SubscriptionItemUpdate[] = [];
@@ -117,12 +117,12 @@ export class SubscriptionItemCalculatorService {
     return updates;
   }
 
-  private getPlanConfig(plan: PlanType): StripePlanPriceConfig | undefined {
+  private tryGetPlanConfig(plan: PlanType): StripePlanPriceConfig | undefined {
     return hasConfigForPlan(plan) ? STRIPE_PLAN_CONFIG[plan] : undefined;
   }
 
-  private getBasePrice(plan: PlanType): string | undefined {
-    const config = this.getPlanConfig(plan);
+  private tryGetBasePrice(plan: PlanType): string | undefined {
+    const config = this.tryGetPlanConfig(plan);
     if (config) return this.prices[config.basePriceKey];
     return isStripePriceName(plan) ? this.prices[plan] : undefined;
   }

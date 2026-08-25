@@ -36,11 +36,11 @@ export class AnomalyRuleService {
     return this.repository.list(organizationId);
   }
 
-  async findById(
+  async tryFindById(
     id: string,
     organizationId: string,
   ): Promise<AnomalyRule | null> {
-    const row = await this.repository.findById(id);
+    const row = await this.repository.tryFindById(id);
     if (!row || row.organizationId !== organizationId) return null;
     return row;
   }
@@ -51,11 +51,11 @@ export class AnomalyRuleService {
    * Which org asked is a debugging detail — it goes to the log, not into an
    * error a customer reads (see {@link AnomalyRuleNotFoundError}).
    */
-  private async requireById(
+  async getById(
     id: string,
     organizationId: string,
   ): Promise<AnomalyRule> {
-    const existing = await this.findById(id, organizationId);
+    const existing = await this.tryFindById(id, organizationId);
     if (!existing) {
       throw new AnomalyRuleNotFoundError(id);
     }
@@ -109,7 +109,7 @@ export class AnomalyRuleService {
   }
 
   async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
-    const existing = await this.requireById(input.id, input.organizationId);
+    const existing = await this.getById(input.id, input.organizationId);
     const changes: AnomalyRuleChanges = {};
     if (input.name !== undefined) changes.name = input.name;
     if (input.description !== undefined) changes.description = input.description;
@@ -172,7 +172,7 @@ export class AnomalyRuleService {
   }
 
   async archive(id: string, organizationId: string): Promise<AnomalyRule> {
-    const existing = await this.requireById(id, organizationId);
+    const existing = await this.getById(id, organizationId);
     return this.repository.update(existing.id, {
       archivedAt: this.now(),
       status: "disabled",

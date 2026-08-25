@@ -12,11 +12,17 @@ export class PrismaScimTokenRepository extends ScimTokenRepository {
     return new PrismaScimTokenRepository(database);
   }
 
-  create(input: { organizationId: string; hashedToken: string; description: string | null }) {
+  create(input: {
+    organizationId: string;
+    hashedToken: string;
+    description: string | null;
+  }): ReturnType<ScimTokenDatabase["scimToken"]["create"]> {
     return this.database.scimToken.create({ data: input });
   }
 
-  list(organizationId: string) {
+  list(
+    organizationId: string,
+  ): ReturnType<ScimTokenDatabase["scimToken"]["findMany"]> {
     return this.database.scimToken.findMany({
       where: { organizationId },
       select: { id: true, description: true, createdAt: true, lastUsedAt: true },
@@ -31,7 +37,9 @@ export class PrismaScimTokenRepository extends ScimTokenRepository {
     return result.count > 0;
   }
 
-  findByHash(hashedToken: string) {
+  tryFindByHash(
+    hashedToken: string,
+  ): ReturnType<ScimTokenDatabase["scimToken"]["findFirst"]> {
     return this.database.scimToken.findFirst({ where: { hashedToken } });
   }
 

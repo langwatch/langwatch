@@ -4,9 +4,17 @@ export type StoredLicense = {
   validatedAt: Date;
 };
 
+export type OrganizationLicenseCandidate = {
+  organizationId: string;
+  licenseKey: string;
+};
+
 /** Persistence and seat-count port. Concrete database adapters stay in apps. */
 export abstract class LicenseRepository {
-  abstract readLicense(organizationId: string): Promise<string | null>;
+  abstract findOrganizationsWithLicense(): Promise<
+    OrganizationLicenseCandidate[]
+  >;
+  abstract tryReadLicense(organizationId: string): Promise<string | null>;
   abstract organizationExists(organizationId: string): Promise<boolean>;
   abstract storeLicense(
     organizationId: string,

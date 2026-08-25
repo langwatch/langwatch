@@ -5,7 +5,7 @@ import type {
 
 export abstract class DepartmentRepository {
   abstract getAll(organizationId: string): Promise<Department[]>;
-  abstract getById(input: {
+  abstract tryGetById(input: {
     id: string;
     organizationId: string;
   }): Promise<Department | null>;

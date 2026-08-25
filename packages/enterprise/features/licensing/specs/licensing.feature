@@ -20,6 +20,13 @@ Feature: Enterprise licensing lifecycle
     When the active Cloud license source resolves the organization
     Then it returns the free baseline so another entitlement source may apply
 
+  Scenario: Inspect platform access for another feature
+    Given an optional instance license and organization license candidates
+    When the licensing service inspects platform access
+    Then it verifies the instance candidate before reading organization candidates
+    And it returns the inspected evidence through the portable Licensing contract
+    And a signature-valid expired license remains genuine platform access
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

@@ -1,26 +1,24 @@
-import { ADMIN_FEATURE_ID } from "@langwatch/enterprise-admin-contract";
 import { AUDIT_LOG_FEATURE_ID } from "@langwatch/enterprise-audit-log-contract";
 import { BILLING_FEATURE_ID } from "@langwatch/enterprise-billing-contract";
 import { GOVERNANCE_FEATURE_ID } from "@langwatch/enterprise-governance-contract";
 import { LICENSING_FEATURE_ID } from "@langwatch/enterprise-licensing-contract";
-import { MANAGED_PROVIDERS_FEATURE_ID } from "@langwatch/enterprise-managed-providers-contract";
+import { MANAGED_PROVIDER_FEATURE_ID } from "@langwatch/enterprise-managed-provider-contract";
 import { SAAS_FEATURE_ID } from "@langwatch/enterprise-saas-contract";
 import { SCIM_FEATURE_ID } from "@langwatch/enterprise-scim-contract";
 import { SSO_FEATURE_ID } from "@langwatch/enterprise-sso-contract";
-import { WEBHOOKS_FEATURE_ID } from "@langwatch/enterprise-webhooks-contract";
+import { WEBHOOK_FEATURE_ID } from "@langwatch/enterprise-webhook-contract";
 import { z } from "zod";
 
 export const enterpriseFeatureIdSchema = z.enum([
   LICENSING_FEATURE_ID,
   SSO_FEATURE_ID,
   SCIM_FEATURE_ID,
-  ADMIN_FEATURE_ID,
   AUDIT_LOG_FEATURE_ID,
   BILLING_FEATURE_ID,
   GOVERNANCE_FEATURE_ID,
-  MANAGED_PROVIDERS_FEATURE_ID,
+  MANAGED_PROVIDER_FEATURE_ID,
   SAAS_FEATURE_ID,
-  WEBHOOKS_FEATURE_ID,
+  WEBHOOK_FEATURE_ID,
 ]);
 export type EnterpriseFeatureId = z.infer<typeof enterpriseFeatureIdSchema>;
 
@@ -52,13 +50,6 @@ const SCIM_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   serverPackage: "@langwatch/enterprise-scim-server",
 });
 
-const ADMIN_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
-  id: ADMIN_FEATURE_ID,
-  contractPackage: "@langwatch/enterprise-admin-contract",
-  serverPackage: "@langwatch/enterprise-admin-server",
-  webPackage: "@langwatch/enterprise-admin-web",
-});
-
 const AUDIT_LOG_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   id: AUDIT_LOG_FEATURE_ID,
   contractPackage: "@langwatch/enterprise-audit-log-contract",
@@ -80,10 +71,10 @@ const GOVERNANCE_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
 });
 
 const MANAGED_PROVIDERS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
-  id: MANAGED_PROVIDERS_FEATURE_ID,
-  contractPackage: "@langwatch/enterprise-managed-providers-contract",
-  serverPackage: "@langwatch/enterprise-managed-providers-server",
-  webPackage: "@langwatch/enterprise-managed-providers-web",
+  id: MANAGED_PROVIDER_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-managed-provider-contract",
+  serverPackage: "@langwatch/enterprise-managed-provider-server",
+  webPackage: "@langwatch/enterprise-managed-provider-web",
 });
 
 const SAAS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
@@ -93,9 +84,9 @@ const SAAS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
 });
 
 const WEBHOOKS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
-  id: WEBHOOKS_FEATURE_ID,
-  contractPackage: "@langwatch/enterprise-webhooks-contract",
-  serverPackage: "@langwatch/enterprise-webhooks-server",
+  id: WEBHOOK_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-webhook-contract",
+  serverPackage: "@langwatch/enterprise-webhook-server",
 });
 
 /** Portable feature discovery. Runtime installers belong to composition packages. */
@@ -109,7 +100,6 @@ export class EnterpriseCatalogue {
       LICENSING_DESCRIPTOR,
       SSO_DESCRIPTOR,
       SCIM_DESCRIPTOR,
-      ADMIN_DESCRIPTOR,
       AUDIT_LOG_DESCRIPTOR,
       BILLING_DESCRIPTOR,
       GOVERNANCE_DESCRIPTOR,

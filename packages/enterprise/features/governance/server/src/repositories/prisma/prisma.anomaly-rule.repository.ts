@@ -29,7 +29,7 @@ export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
     return rows.map(toAnomalyRule);
   }
 
-  async findById(id: string): Promise<AnomalyRule | null> {
+  async tryFindById(id: string): Promise<AnomalyRule | null> {
     const row = await this.prisma.anomalyRule.findUnique({ where: { id } });
     return row ? toAnomalyRule(row) : null;
   }

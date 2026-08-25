@@ -1,4 +1,5 @@
 import {
+  GovernanceQuarantineFillService,
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   type QuarantineFillInput,
@@ -13,13 +14,15 @@ import type {
   QuarantineTraceActivityPort,
 } from "../ports/quarantine-fill.port";
 
-export class QuarantineFillEvaluatorService {
+export class QuarantineFillEvaluatorService extends GovernanceQuarantineFillService {
   private constructor(
     private readonly tenant: QuarantineTenantPort,
     private readonly traceActivity: QuarantineTraceActivityPort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort,
     private readonly now: () => number,
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     tenant: QuarantineTenantPort;

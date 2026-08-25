@@ -19,11 +19,11 @@ export class DepartmentService {
     return this.repository.getAll(input.organizationId);
   }
 
-  getById(input: {
+  tryGetById(input: {
     id: string;
     organizationId: string;
   }): Promise<Department | null> {
-    return this.repository.getById(input);
+    return this.repository.tryGetById(input);
   }
 
   getAssignments(input: {
@@ -54,9 +54,7 @@ export class DepartmentService {
     if (!(await this.repository.rename(input))) {
       throw new DepartmentNotFoundError();
     }
-    const department = await this.repository.getById(input);
-    if (!department) throw new DepartmentNotFoundError();
-    return department;
+    return this.getDepartment(input);
   }
 
   async archive(input: {
@@ -106,10 +104,18 @@ export class DepartmentService {
     departmentId: string | null;
   }): Promise<void> {
     if (input.departmentId === null) return;
-    const department = await this.repository.getById({
+    await this.getDepartment({
       id: input.departmentId,
       organizationId: input.organizationId,
     });
+  }
+
+  private async getDepartment(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Department> {
+    const department = await this.repository.tryGetById(input);
     if (!department) throw new DepartmentNotFoundError();
+    return department;
   }
 }

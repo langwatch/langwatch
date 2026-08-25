@@ -20,12 +20,6 @@ describe("EnterpriseCatalogue", () => {
         serverPackage: "@langwatch/enterprise-scim-server",
       },
       {
-        id: "admin",
-        contractPackage: "@langwatch/enterprise-admin-contract",
-        serverPackage: "@langwatch/enterprise-admin-server",
-        webPackage: "@langwatch/enterprise-admin-web",
-      },
-      {
         id: "audit-log",
         contractPackage: "@langwatch/enterprise-audit-log-contract",
         serverPackage: "@langwatch/enterprise-audit-log-server",
@@ -43,10 +37,10 @@ describe("EnterpriseCatalogue", () => {
         webPackage: "@langwatch/enterprise-governance-web",
       },
       {
-        id: "managed-providers",
-        contractPackage: "@langwatch/enterprise-managed-providers-contract",
-        serverPackage: "@langwatch/enterprise-managed-providers-server",
-        webPackage: "@langwatch/enterprise-managed-providers-web",
+        id: "managed-provider",
+        contractPackage: "@langwatch/enterprise-managed-provider-contract",
+        serverPackage: "@langwatch/enterprise-managed-provider-server",
+        webPackage: "@langwatch/enterprise-managed-provider-web",
       },
       {
         id: "saas",
@@ -54,9 +48,9 @@ describe("EnterpriseCatalogue", () => {
         webPackage: "@langwatch/enterprise-saas-web",
       },
       {
-        id: "webhooks",
-        contractPackage: "@langwatch/enterprise-webhooks-contract",
-        serverPackage: "@langwatch/enterprise-webhooks-server",
+        id: "webhook",
+        contractPackage: "@langwatch/enterprise-webhook-contract",
+        serverPackage: "@langwatch/enterprise-webhook-server",
       },
     ]);
   });

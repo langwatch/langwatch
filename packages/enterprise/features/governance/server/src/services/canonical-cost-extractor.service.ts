@@ -56,7 +56,7 @@ export class CanonicalCostExtractorService {
       const resource = this.merge(resourceLog.resource?.attributes ?? []);
       for (const scopeLog of resourceLog.scopeLogs ?? []) {
         for (const record of scopeLog.logRecords ?? []) {
-          const parsed = this.parse(record, resource);
+          const parsed = this.tryParse(record, resource);
           if (parsed) events.push(parsed);
         }
       }
@@ -83,30 +83,30 @@ export class CanonicalCostExtractorService {
     return result;
   }
 
-  private parse(
+  private tryParse(
     record: OtlpLogRecord,
     resource: Record<string, unknown>,
   ): CanonicalCostEvent | null {
     const merged = { ...resource, ...this.merge(record.attributes ?? []) };
-    const requestId = this.string(merged[FIELD.requestId]);
-    const costUsd = this.cost(merged[FIELD.costUsd]);
+    const requestId = this.tryString(merged[FIELD.requestId]);
+    const costUsd = this.tryCost(merged[FIELD.costUsd]);
     if (!requestId || costUsd === null) return null;
     return {
       costUsd,
-      model: this.string(merged[FIELD.model]) ?? "unknown",
+      model: this.tryString(merged[FIELD.model]) ?? "unknown",
       inputTokens: this.number(merged[FIELD.inputTokens]),
       outputTokens: this.number(merged[FIELD.outputTokens]),
       cacheReadTokens: this.number(merged[FIELD.cacheReadTokens]),
       cacheCreationTokens: this.number(merged[FIELD.cacheCreationTokens]),
       requestId,
       occurredAt: this.date(record.timeUnixNano),
-      userEmail: this.string(merged[FIELD.principalEmail]),
-      teamIdHint: this.string(merged[FIELD.teamIdHint]),
+      userEmail: this.tryString(merged[FIELD.principalEmail]),
+      teamIdHint: this.tryString(merged[FIELD.teamIdHint]),
       raw: merged,
     };
   }
 
-  private string(value: unknown): string | null {
+  private tryString(value: unknown): string | null {
     return typeof value === "string" && value.length > 0 ? value : null;
   }
 
@@ -115,7 +115,7 @@ export class CanonicalCostExtractorService {
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  private cost(value: unknown): string | null {
+  private tryCost(value: unknown): string | null {
     if (typeof value === "number" && Number.isFinite(value))
       return String(value);
     if (typeof value !== "string" || value.trim() === "") return null;

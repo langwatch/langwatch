@@ -29,9 +29,9 @@
  *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
+import { getApp } from "~/server/app-layer/app";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 
@@ -182,7 +182,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
 
   describe("when an ordinary (non-ingest) API key is scoped to one project", () => {
     it("self-scopes to that project without an explicit projectId", async () => {
-      const { token } = await ApiKeyService.create(prisma).create({
+      const { token } = await getApp().apiKeys.create({
         name: `ordinary-single ${suffix}`,
         userId: USER_ID,
         createdByUserId: USER_ID,
@@ -207,7 +207,7 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
 
   describe("when an API key is scoped to two projects", () => {
     it("stays ambiguous without a projectId, resolves with one", async () => {
-      const { token } = await ApiKeyService.create(prisma).create({
+      const { token } = await getApp().apiKeys.create({
         name: `multi-project ${suffix}`,
         userId: USER_ID,
         createdByUserId: USER_ID,

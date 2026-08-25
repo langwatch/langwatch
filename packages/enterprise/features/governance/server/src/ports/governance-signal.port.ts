@@ -38,7 +38,7 @@ export type GovernanceResolvedBudgetCrossing = {
 export abstract class GovernanceSignalPort {
   abstract available(): boolean;
   abstract now(): Date;
-  abstract resolveLifecycleTenant(input: {
+  abstract tryResolveLifecycleTenant(input: {
     organizationId: string;
     preferredProjectId: string | null;
   }): Promise<string | null>;

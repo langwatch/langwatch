@@ -26,7 +26,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return rows.map((row) => departmentSchema.parse(row));
   }
 
-  async getById(input: {
+  async tryGetById(input: {
     id: string;
     organizationId: string;
   }): Promise<Department | null> {
@@ -85,7 +85,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     organizationId: string;
     name: string;
   }): Promise<Department> {
-    const existing = await this.findActiveByName(input);
+    const existing = await this.tryFindActiveByName(input);
     if (existing) return existing;
     try {
       return await this.create(input);
@@ -94,7 +94,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        const winner = await this.findActiveByName(input);
+        const winner = await this.tryFindActiveByName(input);
         if (winner) return winner;
       }
       throw error;
@@ -170,7 +170,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return result.count > 0;
   }
 
-  private async findActiveByName(input: {
+  private async tryFindActiveByName(input: {
     organizationId: string;
     name: string;
   }): Promise<Department | null> {

@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@langwatch/enterprise": "workspace:*",
-    "@langwatch/enterprise-admin-web": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@ import {
 
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const isExpired = cryptography.isExpired.bind(cryptography);
-const parseLicenseKey = cryptography.parseLicenseKey.bind(cryptography);
+const parseLicenseKey = cryptography.tryParseLicenseKey.bind(cryptography);
 const validateLicense = cryptography.validateLicense.bind(cryptography);
 const verifySignature = cryptography.verifySignature.bind(cryptography);
 

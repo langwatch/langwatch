@@ -21,8 +21,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 
 import { IngestionKeyService } from "../ingestionKey.service";
@@ -57,7 +56,7 @@ async function seedTeamAdmin(userId: string): Promise<void> {
 
 describe("IngestionKey ownership + list visibility", () => {
   const ingestKeys = IngestionKeyService.create(prisma);
-  const apiKeyRepo = ApiKeyRepository.create(prisma);
+  const apiKeyService = getApp().apiKeys;
 
   beforeAll(async () => {
     await prisma.organization.create({
@@ -124,7 +123,7 @@ describe("IngestionKey ownership + list visibility", () => {
       });
       expect(issued.token).toMatch(/^ik-lw-/);
 
-      const row = await apiKeyRepo.findById({ id: issued.apiKeyId });
+      const row = await apiKeyService.tryGetById({ id: issued.apiKeyId });
       expect(row?.userId).toBe(USER_A);
       expect(row?.ingestSourceType).toBe("claude_code");
     });
@@ -157,9 +156,7 @@ describe("IngestionKey ownership + list visibility", () => {
         });
         // A genuine org service key: userId null, no ingestSourceType, must
         // stay visible to all members exactly as before.
-        const { apiKey: serviceKey } = await ApiKeyService.create(
-          prisma,
-        ).create({
+        const { apiKey: serviceKey } = await apiKeyService.create({
           name: `service ${suffix}`,
           userId: null,
           createdByUserId: USER_A,
@@ -171,7 +168,7 @@ describe("IngestionKey ownership + list visibility", () => {
           ],
         });
 
-        const visibleToA = await apiKeyRepo.findAllByUser({
+        const visibleToA = await apiKeyService.list({
           userId: USER_A,
           organizationId: ORG_ID,
         });

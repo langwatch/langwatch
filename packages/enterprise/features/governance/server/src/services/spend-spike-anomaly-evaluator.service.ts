@@ -105,7 +105,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     const baselineStart = new Date(
       windowStart.getTime() - BASELINE_WINDOWS * windowMs,
     );
-    const tenantId = await this.repository.resolveGovernanceTenantId(
+    const tenantId = await this.repository.tryResolveGovernanceTenantId(
       rule.organizationId,
     );
     if (!tenantId) {

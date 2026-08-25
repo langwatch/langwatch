@@ -24,14 +24,14 @@ import {
 } from "../projections/ingestion-pull-run-status-eventing.projection";
 import {
   INGESTION_PULL_PROCESS_NAME,
-  IngestionPullProcessService,
-} from "../services/ingestion-pull-process.service";
+  IngestionPullProcess,
+} from "../processes/ingestion-pull.process";
 
 type EventingIngestionPullEvent = IngestionPullProcessingEvent & Event;
 
 export type IngestionPullEventingAdapterOptions = {
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
-  process: IngestionPullProcessService;
+  process: IngestionPullProcess;
 };
 
 export class IngestionPullEventingAdapter {

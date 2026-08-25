@@ -3,28 +3,10 @@ import {
   SsoGate,
   type SsoConfiguration,
 } from "@langwatch/enterprise-sso-contract";
-
-export interface OrgLicenseCandidate {
-  id: string;
-  license: string;
-}
-
-export abstract class SsoLicenseRepository {
-  abstract findOrganizationsWithLicense(): Promise<OrgLicenseCandidate[]>;
-}
-
-export type SsoLicenseInspection =
-  | { valid: false; reason: "invalid_format" | "invalid_signature" }
-  | {
-      valid: true;
-      expiresAt: string;
-      organizationName: string;
-      expired: boolean;
-    };
-
-export abstract class SsoLicenseVerifier {
-  abstract inspect(licenseKey: string): SsoLicenseInspection;
-}
+import type {
+  LicensingService,
+  PlatformLicenseInspection,
+} from "@langwatch/enterprise-licensing-contract";
 
 export abstract class SsoGateLogger {
   abstract info(context: object, message: string): void;
@@ -37,8 +19,7 @@ export abstract class SsoProviderMountInspector {
 
 export interface SsoGateServiceOptions {
   configuration: SsoConfiguration;
-  repository: SsoLicenseRepository;
-  verifier: SsoLicenseVerifier;
+  licensing: LicensingService;
   logger: SsoGateLogger;
   providerMountInspector: SsoProviderMountInspector;
   evaluationTimeoutMs?: number | undefined;
@@ -59,8 +40,7 @@ export class SsoGateService extends SsoGate {
 
   private constructor(
     private readonly configuration: SsoConfiguration,
-    private readonly repository: SsoLicenseRepository,
-    private readonly verifier: SsoLicenseVerifier,
+    private readonly licensing: LicensingService,
     private readonly logger: SsoGateLogger,
     private readonly providerMountInspector: SsoProviderMountInspector,
     private readonly evaluationTimeoutMs: number,
@@ -71,8 +51,7 @@ export class SsoGateService extends SsoGate {
   static create(options: SsoGateServiceOptions): SsoGateService {
     return new SsoGateService(
       options.configuration,
-      options.repository,
-      options.verifier,
+      options.licensing,
       options.logger,
       options.providerMountInspector,
       options.evaluationTimeoutMs ?? 5_000,
@@ -138,18 +117,12 @@ export class SsoGateService extends SsoGate {
   }
 
   private async computeGate(): Promise<boolean> {
-    if (
-      this.hasSignedLicense(this.configuration.instanceLicenseKey, {
-        source: "instance",
-      })
-    ) {
-      return true;
-    }
-
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await Promise.race([
-        this.anyOrganizationHasSignedLicense(),
+      const result = await Promise.race([
+        this.licensing.inspectPlatformAccess({
+          instanceLicenseKey: this.configuration.instanceLicenseKey,
+        }),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
             () => reject(new SsoGateTimeoutError(this.evaluationTimeoutMs)),
@@ -158,39 +131,27 @@ export class SsoGateService extends SsoGate {
           timer.unref?.();
         }),
       ]);
+      for (const inspection of result.inspections) {
+        this.logInspection(inspection);
+      }
+      return result.allowed;
     } finally {
       if (timer) clearTimeout(timer);
     }
   }
 
-  private async anyOrganizationHasSignedLicense(): Promise<boolean> {
-    const candidates = await this.repository.findOrganizationsWithLicense();
-    for (const candidate of candidates) {
-      if (
-        this.hasSignedLicense(candidate.license, {
-          source: "organization",
-          organizationId: candidate.id,
-        })
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private hasSignedLicense(
-    licenseKey: string | undefined,
-    context: { source: "instance" | "organization"; organizationId?: string },
-  ): boolean {
-    if (!licenseKey) return false;
-    const inspection = this.verifier.inspect(licenseKey);
+  private logInspection(inspection: PlatformLicenseInspection): void {
+    const context = {
+      source: inspection.source,
+      organizationId: inspection.organizationId,
+    };
     if (!inspection.valid) {
       const message =
         inspection.reason === "invalid_format"
           ? "Inspected a license candidate: could not be parsed (invalid format)"
           : "Inspected a license candidate: signature failed";
       this.logger.info({ ...context, signatureOk: false }, message);
-      return false;
+      return;
     }
 
     this.logger.info(
@@ -207,6 +168,5 @@ export class SsoGateService extends SsoGate {
         "SSO granted by an expired (but signature-valid) license — renewal reminder",
       );
     }
-    return true;
   }
 }

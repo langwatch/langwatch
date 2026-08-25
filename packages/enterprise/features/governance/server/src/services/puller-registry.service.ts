@@ -23,7 +23,7 @@ export class PullerRegistryService {
     this.adapters.set(adapter.id, adapter);
   }
 
-  get(adapterId: string): RegisteredGovernancePuller | undefined {
+  tryGet(adapterId: string): RegisteredGovernancePuller | undefined {
     return this.adapters.get(adapterId);
   }
 

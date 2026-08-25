@@ -21,24 +21,13 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 /**
  * The organization behind a billing action does not exist (or is not visible).
  *
  * Known and actionable: reload and pick an organization that is still there.
  */
-export class OrganizationNotFoundError extends HandledError {
-  declare readonly code: "organization_not_found";
-
-  constructor() {
-    super("organization_not_found", "Organization not found", {
-      httpStatus: 404,
-      fault: "customer",
-    });
-    this.name = "OrganizationNotFoundError";
-  }
-}
-
 /**
  * Billing needs an email address on the account and there isn't one.
  *

@@ -38,7 +38,7 @@ class RecordingSignalPort extends GovernanceSignalPort {
     return new Date("2026-08-24T12:00:00.000Z");
   }
 
-  resolveLifecycleTenant(): Promise<string | null> {
+  tryResolveLifecycleTenant(): Promise<string | null> {
     return Promise.resolve(this.tenantId);
   }
 

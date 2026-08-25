@@ -1,7 +1,7 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 
 export abstract class GovernanceOcsfExportRepository {
-  abstract resolveGovernanceTenantId(
+  abstract tryResolveGovernanceTenantId(
     organizationId: string,
   ): Promise<string | null>;
 }

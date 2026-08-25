@@ -1,25 +1,3 @@
 {
-  "layoutVersion": 0,
-  "subjects": [
-    "anomaly-alert",
-    "anomaly-rule",
-    "canonical-cost",
-    "cost-attribution-policy",
-    "department",
-    "gateway-debit",
-    "governance",
-    "ingestion-credentials",
-    "ingestion-pull",
-    "ingestion-source",
-    "ingestion-template",
-    "ocsf-export",
-    "ottl",
-    "persona-home",
-    "platform-tool-policy",
-    "pull-destination",
-    "pulled-usage",
-    "puller",
-    "quarantine-fill",
-    "spend-spike-anomaly"
-  ]
+  "layoutVersion": 0
 }

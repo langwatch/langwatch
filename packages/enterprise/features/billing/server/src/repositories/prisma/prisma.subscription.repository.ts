@@ -22,7 +22,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     return new PrismaSubscriptionRepository(database as PrismaClient);
   }
 
-  async findActive(
+  async tryFindActive(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null> {
     return this.prisma.subscription.findFirst({
@@ -31,7 +31,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     });
   }
 
-  async findLastNonCancelled(
+  async tryFindLastNonCancelled(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null> {
     return await this.prisma.subscription.findFirst({
@@ -79,7 +79,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
 
   // --- Webhook handler methods ---
 
-  async findByStripeId(
+  async tryFindByStripeId(
     stripeSubscriptionId: string,
   ): Promise<BillingSubscriptionRecord | null> {
     return await this.prisma.subscription.findUnique({

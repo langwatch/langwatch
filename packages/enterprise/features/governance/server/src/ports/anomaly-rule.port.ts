@@ -29,7 +29,7 @@ export type AnomalyRuleChanges = Partial<
 
 export abstract class AnomalyRuleRepository {
   abstract list(organizationId: string): Promise<AnomalyRule[]>;
-  abstract findById(id: string): Promise<AnomalyRule | null>;
+  abstract tryFindById(id: string): Promise<AnomalyRule | null>;
   abstract create(input: NewAnomalyRule): Promise<AnomalyRule>;
   abstract update(
     id: string,

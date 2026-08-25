@@ -7,6 +7,8 @@ import {
   type LicensePlanLimits,
   type LicenseStatus,
   type PlanInfo,
+  type PlatformLicenseAccess,
+  type PlatformLicenseInspection,
   type RemoveLicenseResult,
   type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
@@ -56,6 +58,15 @@ export type LicenseServiceOptions = {
   configuration?: LicenseServiceConfiguration;
 };
 
+type LicenseResourceCounts = {
+  currentMembers: number;
+  maxMembers: number;
+  currentMembersLite: number;
+  maxMembersLite: number;
+  currentMessagesPerMonth: number;
+  maxMessagesPerMonth: number;
+};
+
 /** Signed-license plan source and lifecycle service. */
 export class LicenseService extends LicensingServiceContract {
   private readonly repository: LicenseRepository;
@@ -80,8 +91,33 @@ export class LicenseService extends LicensingServiceContract {
     return new LicenseService(options);
   }
 
+  async inspectPlatformAccess(input: {
+    instanceLicenseKey?: string | undefined;
+  }): Promise<PlatformLicenseAccess> {
+    const inspections: PlatformLicenseInspection[] = [];
+    if (input.instanceLicenseKey) {
+      const inspection = this.inspectPlatformLicense(
+        input.instanceLicenseKey,
+        { source: "instance" },
+      );
+      inspections.push(inspection);
+      if (inspection.valid) return { allowed: true, inspections };
+    }
+
+    const candidates = await this.repository.findOrganizationsWithLicense();
+    for (const candidate of candidates) {
+      const inspection = this.inspectPlatformLicense(candidate.licenseKey, {
+        source: "organization",
+        organizationId: candidate.organizationId,
+      });
+      inspections.push(inspection);
+      if (inspection.valid) return { allowed: true, inspections };
+    }
+    return { allowed: false, inspections };
+  }
+
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.repository.readLicense(organizationId);
+    const licenseKey = await this.repository.tryReadLicense(organizationId);
     if (!licenseKey) return UNLIMITED_PLAN;
 
     const result = this.cryptography.validateLicense({ licenseKey });
@@ -89,10 +125,10 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.repository.readLicense(organizationId);
+    const licenseKey = await this.repository.tryReadLicense(organizationId);
     if (!licenseKey) return UNLIMITED_PLAN;
 
-    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
+    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
     if (!signedLicense || !this.cryptography.verifySignature(signedLicense)) {
       return UNLIMITED_PLAN;
     }
@@ -119,7 +155,7 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
-    const licenseKey = await this.repository.readLicense(organizationId);
+    const licenseKey = await this.repository.tryReadLicense(organizationId);
     if (!licenseKey) return { hasLicense: false, valid: false };
 
     const validation = this.cryptography.validateLicense({ licenseKey });
@@ -138,7 +174,7 @@ export class LicenseService extends LicensingServiceContract {
       };
     }
 
-    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
+    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
     if (!signedLicense) {
       return { hasLicense: true, valid: false, corrupted: true };
     }
@@ -168,7 +204,7 @@ export class LicenseService extends LicensingServiceContract {
   private async getResourceCounts(
     organizationId: string,
     plan: LicensePlanLimits,
-  ) {
+  ): Promise<LicenseResourceCounts> {
     const resolved = resolvePlanDefaults(plan);
     const messagesPromise = this.usage
       ? this.usage
@@ -188,6 +224,26 @@ export class LicenseService extends LicensingServiceContract {
       maxMembersLite: resolved.maxMembersLite,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
+    };
+  }
+
+  private inspectPlatformLicense(
+    licenseKey: string,
+    source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
+  ): PlatformLicenseInspection {
+    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
+    if (!signedLicense) {
+      return { ...source, valid: false, reason: "invalid_format" };
+    }
+    if (!this.cryptography.verifySignature(signedLicense)) {
+      return { ...source, valid: false, reason: "invalid_signature" };
+    }
+    return {
+      ...source,
+      valid: true,
+      expiresAt: signedLicense.data.expiresAt,
+      organizationName: signedLicense.data.organizationName,
+      expired: this.cryptography.isExpired(signedLicense.data.expiresAt),
     };
   }
 

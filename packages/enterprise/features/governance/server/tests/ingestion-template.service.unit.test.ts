@@ -53,11 +53,11 @@ class MemoryIngestionTemplateRepository extends IngestionTemplateRepository {
     return [template()];
   }
 
-  async findVisible(): Promise<IngestionTemplate | null> {
+  async tryFindVisible(): Promise<IngestionTemplate | null> {
     return template();
   }
 
-  async findPlatform(): Promise<IngestionTemplate | null> {
+  async tryFindPlatform(): Promise<IngestionTemplate | null> {
     return template({ organizationId: null, platformPublished: true });
   }
 

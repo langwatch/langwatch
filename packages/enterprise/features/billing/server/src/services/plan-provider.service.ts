@@ -74,7 +74,7 @@ export class SaaSPlanProviderService extends BillingService {
 
       // An organization is not supposed to hold two active subscriptions, but
       // it can, and then which one answers decides the plan.
-      const activeSubscription = await this.subscriptions.findActive(organizationId);
+      const activeSubscription = await this.subscriptions.tryFindActive(organizationId);
 
       const customLimits: Partial<PlanInfo> = {};
       for (const field of NUMERIC_OVERRIDE_FIELDS) {

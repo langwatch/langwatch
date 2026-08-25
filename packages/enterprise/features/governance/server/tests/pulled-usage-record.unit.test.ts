@@ -31,7 +31,7 @@ class FixedRatePort extends PulledUsageRatePort {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new FixedRatePort()),
 );
-const buildPulledUsageRecord = pulledUsageRecords.build.bind(pulledUsageRecords);
+const buildPulledUsageRecord = pulledUsageRecords.tryBuild.bind(pulledUsageRecords);
 
 const SOURCE: PulledUsageSourceAttribution = {
   ingestionSourceId: "src_1",

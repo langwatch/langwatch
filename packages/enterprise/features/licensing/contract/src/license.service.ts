@@ -1,16 +1,20 @@
-import type { PlanInfo } from "@langwatch/entitlements-contract";
+import type { PlanInfo } from "@langwatch/entitlement-contract";
 import type {
   GenerateLicenseInput,
   GenerateLicenseOutput,
 } from "./license.commands";
 import type {
   LicenseStatus,
+  PlatformLicenseAccess,
   RemoveLicenseResult,
   StoreLicenseResult,
 } from "./license";
 
 /** Application-facing capability supplied by the Enterprise license source. */
 export abstract class LicensingService {
+  abstract inspectPlatformAccess(input: {
+    instanceLicenseKey?: string | undefined;
+  }): Promise<PlatformLicenseAccess>;
   abstract getActivePlan(organizationId: string): Promise<PlanInfo>;
   abstract getSelfHostedPlan(organizationId: string): Promise<PlanInfo>;
   abstract validateAndStoreLicense(

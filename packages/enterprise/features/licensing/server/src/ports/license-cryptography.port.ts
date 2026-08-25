@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/enterprise-licensing-contract";
 
 export abstract class LicenseCryptographyPort {
-  abstract parseLicenseKey(licenseKey: string): SignedLicense | null;
+  abstract tryParseLicenseKey(licenseKey: string): SignedLicense | null;
   abstract verifySignature(
     signedLicense: SignedLicense,
     publicKey?: string,

@@ -17,7 +17,7 @@ export abstract class ScimTokenRepository {
     Array<Pick<ScimTokenRecord, "id" | "description" | "createdAt" | "lastUsedAt">>
   >;
   abstract revoke(input: { organizationId: string; tokenId: string }): Promise<boolean>;
-  abstract findByHash(hashedToken: string): Promise<
+  abstract tryFindByHash(hashedToken: string): Promise<
     Pick<ScimTokenRecord, "id" | "organizationId"> | null
   >;
   abstract recordUse(tokenId: string, usedAt: Date): Promise<void>;
@@ -66,7 +66,9 @@ export class ScimTokenService extends ScimTokenCapability {
     return { token, tokenId: stored.id };
   }
 
-  list(input: { organizationId: string }) {
+  list(input: {
+    organizationId: string;
+  }): ReturnType<ScimTokenCapability["list"]> {
     return this.repository.list(input.organizationId);
   }
 
@@ -79,17 +81,17 @@ export class ScimTokenService extends ScimTokenCapability {
     return { success: true };
   }
 
-  async verify(input: {
+  async tryVerify(input: {
     token: string;
   }): Promise<{ organizationId: string } | null> {
-    const stored = await this.repository.findByHash(this.hashToken(input.token));
+    const stored = await this.repository.tryFindByHash(this.hashToken(input.token));
     if (!stored) return null;
     await this.repository.recordUse(stored.id, this.now());
     return { organizationId: stored.organizationId };
   }
 
   async verifyEntitled(input: { token: string }): Promise<ScimTokenEntitlement> {
-    const stored = await this.repository.findByHash(this.hashToken(input.token));
+    const stored = await this.repository.tryFindByHash(this.hashToken(input.token));
     if (!stored) return { status: "invalid_token" };
     if (!(await this.entitlements.isEntitled(stored.organizationId))) {
       return {

@@ -20,15 +20,19 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { prisma } from "~/server/db";
-
 import {
   PERSONAL_FEATURES,
   PersonalProjectOwnerMismatchError,
-  PersonalWorkspaceFeaturesService,
   personalFeatureEnabled,
   readPersonalFeatures,
-} from "../personalWorkspaceFeatures.service";
+  type OrganizationService,
+} from "@langwatch/organization-contract";
+
+import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-pwf-${suffix}`;
@@ -40,9 +44,10 @@ const SHARED_TEAM_ID = `team-pwf-shared-${suffix}`;
 const SHARED_PROJECT_ID = `proj-pwf-shared-${suffix}`;
 
 describe("PersonalWorkspaceFeaturesService", () => {
-  const service = PersonalWorkspaceFeaturesService.create(prisma);
+  let service: OrganizationService;
 
   beforeAll(async () => {
+    service = getApp().organizations;
     await prisma.organization.create({
       data: { id: ORG_ID, name: `PWF ${suffix}`, slug: `pwf-${suffix}` },
     });
@@ -160,7 +165,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
 
   describe("get", () => {
     it("returns all-false on a freshly-provisioned personal project", async () => {
-      const features = await service.get({
+      const features = await service.getPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
@@ -174,7 +179,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
 
     it("rejects a non-owner caller with NOT_FOUND-shaped error", async () => {
       await expect(
-        service.get({
+        service.getPersonalWorkspaceFeatures({
           projectId: PERSONAL_PROJECT_ID,
           callerUserId: OTHER_USER_ID,
         }),
@@ -183,7 +188,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
 
     it("rejects a non-personal project even by its team's owner", async () => {
       await expect(
-        service.get({
+        service.getPersonalWorkspaceFeatures({
           projectId: SHARED_PROJECT_ID,
           callerUserId: USER_ID,
         }),
@@ -193,11 +198,11 @@ describe("PersonalWorkspaceFeaturesService", () => {
 
   describe("enableAll / disableAll", () => {
     it("enableAll flips all four flags atomically + writes one audit row", async () => {
-      const before = await service.get({
+      const before = await service.getPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
-      const result = await service.enableAll({
+      const result = await service.enableAllPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
@@ -208,7 +213,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
         automations: true,
       });
       // Persistence round-trip
-      const reread = await service.get({
+      const reread = await service.getPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
@@ -233,7 +238,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
     });
 
     it("disableAll flips all four back + writes inverse audit row", async () => {
-      const result = await service.disableAll({
+      const result = await service.disableAllPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
@@ -243,7 +248,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
         annotations: false,
         automations: false,
       });
-      const reread = await service.get({
+      const reread = await service.getPersonalWorkspaceFeatures({
         projectId: PERSONAL_PROJECT_ID,
         callerUserId: USER_ID,
       });
@@ -271,7 +276,7 @@ describe("PersonalWorkspaceFeaturesService", () => {
         where: { projectId: PERSONAL_PROJECT_ID },
       });
       await expect(
-        service.enableAll({
+        service.enableAllPersonalWorkspaceFeatures({
           projectId: PERSONAL_PROJECT_ID,
           callerUserId: OTHER_USER_ID,
         }),

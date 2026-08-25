@@ -84,7 +84,7 @@ describe("governance backend services", () => {
     const service = IngestionCredentialsService.create(
       new ReversibleEncryption(),
     );
-    const sealed = service.encryptParserConfig({
+    const sealed = service.tryEncryptParserConfig({
       adapter: "http_polling",
       credentials: { token: "secret" },
     });

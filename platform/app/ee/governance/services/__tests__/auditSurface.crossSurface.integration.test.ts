@@ -39,8 +39,7 @@ import {
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -142,7 +141,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       },
     });
 
-    const apiKeyResult = await ApiKeyService.create(prisma).create({
+    const apiKeyResult = await getApp().apiKeys.create({
       name: `uniform-pat-${ns}`,
       userId: testUser.id,
       organizationId: testOrg.id,

@@ -40,7 +40,7 @@ describe("PullerRegistryService", () => {
 
     registry.register(puller);
 
-    const resolved = registry.get("test");
+    const resolved = registry.tryGet("test");
     const config = resolved?.validateConfig({ token: "secret" });
     await expect(
       resolved?.runOnce({ cursor: "next" }, config),
@@ -63,7 +63,7 @@ describe("PullerRegistryService", () => {
 
     registry.clear();
 
-    expect(registry.get("test")).toBeUndefined();
+    expect(registry.tryGet("test")).toBeUndefined();
     expect(registry.ids()).toEqual([]);
   });
 });

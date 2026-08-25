@@ -45,7 +45,7 @@ export class PrismaIngestionPullRunProjectionRepository
     );
   }
 
-  async load(
+  async tryLoad(
     projectionKey: string,
     context: ProjectionStoreContext,
   ): Promise<StoredProjection<IngestionPullRunStatusData> | null> {

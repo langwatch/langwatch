@@ -1,11 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   CustomerCreationRaceError,
-  OrganizationNotFoundError,
   UserEmailRequiredError,
 } from "@langwatch/enterprise-billing-contract";
-import type { BillingOrganizationRepository } from "../ports/billing-organization.port";
 
 const logger = createLogger("langwatch:billing:customerService");
 
@@ -14,12 +13,12 @@ const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 export class CustomerService {
   private constructor(
     private readonly stripe: Stripe,
-    private readonly organizations: BillingOrganizationRepository,
+    private readonly organizations: OrganizationService,
   ) {}
 
   static create(options: {
     stripe: Stripe;
-    organizations: BillingOrganizationRepository;
+    organizations: OrganizationService;
   }): CustomerService {
     return new CustomerService(options.stripe, options.organizations);
   }
@@ -29,14 +28,12 @@ export class CustomerService {
     organizationId: string;
   }): Promise<string> {
       const { user, organizationId } = params;
-      const organization = await this.organizations.findById(organizationId);
+      const organization = await this.organizations.getBillingProfile({
+        organizationId,
+      });
 
-      if (!organization) {
-        throw new OrganizationNotFoundError();
-      }
-
-      if (organization.stripeCustomerId) {
-        return organization.stripeCustomerId;
+      if (organization.billingCustomerId) {
+        return organization.billingCustomerId;
       }
 
       if (!user.email) {
@@ -48,9 +45,9 @@ export class CustomerService {
         name: organization.name,
       });
 
-      const claimed = await this.organizations.claimStripeCustomerId({
+      const claimed = await this.organizations.claimBillingCustomerId({
         organizationId,
-        stripeCustomerId: customer.id,
+        billingCustomerId: customer.id,
       });
 
       if (!claimed) {
@@ -75,11 +72,13 @@ export class CustomerService {
           );
         }
 
-        const refreshed = await this.organizations.requireById(organizationId);
-        if (!refreshed.stripeCustomerId) {
+        const refreshed = await this.organizations.getBillingProfile({
+          organizationId,
+        });
+        if (!refreshed.billingCustomerId) {
           throw new CustomerCreationRaceError();
         }
-        return refreshed.stripeCustomerId;
+        return refreshed.billingCustomerId;
       }
 
       return customer.id;

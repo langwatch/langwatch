@@ -54,6 +54,20 @@ export abstract class GovernancePuller<Configuration = unknown> {
   ): Promise<PullResult>;
 }
 
+export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
+export const anthropicAdminPullConfigSchema = z
+  .object({
+    adapter: z.literal(ANTHROPIC_ADMIN_ADAPTER_ID),
+    report: z.enum(["usage", "cost"]),
+    bucketWidth: z.enum(["1m", "1h", "1d"]).default("1d"),
+    startingAt: z.string().datetime().optional(),
+    schedule: z.string().default("0 * * * *"),
+  })
+  .strict();
+export type AnthropicAdminPullConfig = z.infer<
+  typeof anthropicAdminPullConfigSchema
+>;
+
 export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
 
 export const pulledUsageHintSchema = z

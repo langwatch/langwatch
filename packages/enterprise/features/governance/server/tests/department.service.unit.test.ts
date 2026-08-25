@@ -34,7 +34,7 @@ class MemoryDepartmentRepository extends DepartmentRepository {
     return this.row ? [this.row] : [];
   }
 
-  async getById(input: {
+  async tryGetById(input: {
     id: string;
     organizationId: string;
   }): Promise<Department | null> {

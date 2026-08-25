@@ -2,11 +2,9 @@ import {
   INGESTION_PULL_AGGREGATE_TYPE,
   INGESTION_PULL_EVENT_TYPES,
   INGESTION_PULL_EVENT_VERSIONS,
-  PULLED_USAGE_EVENT_TYPES,
   ingestionPullConfiguredEventSchema,
   ingestionPullRunCompletedEventSchema,
   type IngestionPullProcessingEvent,
-  type PulledUsageObservedEventData,
 } from "@langwatch/enterprise-governance-contract";
 import {
   InMemoryProcessStore,
@@ -50,16 +48,18 @@ import {
 import {
   type GatewayDebitsState,
   GATEWAY_DEBITS_PROCESS_NAME,
-  GatewayDebitsProcessService,
-} from "../src/services/gateway-debit-process.service";
-import { GovernanceEventsDeliveryProcessService } from "../src/services/governance-events-delivery-process.service";
+  GatewayDebitProcess,
+} from "../src/processes/gateway-debit.process";
+import { GovernanceEventDeliveryProcess } from "../src/processes/governance-event-delivery.process";
+import { GovernanceEventDeliveryIntent } from "../src/intents/governance-event-delivery.intent";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
-  IngestionPullProcessService,
-} from "../src/services/ingestion-pull-process.service";
+  IngestionPullProcess,
+} from "../src/processes/ingestion-pull.process";
 import { IngestionPullService } from "../src/services/ingestion-pull.service";
-import { PulledUsageLedgerProcessService } from "../src/services/pulled-usage-ledger-process.service";
+import { PulledUsageLedgerProcess } from "../src/processes/pulled-usage-ledger.process";
+import { PulledUsageLedgerIntent } from "../src/intents/pulled-usage-ledger.intent";
 
 class FixedSchedule extends IngestionPullSchedulePort {
   nextRunAt(input: { cron: string; after: number }): number {
@@ -246,7 +246,7 @@ describe("governance Eventing adapters", () => {
 });
 
 describe("ingestion pull process and projection", () => {
-  const process = IngestionPullProcessService.create({
+  const process = IngestionPullProcess.create({
     schedule: new FixedSchedule(),
     execution: IngestionPullService.create(
       new UnusedPull(),
@@ -295,7 +295,7 @@ describe("ingestion pull process and projection", () => {
 
   it("does not let an older projected completion regress the run cursor", () => {
     const projection = IngestionPullRunStatusEventingProjection.create({
-      load: async () => null,
+      tryLoad: async () => null,
       store: async () => undefined,
     } as StateProjectionStore<IngestionPullRunStatusData>);
     const configured = ingestionPullConfiguredEventSchema.parse({
@@ -355,8 +355,8 @@ describe("ingestion pull process and projection", () => {
 describe("pulled usage ledger process", () => {
   it("writes integer nano-USD and all quantities without changing scope", async () => {
     const ledger = new RecordingPulledUsageLedger();
-    const service = PulledUsageLedgerProcessService.create(ledger);
-    await service.write({
+    const intent = PulledUsageLedgerIntent.create(ledger);
+    await intent.execute({
       restatement_key: "restatement-1",
       tenant_id: "project-1",
       scope_id: "team-1",
@@ -383,7 +383,7 @@ describe("pulled usage ledger process", () => {
 describe("gateway debit process", () => {
   it("stashes an unattributed outcome and releases it when admission arrives", () => {
     const port = new RecordingGatewayDebitPort();
-    const service = GatewayDebitsProcessService.create(port);
+    const service = GatewayDebitProcess.create(port);
     const definition = buildProcessDefinition(
       buildProcessManager<GatewaySpendProcessingEvent>({
         name: GATEWAY_DEBITS_PROCESS_NAME,
@@ -459,9 +459,9 @@ describe("gateway debit process", () => {
 describe("governance webhook delivery", () => {
   it("uses deterministic envelopes and redelivery commits one endpoint send", async () => {
     const port = new RecordingGovernanceWebhookPort();
-    const service = GovernanceEventsDeliveryProcessService.create(port);
+    const intent = GovernanceEventDeliveryIntent.create(port);
     const envelope =
-      GovernanceEventsDeliveryProcessService.budgetCrossingEnvelope({
+      GovernanceEventDeliveryProcess.budgetCrossingEnvelope({
         tenantId: "project-1",
         organization_id: "org-1",
         budget_id: "budget-1",
@@ -485,8 +485,8 @@ describe("governance webhook delivery", () => {
       envelope,
     };
     const context = { projectId: "project-1", attempt: 1 } as IntentContext;
-    await service.deliver(payload, context);
-    await service.deliver(payload, context);
+    await intent.deliver(payload, context);
+    await intent.deliver(payload, context);
     const ref = {
       processName: "governanceEventsDelivery",
       projectId: "project-1",

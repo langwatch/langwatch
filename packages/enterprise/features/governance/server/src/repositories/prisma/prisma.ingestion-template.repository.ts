@@ -53,7 +53,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     return rows.map(toIngestionTemplate);
   }
 
-  async findVisible(input: {
+  async tryFindVisible(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null> {
@@ -67,7 +67,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     return row ? toIngestionTemplate(row) : null;
   }
 
-  async findPlatform(id: string): Promise<IngestionTemplate | null> {
+  async tryFindPlatform(id: string): Promise<IngestionTemplate | null> {
     const row = await this.prisma.ingestionTemplate.findFirst({
       where: { id, organizationId: null, archivedAt: null },
     });
@@ -116,7 +116,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     surface: GovernanceCallSurface;
   }): Promise<IngestionTemplateMutationResult> {
     return this.prisma.$transaction(async (transaction) => {
-      const existing = await this.findMutableCandidate(transaction, input);
+      const existing = await this.tryFindMutableCandidate(transaction, input);
       if (!existing) return { status: "not_found" };
       if (existing.organizationId === null) return { status: "platform" };
 
@@ -157,7 +157,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     archivedAt: Date;
   }): Promise<IngestionTemplateMutationResult> {
     return this.prisma.$transaction(async (transaction) => {
-      const existing = await this.findMutableCandidate(transaction, input);
+      const existing = await this.tryFindMutableCandidate(transaction, input);
       if (!existing) return { status: "not_found" };
       if (existing.organizationId === null) return { status: "platform" };
 
@@ -236,10 +236,15 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     });
   }
 
-  private findMutableCandidate(
+  private tryFindMutableCandidate(
     client: Client,
     input: { id: string; organizationId: string },
-  ) {
+  ): Promise<{
+    id: string;
+    slug: string;
+    organizationId: string | null;
+    ottlRules: string;
+  } | null> {
     return client.ingestionTemplate.findFirst({
       where: {
         id: input.id,

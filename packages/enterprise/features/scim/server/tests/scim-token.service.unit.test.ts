@@ -220,7 +220,7 @@ describe("ScimTokenService", () => {
           prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue({});
 
-        const result = await service.verify({ token: "valid-token" });
+        const result = await service.tryVerify({ token: "valid-token" });
 
         expect(result).toEqual({ organizationId: "org-1" });
         expect(prisma.scimToken.findFirst).toHaveBeenCalledWith({
@@ -252,7 +252,7 @@ describe("ScimTokenService", () => {
           prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue({ count: 0 });
 
-        await expect(service.verify({ token: "valid-token" })).resolves.toEqual(
+        await expect(service.tryVerify({ token: "valid-token" })).resolves.toEqual(
           { organizationId: "org-1" },
         );
       });
@@ -264,7 +264,7 @@ describe("ScimTokenService", () => {
           prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
         ).mockResolvedValue(null);
 
-        const result = await service.verify({ token: "invalid-token" });
+        const result = await service.tryVerify({ token: "invalid-token" });
 
         expect(result).toBeNull();
         expect(prisma.scimToken.updateMany).not.toHaveBeenCalled();

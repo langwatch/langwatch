@@ -30,7 +30,7 @@ export abstract class ScimTokenService {
     tokenId: string;
   }): Promise<{ success: true }>;
 
-  abstract verify(input: {
+  abstract tryVerify(input: {
     token: string;
   }): Promise<{ organizationId: string } | null>;
 

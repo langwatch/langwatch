@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerService } from "../src/index";
-import { PrismaBillingOrganizationRepository } from "../src/repositories/prisma/prisma.billing-organization.repository";
 
 const createMockStripe = () => ({
   customers: {
@@ -9,32 +8,34 @@ const createMockStripe = () => ({
   },
 });
 
-const createMockDb = () => ({
-  organization: {
-    findUnique: vi.fn(),
-    findUniqueOrThrow: vi.fn(),
-    updateMany: vi.fn(),
-  },
+const createMockOrganizations = () => ({
+  getOldestTeamId: vi.fn(),
+  getBillingProfile: vi.fn(),
+  claimBillingCustomerId: vi.fn(),
 });
 
 describe("customerService", () => {
   let stripe: ReturnType<typeof createMockStripe>;
-  let db: ReturnType<typeof createMockDb>;
+  let organizations: ReturnType<typeof createMockOrganizations>;
   let service: CustomerService;
 
   beforeEach(() => {
     stripe = createMockStripe();
-    db = createMockDb();
+    organizations = createMockOrganizations();
     service = CustomerService.create({
       stripe: stripe as any,
-      organizations: PrismaBillingOrganizationRepository.create(db as any),
+      organizations,
     });
   });
 
   describe("getOrCreateCustomerId()", () => {
     describe("when organization not found", () => {
       it("raises organization_not_found", async () => {
-        db.organization.findUnique.mockResolvedValue(null);
+        organizations.getBillingProfile.mockRejectedValue(
+          Object.assign(new Error("Organization not found"), {
+            code: "organization_not_found",
+          }),
+        );
 
         await expect(
           service.getOrCreateCustomerId({
@@ -47,10 +48,10 @@ describe("customerService", () => {
 
     describe("when organization already has a Stripe customer", () => {
       it("returns existing customer ID", async () => {
-        db.organization.findUnique.mockResolvedValue({
+        organizations.getBillingProfile.mockResolvedValue({
           id: "org_123",
           name: "Acme",
-          stripeCustomerId: "cus_existing",
+          billingCustomerId: "cus_existing",
         });
 
         const result = await service.getOrCreateCustomerId({
@@ -65,10 +66,10 @@ describe("customerService", () => {
 
     describe("when user has no email", () => {
       it("raises billing_customer_email_required", async () => {
-        db.organization.findUnique.mockResolvedValue({
+        organizations.getBillingProfile.mockResolvedValue({
           id: "org_123",
           name: "Acme",
-          stripeCustomerId: null,
+          billingCustomerId: null,
         });
 
         await expect(
@@ -82,13 +83,13 @@ describe("customerService", () => {
 
     describe("when creating a new customer", () => {
       it("creates customer in Stripe and stores ID", async () => {
-        db.organization.findUnique.mockResolvedValue({
+        organizations.getBillingProfile.mockResolvedValue({
           id: "org_123",
           name: "Acme",
-          stripeCustomerId: null,
+          billingCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_new" });
-        db.organization.updateMany.mockResolvedValue({ count: 1 });
+        organizations.claimBillingCustomerId.mockResolvedValue(true);
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -100,27 +101,29 @@ describe("customerService", () => {
           email: "test@example.com",
           name: "Acme",
         });
-        expect(db.organization.updateMany).toHaveBeenCalledWith({
-          where: { id: "org_123", stripeCustomerId: null },
-          data: { stripeCustomerId: "cus_new" },
+        expect(organizations.claimBillingCustomerId).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          billingCustomerId: "cus_new",
         });
       });
     });
 
     describe("when a race condition occurs", () => {
       it("cleans up orphan and returns existing customer ID", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          name: "Acme",
-          stripeCustomerId: null,
-        });
+        organizations.getBillingProfile
+          .mockResolvedValueOnce({
+            id: "org_123",
+            name: "Acme",
+            billingCustomerId: null,
+          })
+          .mockResolvedValueOnce({
+            id: "org_123",
+            name: "Acme",
+            billingCustomerId: "cus_winner",
+          });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        organizations.claimBillingCustomerId.mockResolvedValue(false);
         stripe.customers.del.mockResolvedValue({ deleted: true });
-        db.organization.findUniqueOrThrow.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: "cus_winner",
-        });
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -132,18 +135,20 @@ describe("customerService", () => {
       });
 
       it("handles orphan cleanup failure gracefully", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          id: "org_123",
-          name: "Acme",
-          stripeCustomerId: null,
-        });
+        organizations.getBillingProfile
+          .mockResolvedValueOnce({
+            id: "org_123",
+            name: "Acme",
+            billingCustomerId: null,
+          })
+          .mockResolvedValueOnce({
+            id: "org_123",
+            name: "Acme",
+            billingCustomerId: "cus_winner",
+          });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        organizations.claimBillingCustomerId.mockResolvedValue(false);
         stripe.customers.del.mockRejectedValue(new Error("Stripe API error"));
-        db.organization.findUniqueOrThrow.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: "cus_winner",
-        });
 
         const result = await service.getOrCreateCustomerId({
           user: { email: "test@example.com" },
@@ -154,18 +159,14 @@ describe("customerService", () => {
       });
 
       it("raises subscription_sync_failed when the refreshed org still has no customer id", async () => {
-        db.organization.findUnique.mockResolvedValue({
+        organizations.getBillingProfile.mockResolvedValue({
           id: "org_123",
           name: "Acme",
-          stripeCustomerId: null,
+          billingCustomerId: null,
         });
         stripe.customers.create.mockResolvedValue({ id: "cus_orphan" });
-        db.organization.updateMany.mockResolvedValue({ count: 0 });
+        organizations.claimBillingCustomerId.mockResolvedValue(false);
         stripe.customers.del.mockResolvedValue({ deleted: true });
-        db.organization.findUniqueOrThrow.mockResolvedValue({
-          id: "org_123",
-          stripeCustomerId: null,
-        });
 
         await expect(
           service.getOrCreateCustomerId({

@@ -347,7 +347,7 @@ const createSeatEventOperations = ({
       // Resolve the currency before touching the database. A checkout we cannot
       // build in the customer's own currency will be rejected outright, and every
       // write below this point would have to be cleaned up afterwards.
-      const checkoutCurrency = customerCurrency.require(
+      const checkoutCurrency = customerCurrency.getCurrency(
         await customerCurrency.resolve({
           stripe,
           customerId,

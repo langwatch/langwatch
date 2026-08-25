@@ -4,7 +4,7 @@
 
 **Behavioural contract:** [Enterprise licensing lifecycle](../specs/licensing.feature)
 
-**Related:** [Entitlements provider neutrality](../../../../features/entitlements/adrs/001-provider-neutral-plan-resolution.md)
+**Related:** [Entitlement provider neutrality](../../../../features/entitlement/adrs/001-provider-neutral-plan-resolution.md)
 
 ## Context
 

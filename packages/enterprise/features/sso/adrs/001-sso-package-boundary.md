@@ -8,13 +8,16 @@
 
 ## Context
 
-Enterprise SSO matching, provider construction, licensing, Prisma access, and
-environment reads previously lived together under the application `ee` tree.
+Enterprise SSO matching, provider construction, license verification, Prisma
+access, and environment reads previously lived together under the application
+`ee` tree.
 
 ## Decision
 
 Own portable SSO configuration and matching in a contract package and own the
-gate, provider builders, and Postgres license adapter in a server package.
+gate and provider builders in a server package. The gate consumes the shared
+Licensing service contract; SSO does not implement license verification or
+license persistence.
 
 ## Public surfaces and transports
 
@@ -24,23 +27,25 @@ builders without owning HTTP routes.
 
 ## Dependencies
 
-The contract depends only on Zod 4. The server depends on the SSO contract and
-Better Auth's portable provider types.
+The contract depends only on Zod 4. The server depends on the SSO and Licensing
+contracts and Better Auth's portable provider types.
 
 ## Persistence
 
-Only `PrismaSsoLicenseRepository` scans organization license candidates through
-an injected structural database capability.
+SSO owns no persistence. The Licensing service scans and verifies instance and
+organization license candidates through its one private repository.
 
 ## Runtime and registration
 
-`PostgresSsoAdapter.create(...).build()` constructs the gate. Importing either
-package has no registration or connection side effects.
+`LicensingSsoAdapter.create(...).build()` constructs the gate from the shared
+Licensing service. Importing either package has no registration or connection
+side effects.
 
 ## Environment and configuration
 
 Feature packages never read environment variables. The application maps its
-environment to `SsoConfiguration` and supplies license verification keys.
+environment to `SsoConfiguration`; the Licensing composition owns license
+verification keys.
 
 ## Errors
 
