@@ -205,6 +205,11 @@ export default function CliAuthPage() {
   const [permissionSelections, setPermissionSelections] = useState<
     Record<string, PermissionSelection>
   >({});
+  // Step one of the screen: the code check. The organization picker, the
+  // access selection and the approve action only appear once the user
+  // confirms the code matches their terminal, so the phishing check is not
+  // one card among many but the gate to the rest of the page.
+  const [isCodeConfirmed, setIsCodeConfirmed] = useState(false);
 
   // Auto-pick the first org if there's only one. The chooser is only
   // necessary when the user is in 2+.
@@ -311,6 +316,9 @@ export default function CliAuthPage() {
   // Look up the device code once we have a session.
   useEffect(() => {
     if (!session || !userCode) return;
+    // A fresh code always starts at the confirmation step, even when the
+    // page is reused for a second login in the same tab.
+    setIsCodeConfirmed(false);
     let cancelled = false;
     void (async () => {
       try {
@@ -612,6 +620,11 @@ export default function CliAuthPage() {
       : `Expires in ${seconds}s`;
   }, [lookup]);
 
+  const isApprovalReady =
+    lookup.kind === "ready" &&
+    action.kind !== "success" &&
+    action.kind !== "denied";
+
   if (sessionStatus === "loading" || (!session && userCode)) {
     return <FullPageSpinner />;
   }
@@ -677,260 +690,272 @@ export default function CliAuthPage() {
             </>
           )}
 
-          {lookup.kind === "ready" &&
-            action.kind !== "success" &&
-            action.kind !== "denied" && (
-              <>
-                <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                  {requiresProject
-                    ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
-                    : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
-                </Text>
-                <Box
-                  bg="bg.subtle"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="lg"
-                  p={4}
-                  fontFamily="mono"
-                  fontSize="2xl"
-                  fontWeight="bold"
-                  textAlign="center"
-                  letterSpacing="0.2em"
-                  color="fg"
+          {isApprovalReady && !isCodeConfirmed && (
+            <>
+              <Text textStyle="sm" color="fg.muted" lineHeight="tall">
+                {requiresProject
+                  ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
+                  : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+              </Text>
+              <Box
+                bg="bg.subtle"
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="lg"
+                p={4}
+                fontFamily="mono"
+                fontSize="2xl"
+                fontWeight="bold"
+                textAlign="center"
+                letterSpacing="0.2em"
+                color="fg"
+              >
+                {lookup.userCode}
+              </Box>
+              <Text textStyle="xs" color="fg.muted" textAlign="center">
+                Confirm this matches the code shown in your terminal.
+                {expiryText ? (
+                  <>
+                    <br />
+                    {expiryText}.
+                  </>
+                ) : null}
+              </Text>
+              <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+                <Button
+                  colorPalette="orange"
+                  flex={1}
+                  onClick={() => setIsCodeConfirmed(true)}
                 >
-                  {lookup.userCode}
-                </Box>
-                <Text textStyle="xs" color="fg.muted" textAlign="center">
-                  Confirm this matches the code shown in your terminal.
-                  {expiryText ? (
-                    <>
-                      <br />
-                      {expiryText}.
-                    </>
-                  ) : null}
-                </Text>
+                  Confirm
+                </Button>
+                <Button
+                  variant="outline"
+                  color="fg.muted"
+                  borderColor="border.emphasized"
+                  onClick={handleDeny}
+                  loading={action.kind === "submitting"}
+                >
+                  Deny
+                </Button>
+              </Stack>
+            </>
+          )}
 
-                {organizations && organizations.length > 1 && (
+          {isApprovalReady && isCodeConfirmed && (
+            <>
+              {organizations && organizations.length > 1 && (
+                <Box>
+                  <Text textStyle="sm" fontWeight="semibold" color="fg" mb={2}>
+                    Organization
+                  </Text>
+                  <VStack align="stretch" gap={2}>
+                    {organizations.map((org) => (
+                      <Button
+                        key={org.id}
+                        size="sm"
+                        colorPalette={
+                          selectedOrgId === org.id ? "orange" : "gray"
+                        }
+                        variant={
+                          selectedOrgId === org.id ? "surface" : "outline"
+                        }
+                        onClick={() => setSelectedOrgId(org.id)}
+                        justifyContent="flex-start"
+                      >
+                        {org.name}
+                      </Button>
+                    ))}
+                  </VStack>
+                </Box>
+              )}
+
+              {requiresProject && (
+                <Box>
+                  <HStack mb={2} justify="space-between" align="center">
+                    <Text textStyle="sm" fontWeight="semibold" color="fg">
+                      Project
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      color="fg.muted"
+                      onClick={() => setCreateProjectOpen(true)}
+                    >
+                      <Icon as={Plus} boxSize={3.5} />
+                      Create project
+                    </Button>
+                  </HStack>
+                  {offeredProjects.length === 0 ? (
+                    <StatusCard
+                      palette="orange"
+                      icon={CircleAlert}
+                      title="No projects yet"
+                    >
+                      Create a project in this organization first, then pick it
+                      here; the key flows back to your terminal automatically.
+                    </StatusCard>
+                  ) : (
+                    <>
+                      <ScopeChipPicker
+                        variant="single-select"
+                        label=""
+                        placeholder="None selected"
+                        allowedScopeTypes={["PROJECT"]}
+                        organizationId={selectedOrgId ?? undefined}
+                        availableProjects={offeredProjects}
+                        availableTeams={teamsForOrg}
+                        value={
+                          selectedProjectId
+                            ? [
+                                {
+                                  scopeType: "PROJECT",
+                                  scopeId: selectedProjectId,
+                                },
+                              ]
+                            : []
+                        }
+                        onChange={(next) =>
+                          setSelectedProjectId(next[0]?.scopeId ?? null)
+                        }
+                        showSummary={false}
+                      />
+                      {projectsForOrg.length === 0 &&
+                        personalProject &&
+                        selectedProjectId === personalProject.id && (
+                          <Text textStyle="xs" color="fg.muted" mt={1.5}>
+                            No shared projects in this organization yet, so your
+                            personal project is preselected. Only you can read
+                            what lands there.
+                          </Text>
+                        )}
+                    </>
+                  )}
+                </Box>
+              )}
+
+              {!requiresProject && (
+                <>
                   <Box>
                     <Text
                       textStyle="sm"
                       fontWeight="semibold"
                       color="fg"
-                      mb={2}
+                      mb={1}
                     >
-                      Organization
+                      What the CLI can access
                     </Text>
-                    <VStack align="stretch" gap={2}>
-                      {organizations.map((org) => (
-                        <Button
-                          key={org.id}
-                          size="sm"
-                          colorPalette={
-                            selectedOrgId === org.id ? "orange" : "gray"
-                          }
-                          variant={
-                            selectedOrgId === org.id ? "surface" : "outline"
-                          }
-                          onClick={() => setSelectedOrgId(org.id)}
-                          justifyContent="flex-start"
-                        >
-                          {org.name}
-                        </Button>
-                      ))}
-                    </VStack>
+                    <Text textStyle="xs" color="fg.muted" mb={2}>
+                      The key works inside these scopes, always limited to your
+                      own access.
+                    </Text>
+                    {myBindings.isLoading ? (
+                      <HStack>
+                        <Spinner size="sm" />
+                        <Text textStyle="sm" color="fg.muted">
+                          Loading your access…
+                        </Text>
+                      </HStack>
+                    ) : (
+                      <ScopeChipPicker
+                        value={selectedScopes}
+                        onChange={setSelectedScopes}
+                        organizationId={selectedOrgId ?? undefined}
+                        organizationName={selectedOrgName}
+                        availableTeams={sharedTeams}
+                        availableProjects={offeredProjects}
+                        label=""
+                        showSummary={false}
+                      />
+                    )}
+                    {!myBindings.isLoading &&
+                      selectedScopes.length === 0 &&
+                      !hasAnyScopeToOffer && (
+                        <Text textStyle="xs" color="orange.fg" mt={2}>
+                          Your account holds no access in this organization, so
+                          there is nothing to give the CLI. Ask an administrator
+                          to add you to a team, then run{" "}
+                          <code>langwatch login</code> again.
+                        </Text>
+                      )}
                   </Box>
-                )}
 
-                {requiresProject && (
                   <Box>
-                    <HStack mb={2} justify="space-between" align="center">
+                    <HStack justify="space-between" align="center" mb={1}>
                       <Text textStyle="sm" fontWeight="semibold" color="fg">
-                        Project
+                        Permissions
                       </Text>
                       <Button
                         size="xs"
                         variant="ghost"
                         color="fg.muted"
-                        onClick={() => setCreateProjectOpen(true)}
+                        onClick={handleToggleCustomizePermissions}
                       >
-                        <Icon as={Plus} boxSize={3.5} />
-                        Create project
+                        {arePermissionsCustomized ? "Use default" : "Customize"}
                       </Button>
                     </HStack>
-                    {offeredProjects.length === 0 ? (
-                      <StatusCard
-                        palette="orange"
-                        icon={CircleAlert}
-                        title="No projects yet"
-                      >
-                        Create a project in this organization first, then pick
-                        it here; the key flows back to your terminal
-                        automatically.
-                      </StatusCard>
-                    ) : (
-                      <>
-                        <ScopeChipPicker
-                          variant="single-select"
-                          label=""
-                          placeholder="None selected"
-                          allowedScopeTypes={["PROJECT"]}
-                          organizationId={selectedOrgId ?? undefined}
-                          availableProjects={offeredProjects}
-                          availableTeams={teamsForOrg}
-                          value={
-                            selectedProjectId
-                              ? [
-                                  {
-                                    scopeType: "PROJECT",
-                                    scopeId: selectedProjectId,
-                                  },
-                                ]
-                              : []
-                          }
-                          onChange={(next) =>
-                            setSelectedProjectId(next[0]?.scopeId ?? null)
-                          }
-                          showSummary={false}
+                    {arePermissionsCustomized ? (
+                      <VStack align="stretch" gap={2}>
+                        <PermissionCounter count={cliKeyPermissions.length} />
+                        <PermissionCategoryList
+                          selections={effectivePermissionSelections}
+                          userPermissions={cliKeyUserPermissions}
+                          onChange={setPermissionSelections}
                         />
-                        {projectsForOrg.length === 0 &&
-                          personalProject &&
-                          selectedProjectId === personalProject.id && (
-                            <Text textStyle="xs" color="fg.muted" mt={1.5}>
-                              No shared projects in this organization yet, so
-                              your personal project is preselected. Only you can
-                              read what lands there.
-                            </Text>
-                          )}
-                      </>
-                    )}
-                  </Box>
-                )}
-
-                {!requiresProject && (
-                  <>
-                    <Box>
-                      <Text
-                        textStyle="sm"
-                        fontWeight="semibold"
-                        color="fg"
-                        mb={1}
-                      >
-                        What the CLI can access
-                      </Text>
-                      <Text textStyle="xs" color="fg.muted" mb={2}>
-                        The key works inside these scopes, always limited to
-                        your own access.
-                      </Text>
-                      {myBindings.isLoading ? (
-                        <HStack>
-                          <Spinner size="sm" />
-                          <Text textStyle="sm" color="fg.muted">
-                            Loading your access…
-                          </Text>
-                        </HStack>
-                      ) : (
-                        <ScopeChipPicker
-                          value={selectedScopes}
-                          onChange={setSelectedScopes}
-                          organizationId={selectedOrgId ?? undefined}
-                          organizationName={selectedOrgName}
-                          availableTeams={sharedTeams}
-                          availableProjects={offeredProjects}
-                          label=""
-                          showSummary={false}
-                        />
-                      )}
-                      {!myBindings.isLoading &&
-                        selectedScopes.length === 0 &&
-                        !hasAnyScopeToOffer && (
-                          <Text textStyle="xs" color="orange.fg" mt={2}>
-                            Your account holds no access in this organization,
-                            so there is nothing to give the CLI. Ask an
-                            administrator to add you to a team, then run{" "}
-                            <code>langwatch login</code> again.
+                        {cliKeyPermissions.length === 0 && (
+                          <Text textStyle="xs" color="fg.muted">
+                            Select at least one permission to approve.
                           </Text>
                         )}
-                    </Box>
+                      </VStack>
+                    ) : (
+                      <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+                        The key gets your access for everyday work: traces,
+                        datasets, prompts, evaluations, the AI Gateway, and
+                        project settings. It cannot manage members and roles, or
+                        manage the organization.
+                      </Text>
+                    )}
+                  </Box>
+                </>
+              )}
 
-                    <Box>
-                      <HStack justify="space-between" align="center" mb={1}>
-                        <Text textStyle="sm" fontWeight="semibold" color="fg">
-                          Permissions
-                        </Text>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="fg.muted"
-                          onClick={handleToggleCustomizePermissions}
-                        >
-                          {arePermissionsCustomized
-                            ? "Use default"
-                            : "Customize"}
-                        </Button>
-                      </HStack>
-                      {arePermissionsCustomized ? (
-                        <VStack align="stretch" gap={2}>
-                          <PermissionCounter count={cliKeyPermissions.length} />
-                          <PermissionCategoryList
-                            selections={effectivePermissionSelections}
-                            userPermissions={cliKeyUserPermissions}
-                            onChange={setPermissionSelections}
-                          />
-                          {cliKeyPermissions.length === 0 && (
-                            <Text textStyle="xs" color="fg.muted">
-                              Select at least one permission to approve.
-                            </Text>
-                          )}
-                        </VStack>
-                      ) : (
-                        <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-                          The key gets your access for everyday work: traces,
-                          datasets, prompts, evaluations, the AI Gateway, and
-                          project settings. It cannot manage members and roles,
-                          or manage the organization.
-                        </Text>
-                      )}
-                    </Box>
-                  </>
-                )}
+              {action.kind === "error" && (
+                <StatusCard
+                  palette="red"
+                  icon={TriangleAlert}
+                  title="Approval failed"
+                >
+                  {action.message}
+                </StatusCard>
+              )}
 
-                {action.kind === "error" && (
-                  <StatusCard
-                    palette="red"
-                    icon={TriangleAlert}
-                    title="Approval failed"
-                  >
-                    {action.message}
-                  </StatusCard>
-                )}
-
-                <Stack direction={{ base: "column", sm: "row" }} gap={3}>
-                  <Button
-                    colorPalette="orange"
-                    flex={1}
-                    onClick={handleApprove}
-                    loading={action.kind === "submitting"}
-                    disabled={
-                      !selectedOrgId ||
-                      (requiresProject && !selectedProjectId) ||
-                      isDeviceSessionSelectionIncomplete
-                    }
-                  >
-                    {requiresProject ? "Send API key" : "Approve"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    color="fg.muted"
-                    borderColor="border.emphasized"
-                    onClick={handleDeny}
-                    loading={action.kind === "submitting"}
-                  >
-                    Deny
-                  </Button>
-                </Stack>
-              </>
-            )}
+              <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+                <Button
+                  colorPalette="orange"
+                  flex={1}
+                  onClick={handleApprove}
+                  loading={action.kind === "submitting"}
+                  disabled={
+                    !selectedOrgId ||
+                    (requiresProject && !selectedProjectId) ||
+                    isDeviceSessionSelectionIncomplete
+                  }
+                >
+                  {requiresProject ? "Send API key" : "Approve"}
+                </Button>
+                <Button
+                  variant="outline"
+                  color="fg.muted"
+                  borderColor="border.emphasized"
+                  onClick={handleDeny}
+                  loading={action.kind === "submitting"}
+                >
+                  Deny
+                </Button>
+              </Stack>
+            </>
+          )}
 
           {action.kind === "success" && (
             <>
