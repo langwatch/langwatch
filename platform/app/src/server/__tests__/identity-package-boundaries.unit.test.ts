@@ -106,9 +106,17 @@ describe("identity package boundaries", () => {
       const offenders: string[] = [];
       for (const file of sourceFiles(join(APP_SRC, "server", "better-auth"))) {
         for (const specifier of importSpecifiers(file)) {
+          // The PURE package is deliberately not in this set. The feature's
+          // own premise is that `@langwatch/identity` "stays importable by
+          // the frontend" — it is vocabulary, facts and pure functions, and a
+          // rule that let a browser bundle import it while forbidding
+          // better-auth would be saying two different things about the same
+          // package. What the composition root exists to own is the SERVICES
+          // and their wiring, so those are what may only be reached through
+          // it: `@langwatch/identity-server`, and app-layer identity itself.
           const reachesIdentity =
             /app-layer\/identity\//.test(specifier) ||
-            /@langwatch\/identity/.test(specifier);
+            /^@langwatch\/identity-server/.test(specifier);
           if (
             reachesIdentity &&
             !/app-layer\/identity\/runtime$/.test(specifier)

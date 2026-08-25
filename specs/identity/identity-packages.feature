@@ -40,4 +40,5 @@ Feature: Identity ships as two packages with one composition root
     Given the app's server sources
     When every construction of an IdentityService is located
     Then it is in app-layer/identity/runtime.ts and nowhere else
-    And better-auth reaches identity only through that runtime
+    And better-auth reaches the identity services only through that runtime
+    But better-auth may import the pure core directly, as the frontend does

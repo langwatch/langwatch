@@ -101,6 +101,18 @@ import {
   isUserOnIdentityWrites,
 } from "./write-gate";
 
+/**
+ * The method-set policy, re-stated on the runtime because the runtime is the
+ * app's ONE door into app-layer identity (ADR-115) — and better-auth is the
+ * caller the boundary test names. It composes nothing: these are policy
+ * functions over the SSO gate and env, and they are exposed here rather than
+ * imported sideways so `better-auth/` keeps a single identity import.
+ */
+export {
+  deploymentIsFederationCapable,
+  resolveSignInMethodPolicy,
+} from "./signin-method-policy";
+
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);

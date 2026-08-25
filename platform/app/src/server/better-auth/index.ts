@@ -25,13 +25,11 @@ import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
   identityBridgeCeremonies,
+  deploymentIsFederationCapable,
   identityCeremonies,
   identityStorageAdapter,
-} from "~/server/app-layer/identity/runtime";
-import {
-  deploymentIsFederationCapable,
   resolveSignInMethodPolicy,
-} from "~/server/app-layer/identity/signin-method-policy";
+} from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
