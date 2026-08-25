@@ -771,7 +771,14 @@ const appConfig = defineConfig({
           variant: {
             outline: {
               root: {
-                boxShadow: "2xs",
+                // One soft contact shadow in light mode; in dark, shadows
+                // die on the ground, so the card's lift is a hairline inner
+                // top highlight instead — the modern dark-surface tell.
+                boxShadow: "0 1px 2px rgba(16, 16, 32, 0.05)",
+                _dark: {
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.35)",
+                },
               },
             },
             elevated: {

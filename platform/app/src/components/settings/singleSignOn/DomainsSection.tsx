@@ -16,7 +16,7 @@ import { useState } from "react";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
-import { CopyValueRows } from "./CopyValueRow";
+import { CopyValueRows } from "../CopyValueRows";
 import { reportRefusal } from "./refusals";
 
 /**

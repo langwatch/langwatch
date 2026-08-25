@@ -22,6 +22,7 @@ import { GroupsSection } from "../../components/access/GroupsSection";
 import { CopyInput } from "../../components/CopyInput";
 import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
+import { CopyValueRows } from "../../components/settings/CopyValueRows";
 import { ScimReconciliationPanel } from "../../components/settings/ScimReconciliationPanel";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
@@ -269,13 +270,21 @@ function OverviewTab({
         <DirectoryMembersSection organizationId={organizationId} />
       )}
 
-      <VStack gap={2} align="start" width="full">
-        <Heading size="md">Where your identity provider sends it</Heading>
+      <VStack gap={2} align="stretch" width="full">
+        <Heading size="sm">Where your identity provider sends it</Heading>
         <Text color="fg.muted" fontSize="sm">
           Each token works against one single sign-on connection and only
           manages the people that connection provisioned.
         </Text>
-        <CopyInput value={scimBaseUrl} label="Provisioning address" />
+        <CopyValueRows
+          rows={[
+            {
+              label: "Provisioning address",
+              hint: "Paste this into your identity provider, with a token from the Tokens tab",
+              value: scimBaseUrl,
+            },
+          ]}
+        />
       </VStack>
     </VStack>
   );

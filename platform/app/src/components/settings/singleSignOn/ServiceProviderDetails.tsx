@@ -1,6 +1,6 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeSetupView } from "@langwatch/identity-server";
-import { CopyValueRows } from "./CopyValueRow";
+import { CopyValueRows } from "../CopyValueRows";
 
 /**
  * What LangWatch is, to somebody about to configure their identity provider

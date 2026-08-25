@@ -21,6 +21,7 @@ export function SettingsEmptyState({
   title,
   description,
   action,
+  dashed = false,
   testId,
 }: {
   /** A 20px lucide glyph. Muted, never in colour. */
@@ -29,6 +30,10 @@ export function SettingsEmptyState({
   /** One line. The band's own description already said the general case. */
   description: string;
   action: ReactNode;
+  /** The dashed frame, for the state that IS the page: a whole surface with
+   *  nothing in it yet reads as an outline of the thing to come, where a
+   *  solid border would read as a thing that exists and is empty. */
+  dashed?: boolean;
   testId?: string;
 }) {
   return (
@@ -36,9 +41,10 @@ export function SettingsEmptyState({
       size="sm"
       width="full"
       borderWidth="1px"
-      borderColor="border.muted"
+      borderStyle={dashed ? "dashed" : "solid"}
+      borderColor={dashed ? "border.emphasized" : "border.muted"}
       borderRadius="10px"
-      paddingY={6}
+      paddingY={dashed ? 10 : 6}
       paddingX={5}
       data-testid={testId}
     >

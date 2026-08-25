@@ -10,9 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Plug } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
+import { SettingsEmptyState } from "./SettingsEmptyState";
 
 /**
  * What the directory has been doing, on the organization's own SCIM page
@@ -59,7 +61,7 @@ export function ScimReconciliationPanel({
   return (
     <VStack gap={6} width="full" align="stretch">
       <VStack gap={3} width="full" align="stretch">
-        <Heading size="md">Connections</Heading>
+        <Heading size="sm">Connections</Heading>
         {connections.length === 0 && (
           <NoConnectionYet maySetUp={maySetUpSingleSignOn} />
         )}
@@ -90,27 +92,13 @@ export function ScimReconciliationPanel({
  */
 function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
   return (
-    <Box
-      width="full"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="10px"
-      paddingX={4}
-      paddingY={5}
-      data-testid="directory-no-connection"
-    >
-      <VStack align="start" gap={4}>
-        <VStack align="start" gap={1}>
-          <Text fontSize="sm" fontWeight={500}>
-            No identity provider is connected yet
-          </Text>
-          <Text fontSize="xs" color="fg.muted" lineHeight="1.6" maxWidth="60ch">
-            Provisioning runs against a single sign-on connection, so connecting
-            one is the first step. After that your identity provider creates,
-            updates and removes people here on its own.
-          </Text>
-        </VStack>
-        {maySetUp ? (
+    <SettingsEmptyState
+      dashed
+      icon={<Plug size={20} />}
+      title="No identity provider is connected yet"
+      description="Provisioning runs against a single sign-on connection, so connecting one is the first step. After that your identity provider creates, updates and removes people here on its own."
+      action={
+        maySetUp ? (
           <Button asChild size="sm" colorPalette="orange">
             <RouterLink href="/settings/authentication">
               Set up single sign-on
@@ -120,9 +108,10 @@ function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
           <Text fontSize="xs" color="fg.muted">
             An administrator who manages single sign-on sets this up.
           </Text>
-        )}
-      </VStack>
-    </Box>
+        )
+      }
+      testId="directory-no-connection"
+    />
   );
 }
 
@@ -235,7 +224,7 @@ function DirectoryFailures({ connection }: { connection: ConnectionPanel }) {
 function RecentDirectoryChanges({ changes }: { changes: DirectoryChange[] }) {
   return (
     <VStack align="stretch" gap={3}>
-      <Heading size="md">Recent changes from your identity provider</Heading>
+      <Heading size="sm">Recent changes from your identity provider</Heading>
       {changes.length === 0 && (
         <Text color="fg.muted" fontSize="sm">
           Your identity provider has not changed anyone&apos;s access yet.
