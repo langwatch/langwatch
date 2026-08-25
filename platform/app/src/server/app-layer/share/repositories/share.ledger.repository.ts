@@ -145,7 +145,11 @@ export class LedgerShareRepository implements ShareRepository {
       scopeId: params.resourceId,
       resource: {
         token: params.token,
-        permission: SHARE_LINK_PERMISSION,
+        // The link's own permission, or the default when the minter said
+        // nothing — the fact always names one, because the ledger row is the
+        // authority a rollback reads back through (`grantRowToFact` treats a
+        // permission-less resource row as no resource grant at all).
+        permission: params.permission ?? SHARE_LINK_PERMISSION,
         kind: params.resourceType === "THREAD" ? "thread" : "trace",
         ...(params.expiresAt
           ? { expiresAtMs: params.expiresAt.getTime() }

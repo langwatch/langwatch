@@ -2092,6 +2092,15 @@ const presentations = {
     describe: () =>
       "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
   },
+  // Sharer-facing, and reachable only from the mint: a share link may confer
+  // one of a small, fixed set of things, and this one was not in it. The copy
+  // names no permission string - the reader picked an option in a dialog, or
+  // sent an API request whose `meta.allowed` lists the values verbatim.
+  share_permission_not_allowed: {
+    title: "A share link can't grant that",
+    describe: () =>
+      "Choose what the link should allow from the options offered, then create it again.",
+  },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
   trace_sharing_disabled: {

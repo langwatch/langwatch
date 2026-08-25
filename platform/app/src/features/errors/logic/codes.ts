@@ -331,6 +331,7 @@ export const APP_ERROR_CODES = [
   "share_link_expired",
   "share_link_forbidden",
   "share_link_not_found",
+  "share_permission_not_allowed",
   "share_read_rate_limited",
   "span_not_found",
   "spend_source_unavailable",

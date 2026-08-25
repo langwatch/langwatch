@@ -381,6 +381,7 @@ describe("PrismaAuthzReadRepository", () => {
           resourceId: true,
           projectId: true,
           visibility: true,
+          permission: true,
           expiresAt: true,
           maxViews: true,
           viewCount: true,

@@ -290,6 +290,65 @@ export const SHAREABLE_RESOURCE_KINDS = {
 export type ShareableResourceKind = keyof typeof SHAREABLE_RESOURCE_KINDS;
 
 /**
+ * ADR-092 §8 — what one share link may confer. A closed allowlist, not the
+ * registry's cross product: a link is a bearer capability handed to whoever
+ * receives the URL, so the set of things it can ever say has to be small
+ * enough to read in one sitting and enumerated in one place.
+ *
+ * The value is the FULL set of permissions the link grants, because a link
+ * that lets someone annotate what they cannot see grants nothing usable —
+ * the annotate option therefore carries `traces:view` alongside the
+ * annotation verb rather than relying on an implication somewhere else.
+ *
+ * Representation: ONE stored row carrying ONE permission string (the link's
+ * identity IS its token, and two rows would be two tokens, so two grant rows
+ * cannot represent one link). The expansion happens at COLLECT, which emits
+ * one `ResourceGrant` per entry — and that needs nothing new from the engine,
+ * because `matchResourceGrant` already scans a LIST and tests each entry with
+ * `permissionSatisfiedBy`. The alternative — one grant whose single
+ * permission implies the other — is not expressible: `permissionSatisfiedBy`
+ * only knows `<resource>:manage` → sibling actions of the SAME resource, and
+ * `annotations:create` and `traces:view` are different resources.
+ */
+export const SHARE_LINK_PERMISSIONS = {
+  /** Read-only: what every link minted before this allowlist existed says. */
+  "traces:view": ["traces:view"],
+  /** Read plus leave comments on the shared trace. */
+  "annotations:create": ["traces:view", "annotations:create"],
+} as const satisfies Record<string, readonly string[]>;
+
+/** What a link says when its minter said nothing, and what every row stored
+ *  before the column existed means. */
+export const DEFAULT_SHARE_LINK_PERMISSION = "traces:view" as const;
+
+export type ShareLinkPermission = keyof typeof SHARE_LINK_PERMISSIONS;
+
+/** Whether a caller-supplied string is one the mint may store. */
+export function isShareLinkPermission(
+  value: string,
+): value is ShareLinkPermission {
+  return Object.hasOwn(SHARE_LINK_PERMISSIONS, value);
+}
+
+/**
+ * Every permission a stored link confers, expanded from the one string on
+ * its row. `null` (a row written before the column existed) reads as the
+ * default, exactly as it did when the value was a constant.
+ *
+ * A stored string OUTSIDE the allowlist grants literally itself and nothing
+ * else — parsed, not asserted, the same discipline the projection's resource
+ * kind follows: a row an older writer or a hand-run statement left behind
+ * must not be able to widen itself through an implication table it was never
+ * validated against.
+ */
+export function shareLinkPermissionsGranted(
+  permission: string | null | undefined,
+): readonly string[] {
+  const stored = permission ?? DEFAULT_SHARE_LINK_PERMISSION;
+  return isShareLinkPermission(stored) ? SHARE_LINK_PERMISSIONS[stored] : [stored];
+}
+
+/**
  * ADR-021 scope fence as registry data: a binding at `scopeType` may grant
  * `permission` only when the permission's resource is grantable at or below
  * that tier. Org-exclusive resources (scopes: ["organization"]) need an

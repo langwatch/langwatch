@@ -5,6 +5,7 @@ import {
   ShareLinkExpiredError,
   ShareLinkForbiddenError,
   ShareLinkNotFoundError,
+  ShareLinkPermissionNotAllowedError,
   TraceSharingDisabledError,
 } from "../errors";
 import type {
@@ -398,6 +399,72 @@ describe("ShareService", () => {
       expect(pinnedTraces.autoPin).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         traceId: "trace_a",
+      });
+    });
+
+    describe("when the mint names what the link may do", () => {
+      const mintWith = async (permission?: string) => {
+        vi.mocked(repo.create).mockImplementation(
+          async (params) => ({ ...params, id: "share_1" }) as never,
+        );
+        await service.createShare({
+          projectId: PROJECT_ID,
+          resourceType: "TRACE",
+          resourceId: "trace_a",
+          ...(permission === undefined ? {} : { permission }),
+        });
+        return vi.mocked(repo.create).mock.calls[0]![0];
+      };
+
+      /** @scenario "A link minted without a permission stays read-only" */
+      it("stores nothing when the minter said nothing", async () => {
+        // Not "permission is traces:view" — the KEY is absent, so the row a
+        // caller who never heard of this option writes is the row it always
+        // wrote, and the default keeps exactly one spelling.
+        expect(await mintWith()).not.toHaveProperty("permission");
+      });
+
+      /** @scenario "An annotate link lets its holder annotate the shared trace" */
+      it("stores an allowlisted permission verbatim", async () => {
+        expect((await mintWith("annotations:create")).permission).toBe(
+          "annotations:create",
+        );
+      });
+
+      it("stores nothing when the minter spells out the default", async () => {
+        expect(await mintWith("traces:view")).not.toHaveProperty("permission");
+      });
+
+      /** @scenario "A share link cannot be minted for something it may not grant" */
+      it("refuses a permission outside the allowlist, before storage", async () => {
+        const minting = service.createShare({
+          projectId: PROJECT_ID,
+          resourceType: "TRACE",
+          resourceId: "trace_a",
+          permission: "datasets:manage",
+        });
+
+        // The code, not the prose: the message is copy and will change.
+        await expect(minting).rejects.toMatchObject({
+          code: "share_permission_not_allowed",
+        });
+        expect(repo.create).not.toHaveBeenCalled();
+      });
+
+      it("hands the refused caller the values it should have sent", async () => {
+        const error = await service
+          .createShare({
+            projectId: PROJECT_ID,
+            resourceType: "TRACE",
+            resourceId: "trace_a",
+            permission: "traces:delete",
+          })
+          .catch((thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(ShareLinkPermissionNotAllowedError);
+        expect((error as ShareLinkPermissionNotAllowedError).meta).toEqual({
+          allowed: ["traces:view", "annotations:create"],
+        });
       });
     });
 

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_SHARE_LINK_PERMISSION,
   PRINCIPAL_KIND_FROM_STORED,
   STORED_PRINCIPAL_KIND,
 } from "@langwatch/authz";
@@ -17,11 +18,15 @@ import type {
   RoleFact,
 } from "./facts";
 
-/** The single permission a share link has ever conferred (ADR-057) - the one
- *  spelling every minter and every importer of a share-link grant uses
- *  (`cutover.migration.ts`'s import and the platform's `LedgerShareRepository`
- *  mint, both). */
-export const SHARE_LINK_PERMISSION = "traces:view";
+/** The permission a share link confers when its minter named none (ADR-057's
+ *  original, and still the only thing an existing link says) - the one
+ *  spelling every minter and every importer of a share-link grant falls back
+ *  to (`cutover.migration.ts`'s import and the platform's
+ *  `LedgerShareRepository` mint, both). A link that DOES name one carries it
+ *  on the fact; the closed set it may name is `SHARE_LINK_PERMISSIONS` in
+ *  `@langwatch/authz`, which this is re-exported from so the default has one
+ *  spelling across both packages. */
+export const SHARE_LINK_PERMISSION = DEFAULT_SHARE_LINK_PERMISSION;
 
 /**
  * Pure row mapping for the grants ledger's Postgres projection: reducer
@@ -350,6 +355,10 @@ export interface CompatShareLinkRowShape {
   projectId: string;
   userId: string | null;
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  /** What the link confers. `null` where the fact names the default, so the
+   *  compat row an ordinary link folds to is byte-identical to the one the
+   *  legacy mint wrote before the column existed. */
+  permission: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
 }
@@ -463,6 +472,12 @@ export function grantFactToCompatShareLink({
     projectId: resource.projectId,
     userId: resource.createdByUserId ?? null,
     visibility,
+    // The DEFAULT folds to null, not to its own name: the compat column's
+    // absence is what "an ordinary link" has always looked like on this
+    // table, and writing the string instead would make every pre-existing
+    // row differ from every re-folded one for no change in meaning.
+    permission:
+      resource.permission === SHARE_LINK_PERMISSION ? null : resource.permission,
     expiresAt:
       resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
     maxViews: resource.maxViews ?? null,

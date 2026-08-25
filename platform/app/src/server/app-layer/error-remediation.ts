@@ -245,6 +245,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- shared trace links (ADR-057 / ADR-092 section 8) ----
+  share_permission_not_allowed: {
+    tips: [
+      "`meta.allowed` lists every value a share link may be created with; send one of those",
+      "Omit `permission` entirely for the ordinary read-only link",
+    ],
+  },
+
   // ---- management API (organization, members, roles, role bindings) ----
   enterprise_plan_required: {
     tips: [
