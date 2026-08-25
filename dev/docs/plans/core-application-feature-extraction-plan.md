@@ -1,10 +1,11 @@
-# Core application feature extraction plan
+# Application feature extraction plan
 
-**Date:** 2026-08-24
+**Date:** 2026-08-25
 
-**Scope:** the non-Enterprise product implementation still under
-`platform/app`. Enterprise feature extraction is explicitly out of scope for
-this plan.
+**Scope:** all product implementation still under `platform/app`. Core product
+code moves to `packages/features`; licensed code moves to
+`packages/enterprise/features`. Process composition moves later to `apps/ui`,
+`apps/api`, or `apps/worker`.
 
 **Decisions:**
 [ADR-101](../adr/101-feature-package-surfaces.md),
@@ -23,11 +24,14 @@ This is the canonical migration map. A source move must point to a row in this
 map. We do not choose the next package from whichever legacy file happens to be
 open.
 
-The inventory at the start of this plan contains approximately:
+The 2026-08-25 inventory contains:
 
-- 1,579 production TypeScript modules below `platform/app/src/server`;
-- 128 production modules below `platform/app/src/app/api`; and
-- 1,205 production modules below `pages`, `components`, and `hooks`.
+- 3,962 production TypeScript modules and 777,241 lines below
+  `platform/app/src`;
+- 1,270 modules and 299,549 lines below `server`;
+- 1,859 modules and 344,329 lines below `features` and `components`; and
+- 119 API route modules plus 165 page modules that must become thin process
+  composition rather than feature implementations.
 
 The large count is why the split is organised as vertical features rather than
 as a directory rename.
@@ -137,6 +141,130 @@ catch-all feature would recreate `platform/app` under `packages/features`.
 | broadcast/SSE, mail, Redis, ClickHouse, Prisma, queues and object storage clients                             | reusable technical infrastructure, not product ownership                                                                                                                                                             | infrastructure packages and runtime composition                    |
 | generic export transport                                                                                      | route/progress transport only; Scenario, Simulation and Trace own their export behaviour                                                                                                                             | `apps/api`                                                         |
 | cross-feature navigation, command bar and page shells                                                         | compose feature-web screens                                                                                                                                                                                          | `apps/ui`                                                          |
+
+## Residual application path map
+
+This is the disposal map for the remaining application tree. Counts are
+production `.ts` and `.tsx` files; declarations, tests, specs and stories are
+excluded. A directory name is not proof of feature ownership: the mixed rows
+below must be split, not moved wholesale.
+
+### Top-level destinations
+
+| Current path                              |   Files / lines | Logical destination                                                                                                                         |
+| ----------------------------------------- | --------------: | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform/app/src/server/**`              | 1,270 / 299,549 | Feature behaviour and persistence to the owning `server` package; transports and process infrastructure to `apps/api` or `apps/worker`      |
+| `platform/app/src/features/**`            |   988 / 179,472 | Reusable presentation to the owning `web` package; navigation, onboarding and page orchestration to `apps/ui`                               |
+| `platform/app/src/components/**`          |   871 / 164,857 | Feature presentation to the owning `web` package; generic primitives to the design system; page shells to `apps/ui`                         |
+| `platform/app/src/pages/**`               |    165 / 40,658 | Browser route shells to `apps/ui`; `pages/api` compatibility transports to `apps/api`                                                       |
+| `platform/app/src/app/api/**`             |    119 / 23,095 | Hono transport composition in `apps/api`; no repositories or domain policy remain here                                                      |
+| `platform/app/src/prompts/**`             |    100 / 12,465 | Prompt behaviour and reusable UI to `prompt/web`; route and query adapters to `apps/ui`                                                     |
+| `platform/app/src/optimization_studio/**` |    100 / 17,193 | Mostly `workflow/web`; cross-feature editors consume Agent, Dataset, Evaluation, Evaluator, Model Provider and Prompt services or web ports |
+| `platform/app/src/hooks/**`               |      90 / 9,478 | Feature hooks to the owning `web` package; router and page-composition hooks to `apps/ui`                                                   |
+| `platform/app/src/runtime/**`             |      74 / 3,974 | Process boot, config and feature installers split between `apps/ui`, `apps/api` and `apps/worker`                                           |
+| `platform/app/src/utils/**`               |    107 / 11,988 | Split by dependency: domain helpers to feature packages, generic presentation to the design system, process helpers to the relevant app     |
+
+The remaining tree still has 107 production files using a global App accessor,
+204 reaching Prisma directly or through a generated client, and 119 reading an
+environment object. Those are migration signals, not acceptable final seams.
+
+### Server and eventing destinations
+
+| Current path                                                                                                                    | Destination and split rule                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/app-layer/traces/**`, `server/traces/**`, trace-specific `server/filters/**` and `server/export/**`                     | One `trace/server` graph. Collapse the two read/service stacks before moving them; preserve every response field, cursor, redaction, offload and cost rule.                      |
+| `server/tracer/**`, `server/otel/**`, ingestion portions of `server/routes/**`                                                  | `telemetry/server` for OTLP intake and normalisation; Trace consumes normalised telemetry. HTTP registration remains `apps/api`.                                                 |
+| `server/app-layer/{organizations,permissions,role-bindings}/**`, `server/{organizations,invites,teams,role-bindings,rbac}/**`   | `organization/server`, `authz/server` and `role/server`. Team, group, membership and invite stay subordinate to Organization; grants stay AuthZ.                                 |
+| `server/modelProviders/**`                                                                                                      | Provider/default/cost persistence and policy to `model-provider/server`. Registry, SDK/HTTP validation and onboarding remain injected adapters; `codexGatewayModel` is Gateway.  |
+| `server/gateway/**` and gateway usage/budget code                                                                               | `gateway/server`. Governance consumes gateway facts through a contract; it does not own core gateway persistence.                                                                |
+| `server/{evaluations,evaluators,experiments,experiments-v3,scenarios,suites,workflows}/**` and matching `app-layer` directories | Corresponding singular feature server. Execution orchestration may remain worker composition, but definition/read repositories do not.                                           |
+| `server/analytics/**`, `server/dashboards/**`, `server/saved-views/**`, `server/app-layer/{analytics,metrics,filters}/**`       | `analytics/server` and `dashboard/server`. Dashboard consumes Analytics; it does not duplicate analytical repositories.                                                          |
+| `server/app-layer/{automations,reports,scheduler}/**`                                                                           | Automation policy to `automation/server`; scheduler wake-up, dispatch and provider wiring to worker composition or named technical adapters.                                     |
+| `server/app-layer/{langy,coding-agent,topic-clustering}/**`                                                                     | `langy/server`, `coding-agent/server` and `topic/server`; process transports and external clients remain adapters.                                                               |
+| `server/app-layer/{billing,subscription,usage,usage-stats}/**`, `server/license-enforcement/**`                                 | Licensed billing/licensing implementations under `packages/enterprise`; portable plan decisions through core `entitlement`. No licensed implementation leaks into core packages. |
+| `server/stored-objects/**`                                                                                                      | `stored-object/server`; complete this before Trace media, Dataset uploads and Evaluation input offload are rewired.                                                              |
+| `server/featureFlag/**`                                                                                                         | Ops owns the management lifecycle; selected values and boot-time switches remain runtime configuration.                                                                          |
+| `server/webhooks/**`, `server/mailer/**`                                                                                        | Feature-specific webhook/delivery behaviour goes to its owner; HTTP clients, mail transport and generic delivery infrastructure remain process adapters.                         |
+| `server/clickhouse/**`, `server/db*.ts`, `server/storage.ts`, `server/s3/**`, `server/aws/**`, `server/shutdown/**`             | Shared infrastructure packages and process lifecycle composition, never a product feature.                                                                                       |
+| `server/api/**`, `server/routes/**`, `server/openapi/**`, `server/context/**`, `server/middleware/**`                           | `apps/api`. Each handler validates transport input, checks auth and delegates to `context.app.<service>`.                                                                        |
+
+Feature event pipelines move with the feature. Only the catalogue, substrate
+adapters, replay controls and process registration remain in worker
+composition.
+
+| Current pipeline                                     | Owner                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `trace-processing`                                   | `trace/server`                                                     |
+| `metric-processing`, `log-processing`                | `telemetry/server`                                                 |
+| `coding-agent-processing`                            | `coding-agent/server`                                              |
+| `simulation-processing`                              | `simulation/server`                                                |
+| `evaluation-processing`                              | `evaluation/server`                                                |
+| `experiment-run-processing`                          | `experiment/server`                                                |
+| `suite-run-processing`                               | `suite/server`                                                     |
+| `automations`                                        | `automation/server`                                                |
+| `topic-clustering-processing`                        | `topic/server`                                                     |
+| `gateway-spend-processing`                           | `gateway/server`; Enterprise Governance consumes its durable facts |
+| `billing-reporting`                                  | Enterprise `billing/server`                                        |
+| `langy-conversation-processing`, `langy-maintenance` | `langy/server`                                                     |
+| `github-maintenance`                                 | `github/server`                                                    |
+| `blob-maintenance`                                   | `stored-object/server`                                             |
+| `process-manager-maintenance`, `shared`              | `apps/worker` process/framework composition                        |
+
+### Browser destinations
+
+| Current path                                                                                                      | Logical destination                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features/traces-v2/**`, `components/traces/**`                                                                   | Reusable trace explorer, drawer, table and formatting to `trace/web`; page route, tRPC queries and onboarding remain `apps/ui`.                                                                                       |
+| `features/{langy,automations,analytics-query,presence}/**`                                                        | Corresponding feature `web` packages.                                                                                                                                                                                 |
+| `components/{agents,annotations,automations,datasets,evaluators,prompts,scenarios,simulations,suites,traces}/**`  | Corresponding feature `web` packages; the application passes data and narrow rendering ports.                                                                                                                         |
+| `components/ops/**`                                                                                               | `ops/web` for reusable operator presentation; queries, permissions and page routing remain `apps/ui`.                                                                                                                 |
+| `components/settings/**`                                                                                          | Not a Settings feature. Split Model Provider, Data Privacy, Role/AuthZ, Organization, Secret, API Key and Enterprise Governance presentation into their owners; retain only settings navigation and page composition. |
+| `components/me/**`                                                                                                | Keep personal page composition in `apps/ui`; move reusable User, Trace, Coding Agent, Gateway, Model Provider and Enterprise Governance panels to their owners.                                                       |
+| `optimization_studio/components/**`, `optimization_studio/hooks/**`, `optimization_studio/utils/**`               | Mostly `workflow/web`; selectors and editors consume the appropriate feature contracts rather than copying their domain types.                                                                                        |
+| `features/{navigation,command-bar,onboarding,errors,briefing}/**`, `components/{home,welcome,sidebar,drawers}/**` | `apps/ui` composition unless a durable product lifecycle is identified and added to the catalogue.                                                                                                                    |
+| `components/{ui,icons,shared,forms,inputs,outputs,variables,targets,blocks,code}/**`                              | Design-system or a small technical web package when genuinely reusable; otherwise `apps/ui`.                                                                                                                          |
+
+### Enterprise containment
+
+Licensed implementation never moves into a core feature merely because a core
+route calls it.
+
+| Current path or concern                                  | Destination                                                                            |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `platform/app/ee/**`, `server/enterprise/**`             | The matching package below `packages/enterprise/features/**`                           |
+| Governance routes, pages and runtime adapters            | `governance/{contract,server,web}` plus `packages/enterprise/composition/{api,worker}` |
+| SCIM and SSO                                             | `scim/**` and `sso/**`; core Auth and Organization consume only portable contracts     |
+| Managed model providers                                  | `managed-provider/**`; core Model Provider receives a contract collaborator            |
+| Billing, subscription, usage limits and licence purchase | `billing/**` and `licensing/**`; core Entitlement exposes provider-neutral decisions   |
+| Admin and Ops                                            | Core `ops/**`; these are back-office capabilities, not licence-gated Enterprise code   |
+
+### Repository-root cleanup destinations
+
+| Current path                                          | Destination                                                                                                                                     |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/agentic-e2e/**`                                | `dev/tests/agentic-e2e/**`, moved atomically with workspace, workflow, Docker and documentation references                                      |
+| Clearly feature-owned `specs/<feature>/**`            | `<owning-feature>/specs/**`; mixed Trace, Studio, Evaluation, RBAC, Gateway, Governance and Settings roots are classified file by file          |
+| SDK-owned specs                                       | The matching SDK-local `specs` directory                                                                                                        |
+| Process, security, CI, setup and infrastructure specs | Remain central until a real technical package owns them                                                                                         |
+| Root `assets/**`                                      | Referenced repository artwork may move to `.github/assets`; unreferenced media is reviewed for deletion rather than moved blindly               |
+| Root `skills/**`                                      | Remains the shipped LangWatch product-skills workspace; it is not merged with agent-development skills                                          |
+| `.agents/skills/**` and `.claude/skills/**`           | `.agents/skills` is the canonical migration-agent home; Claude-specific compatibility skills move only after their direct consumers are updated |
+| `.coderabbit.yaml` and tool dotfiles                  | Stay at repository root where their tools require them; PR templates already belong under `.github`                                             |
+
+### Execution order
+
+1. Keep boot and process composition explicit; remove global App, global Prisma,
+   import-time environment reads and request-time service construction.
+2. Finish the shared dependency spine: Organization/AuthZ/Role, API Key,
+   Stored Object, Model Provider and Secret.
+3. Finish execution services and web surfaces: Evaluation, Scenario,
+   Simulation, Suite, Experiment, Workflow and Agent.
+4. Collapse and extract the full Trace/Telemetry graph before switching any
+   trace transport to a new query path.
+5. Finish Analytics, Dashboard, Topic, Gateway, Automation, GitHub, Coding
+   Agent, Langy, Presence and Ops.
+6. Move feature-owned ADRs, specs and tests with each completed feature, then
+   perform the physical `apps/ui`, `apps/api` and `apps/worker` split.
 
 ## Catalogue corrections revealed by the inventory
 

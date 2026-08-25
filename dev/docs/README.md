@@ -17,6 +17,7 @@ Cross-cutting principles that apply everywhere:
 ## Architecture
 
 - **adr/** - Architecture Decision Records (RBAC, event sourcing, logging, feature flags, Redis)
+- **[Application feature extraction plan](plans/core-application-feature-extraction-plan.md)** - current path-to-owner map for draining `platform/app`
 
 ## Also See
 
