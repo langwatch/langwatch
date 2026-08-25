@@ -269,8 +269,11 @@ save, so the address has to be reachable from wherever the app is running.</p>
     <td>{{if .Active}}<span class="pill ok">active</span>{{else}}<span class="pill refused">inactive</span>{{end}}</td></tr>
 {{end}}
 </table>
-<p class="hint">Sign in as any of them by adding <code>login_hint=&lt;email&gt;</code> to the
-authorization request — no password, no browser step.</p>
+<p class="hint">A login started from your application lands on the account picker, where you
+choose one of these. There are no passwords — picking a user is the whole ceremony.</p>
+<p class="hint">Scripts and tests can skip the picker: add <code>login_hint=&lt;email&gt;</code>
+to the authorization request and this tenant redirects straight back with a code for that
+user, with nothing to click.</p>
 </section>
 
 <section class="panel">

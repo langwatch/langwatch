@@ -12,7 +12,7 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 	plan := func(sel domain.Selection) []Child {
 		o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 		st := domain.Stack{Slug: "test", Services: []domain.Service{
-			{Name: "idp", Port: 5565, URL: "https://idp.test.langwatch.localhost"},
+			{Name: "idp", Port: 5565, DNSPort: 5566, URL: "https://idp.test.langwatch.localhost"},
 		}}
 		return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir(), "")
 	}
@@ -41,7 +41,7 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 		if !strings.Contains(idp.Shell, "svc=idpsim") {
 			t.Errorf("the idp lane runs %q, not the idpsim service", idp.Shell)
 		}
-		var hasAddr, hasBase bool
+		var hasAddr, hasBase, hasDNS bool
 		for _, e := range idp.Env {
 			if e == "SERVER_ADDR=:5565" {
 				hasAddr = true
@@ -49,12 +49,22 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 			if e == "IDPSIM_BASE_URL=https://idp.test.langwatch.localhost" {
 				hasBase = true
 			}
+			if e == "IDPSIM_DNS_ADDR=127.0.0.1:5566" {
+				hasDNS = true
+			}
 		}
 		if !hasAddr {
 			t.Errorf("idp env %v lacks its allocated SERVER_ADDR", idp.Env)
 		}
 		if !hasBase {
 			t.Errorf("idp env %v lacks the routed IDPSIM_BASE_URL, so issuer URLs would be loopback", idp.Env)
+		}
+		// Without it the simulator binds its fixed default, a second stack
+		// finds that busy and silently moves to an ephemeral port, and the
+		// overlay's SSO_DOMAIN_PROOF_DNS_SERVERS then names a listener that
+		// belongs to another worktree.
+		if !hasDNS {
+			t.Errorf("idp env %v lacks its allocated IDPSIM_DNS_ADDR, so two stacks would race for one nameserver", idp.Env)
 		}
 	})
 }
