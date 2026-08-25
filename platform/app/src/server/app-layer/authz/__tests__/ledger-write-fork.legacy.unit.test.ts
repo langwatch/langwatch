@@ -35,6 +35,44 @@ beforeEach(() => {
 });
 
 describe("given an organization the genesis import has not reached", () => {
+  // The legacy table has no column for the date access ends. Writing the row
+  // anyway would produce a grant an admin believes ends on Friday and which
+  // never ends, so the writer refuses instead of dropping the term.
+  describe("when the attached binding carries a date its access ends", () => {
+    /** @scenario "An end date is refused where it could not be stored" */
+    it("refuses with grant_expiry_not_supported and writes nothing", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
+
+      await expect(
+        writer.attachBindings({
+          organizationId: ORG_ID,
+          bindings: [{ ...binding, expiresAtMs: 1_800_000_000_000 }],
+          actor: ACTOR,
+          onDuplicate: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "grant_expiry_not_supported" });
+
+      expect(db.roleBinding.create).not.toHaveBeenCalled();
+      expect(db.roleBinding.createMany).not.toHaveBeenCalled();
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+      expect(sent).toEqual([]);
+      expect(bumpAuthzEpoch).not.toHaveBeenCalled();
+    });
+
+    it("still writes a binding in the same batch that carries no end date", async () => {
+      const { writer, db } = harness({ onLedger: false });
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding],
+        actor: ACTOR,
+        onDuplicate: "reject",
+      });
+
+      expect(db.roleBinding.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when a binding is attached rejecting duplicates", () => {
     /** @scenario "An organization that has not completed the genesis import keeps writing legacy rows imperatively" */
     it("writes the row itself and emits no command", async () => {

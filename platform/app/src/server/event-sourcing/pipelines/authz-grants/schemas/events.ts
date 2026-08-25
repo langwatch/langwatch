@@ -122,6 +122,11 @@ export const resourceGrantTermsSchema = z.object({
  * revocable by no principal. It is only meaningful paired with a token, and
  * tokens exist at RESOURCE scope alone.
  *
+ * `expiresAtMs` on the grant itself is the binding tiers' time box, and is
+ * refused at RESOURCE scope: a share link states its expiry inside its terms
+ * and always has, so accepting both would give one row two expiries and no
+ * rule about which wins.
+ *
  * The `project` principal has exactly two legal placements: the resource tier
  * (a share link whose audience is "members who can see this project"), and
  * its OWN project's PROJECT scope — the project-credential self-grant the
@@ -139,9 +144,13 @@ export const grantShapeRefinement = {
     roleKey: string | null;
     scope: { type: string; id: string };
     resource?: unknown;
+    expiresAtMs?: number;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) {
+      return false;
+    }
+    if (isResourceScope && grant.expiresAtMs !== undefined) {
       return false;
     }
     const isOwnProjectCredential =
@@ -159,7 +168,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
   path: ["resource"] as const,
 };
 
@@ -173,6 +182,14 @@ export const grantAttachedEventSchema = EventSchema.extend({
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
+      /**
+       * When a binding-tier grant stops granting. ADDITIVE: every event ever
+       * appended lacks it, and an event without it folds to exactly the row
+       * it folded to before - `Grant.expiresAt` null, granting until revoked.
+       * `.positive()` because epoch 0 is not a date anybody means, and a
+       * grant that expired in 1970 would be a fact that never granted.
+       */
+      expiresAtMs: z.number().int().positive().optional(),
       source: grantEventSourceSchema,
       actor: grantsLedgerActorSchema,
     })

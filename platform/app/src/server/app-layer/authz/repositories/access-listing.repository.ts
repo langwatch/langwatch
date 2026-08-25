@@ -57,6 +57,17 @@ export type AccessListingBindingRow = {
   scopeType: RoleBindingScopeType;
   scopeId: string;
   createdAt: Date;
+  /**
+   * When the binding stops granting, or null when it does not - the
+   * expiring-grants term (ADR-092). Surfaced so a listing can SHOW the end
+   * date somebody set; never filtered on, because a listing that hid elapsed
+   * rows would leave an admin unable to see access they need to clean up.
+   *
+   * Always null on the legacy head: `RoleBinding` has no such column, and an
+   * organization still writing through it cannot create an expiring binding
+   * in the first place (the writer refuses it).
+   */
+  expiresAt: Date | null;
   user: {
     id: string;
     name: string | null;

@@ -109,6 +109,8 @@ export const APP_ERROR_CODES = [
   "github_pr_not_mapped",
   "github_rate_limited",
   "github_repo_not_accessible",
+  "grant_expiry_in_past",
+  "grant_expiry_not_supported",
   "grant_validation_failed",
   "group_member_already_added",
   "group_not_found",

@@ -47,6 +47,7 @@ import {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type GrantEventSource,
+  GrantExpiryUnsupportedError,
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -453,6 +454,12 @@ export class GrantsLedgerWriter {
             principal: principalForWhere(binding.principal),
             roleKey: roleKeyFor(binding),
             scope: { type: binding.scopeType, id: binding.scopeId },
+            // Omitted when there is none, never sent as undefined: an
+            // absent key is what every event before expiring bindings
+            // carries, and the two have to serialize identically.
+            ...(binding.expiresAtMs !== undefined
+              ? { expiresAtMs: binding.expiresAtMs }
+              : {}),
             source,
             actor,
             occurredAtMs,
@@ -595,6 +602,18 @@ export class GrantsLedgerWriter {
     onDuplicate: "reject" | "skip";
     occurredAtMs: number;
   }): Promise<AttachOutcome> {
+    // `RoleBinding` has no expiry column, so an expiring attach on this side
+    // of the fork would land a row that grants FOREVER while the admin
+    // believes it ends on Friday. Refusing is the only honest answer: the
+    // caller can re-send without the expiry and revoke by hand.
+    const expiring = fresh.find((binding) => binding.expiresAtMs !== undefined);
+    if (expiring) {
+      throw new GrantExpiryUnsupportedError({
+        scopeType: expiring.scopeType,
+        scopeId: expiring.scopeId,
+      });
+    }
+
     const rows = fresh.map((binding) =>
       legacyBindingRow({ organizationId, binding }),
     );

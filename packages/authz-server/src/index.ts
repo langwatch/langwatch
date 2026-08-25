@@ -60,7 +60,13 @@ export type {
   AuthzEpochReader,
   AuthzServiceOptions,
 } from "./authz.service";
-export { DuplicateGrantError, GrantValidationError } from "./grant-validation";
+export {
+  assertExpiryInFuture,
+  DuplicateGrantError,
+  GrantExpiryInPastError,
+  GrantExpiryUnsupportedError,
+  GrantValidationError,
+} from "./grant-validation";
 export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,

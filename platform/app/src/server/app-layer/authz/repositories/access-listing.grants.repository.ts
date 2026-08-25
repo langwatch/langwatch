@@ -80,6 +80,7 @@ const GRANT_ROW_SELECT = {
   legacyRole: true,
   scopeType: true,
   scopeId: true,
+  expiresAt: true,
   occurredAt: true,
   updatedAt: true,
 } as const satisfies Prisma.GrantSelect;
@@ -667,6 +668,12 @@ function toListedRow({
     scopeType: grant.scopeType,
     scopeId: row.scopeId,
     createdAt: row.occurredAt,
+    // `?? null` rather than a bare read: the two heads are compared row for
+    // row by the listing-parity test, and the legacy one answers null for
+    // every binding. A row that reached here without the column would
+    // otherwise report `undefined` and read as a different answer to the
+    // same question.
+    expiresAt: row.expiresAt ?? null,
     user,
     group,
     apiKey,

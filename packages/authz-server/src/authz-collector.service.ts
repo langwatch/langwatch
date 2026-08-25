@@ -2,13 +2,14 @@
  * ADR-092 §2 — COLLECT: the policy half of reading authorization data. The
  * queries live behind AuthzReadRepository (the app's Prisma implementation);
  * this service owns what the rows MEAN: group expansion, the lenient
- * custom-role parse, share-link liveness, audience mapping, and scope
- * resolution. One snapshot per (principal, organization) feeds any number
- * of pure decide() calls.
+ * custom-role parse, binding and share-link liveness, audience mapping, and
+ * scope resolution. One snapshot per (principal, organization) feeds any
+ * number of pure decide() calls.
  */
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
+  CollectedBinding,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
@@ -21,7 +22,8 @@ import type {
 } from "./authz-read.repository";
 
 export type AuthzCollectorOptions = {
-  /** Injected so share-link liveness is testable at its exact boundary. */
+  /** Injected so binding and share-link liveness are testable at their exact
+   *  boundary. */
   now?: () => Date;
 };
 
@@ -260,10 +262,13 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const bindings = await reader.findApiKeyBindings({
-      apiKeyId: principal.id,
-      organizationId,
-    });
+    const bindings = liveBindings(
+      await reader.findApiKeyBindings({
+        apiKeyId: principal.id,
+        organizationId,
+      }),
+      this.now(),
+    );
     return {
       principal,
       organizationId,
@@ -318,7 +323,14 @@ export class AuthzCollectorService {
         }),
       ]);
 
-    const bindings = [...directBindings, ...groupBindings];
+    // Expired rows are dropped HERE, once, for both heads: the compat head
+    // has no expiry column to filter on and the grants head would need the
+    // predicate written a second time in SQL. One filter over the collected
+    // list is what makes the two answer identically.
+    const bindings = liveBindings(
+      [...directBindings, ...groupBindings],
+      this.now(),
+    );
     // A seat-disabled membership is NOT a membership: the person keeps their
     // row, their role and everything they did, and holds no access until an
     // admin re-enables them (seat-reconciliation.feature). Reporting it as a
@@ -392,6 +404,35 @@ function parseCustomRolePermissions(
     map.set(row.id, permissions);
   }
   return map;
+}
+
+/**
+ * The bindings still granting at `now`.
+ *
+ * An elapsed binding is treated as ABSENT, not as revoked, and the
+ * difference is the whole design: nothing is written when the moment passes,
+ * so `revokedAt` stays null, the organization's authz epoch is not bumped,
+ * and the row remains readable as the audit record of access that once
+ * existed. The cost of not bumping is that a snapshot cached BEFORE the
+ * expiry keeps answering from it - bounded by the cache's absolute age
+ * ceiling (30s, `DEFAULT_CACHE_MAX_AGE_MS` in authz.service.ts) and accepted
+ * (`specs/rbac/expiring-grants.feature`). An admin who needs access to stop
+ * this instant revokes, which does bump.
+ *
+ * `<=` rather than `<`: a binding whose expiry is exactly now is over. The
+ * write surface refuses to create one on the same boundary
+ * (`assertExpiryInFuture`), so the two halves cannot disagree.
+ */
+function liveBindings(
+  bindings: CollectedBinding[],
+  now: Date,
+): CollectedBinding[] {
+  // The overwhelmingly common case is that nothing expires at all, and a
+  // filter that allocates a second array for it would run on every check.
+  if (!bindings.some((binding) => binding.expiresAt != null)) return bindings;
+  return bindings.filter(
+    (binding) => binding.expiresAt == null || binding.expiresAt > now,
+  );
 }
 
 function isLiveShareLink(row: ShareLinkRow, now: Date): boolean {

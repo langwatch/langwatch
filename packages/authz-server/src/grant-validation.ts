@@ -67,6 +67,80 @@ export class DuplicateGrantError extends HandledError {
   }
 }
 
+/**
+ * A grant was asked to expire at a moment that has already passed.
+ *
+ * Knowable and actionable, which is what earns it a code: the caller sent a
+ * date, we can see it is behind us, and the fix is theirs (send a later one).
+ * Writing it anyway would append a fact that grants nothing from the instant
+ * it lands - an access change an admin would reasonably believe had worked.
+ *
+ * 422 rather than 400, matching the REST family's other input rejections
+ * (`role_binding_principal_invalid`, `scope_not_in_organization`): the
+ * request parsed, one of its values is unusable.
+ */
+export class GrantExpiryInPastError extends HandledError {
+  declare readonly code: "grant_expiry_in_past";
+
+  constructor(meta: Record<string, unknown> = {}) {
+    super("grant_expiry_in_past", "A grant's expiry must be in the future", {
+      httpStatus: 422,
+      meta,
+    });
+    this.name = "GrantExpiryInPastError";
+  }
+}
+
+/**
+ * The organization's grants are still written the pre-ledger way, and the
+ * legacy `RoleBinding` table has no column to hold an expiry.
+ *
+ * This is a refusal rather than a silent drop on purpose. The alternative -
+ * accepting the expiry and storing a row that cannot carry it - produces a
+ * grant an admin believes ends on Friday and which in fact never ends, which
+ * is the exact failure the feature exists to prevent. The caller can act on
+ * it: re-send without an expiry and revoke by hand, or wait for the
+ * organization's migration.
+ */
+export class GrantExpiryUnsupportedError extends HandledError {
+  declare readonly code: "grant_expiry_not_supported";
+
+  constructor(meta: Record<string, unknown> = {}) {
+    super(
+      "grant_expiry_not_supported",
+      "Expiring access is not available for this organization yet",
+      { httpStatus: 409, meta },
+    );
+    this.name = "GrantExpiryUnsupportedError";
+  }
+}
+
+/**
+ * An expiry has to be strictly in the future AT WRITE TIME.
+ *
+ * Strictly: an expiry of exactly now is a grant that is already over, and
+ * the collect-side comparison (`expiresAt <= now`) treats it as such. The two
+ * halves agree on the boundary deliberately - a write this accepted and the
+ * read immediately refused would be indistinguishable from a bug.
+ *
+ * `now` is passed, never read: the write surface takes its clock from its
+ * caller for the same reason the collector does.
+ */
+export function assertExpiryInFuture({
+  expiresAtMs,
+  now,
+  meta = {},
+}: {
+  expiresAtMs: number | undefined;
+  now: number;
+  meta?: Record<string, unknown>;
+}): void {
+  if (expiresAtMs === undefined) return;
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= now) {
+    throw new GrantExpiryInPastError({ ...meta, expiresAtMs });
+  }
+}
+
 /** Every scope a role binding can name - the resource tier cannot. */
 export type GrantableScope = Exclude<AuthzScopeRef, { type: "resource" }>;
 

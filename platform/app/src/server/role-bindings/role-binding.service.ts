@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { assertExpiryInFuture } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -436,6 +437,7 @@ export class RoleBindingService {
         scopeId: b.scopeId,
         scopeName: scopeNames.get(b.scopeId) ?? null,
         createdAt: b.createdAt,
+        expiresAt: b.expiresAt,
       }));
   }
 
@@ -491,6 +493,10 @@ export class RoleBindingService {
       scopeName: scopeNames.get(b.scopeId) ?? null,
       memberUserIds: memberUserIdsFor(b.groupId),
       createdAt: b.createdAt,
+      // Reported whether or not it has passed. A listing that hid elapsed
+      // bindings would leave an admin unable to see - or tidy up - access
+      // that stopped working on its own.
+      expiresAt: b.expiresAt,
     }));
   }
 
@@ -641,6 +647,13 @@ export class RoleBindingService {
     };
   }
 
+  /**
+   * `expiresAt` time-boxes the binding (ADR-092's expiring grants): the
+   * access works until that moment and then simply stops - no revocation is
+   * written, no audit row appears, and the binding stays listed so an admin
+   * can see what ended. It is refused if it is not strictly in the future,
+   * on the same boundary the collector uses to decide a binding is over.
+   */
   async create({
     organizationId,
     userId,
@@ -650,6 +663,7 @@ export class RoleBindingService {
     customRoleId,
     scopeType,
     scopeId,
+    expiresAt,
     actor,
   }: {
     organizationId: string;
@@ -660,6 +674,7 @@ export class RoleBindingService {
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
+    expiresAt?: Date;
     actor: LedgerActor;
   }): Promise<{ id: string }> {
     const principals = [userId, groupId, apiKeyId].filter(
@@ -668,6 +683,13 @@ export class RoleBindingService {
     if (principals.length !== 1) {
       throw new RoleBindingPrincipalInvalidError();
     }
+    // The one expiry rule, shared with GrantsService rather than restated:
+    // both write surfaces answer `grant_expiry_in_past` on the same boundary.
+    assertExpiryInFuture({
+      expiresAtMs: expiresAt?.getTime(),
+      now: Date.now(),
+      meta: { scopeType, scopeId },
+    });
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
     await assertNoPersonalTeamScope({
@@ -703,6 +725,7 @@ export class RoleBindingService {
               role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
             scopeType,
             scopeId,
+            ...(expiresAt ? { expiresAtMs: expiresAt.getTime() } : {}),
           },
         ],
         actor,

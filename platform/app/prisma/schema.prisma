@@ -3046,7 +3046,8 @@ model Grant {
   scopeId   String
 
   // Resource-tier FACT columns (ShareLink heritage, ADR-057 possession
-  // intact; null on every other tier). All of them are set by the mint event
+  // intact; null on every other tier) - EXCEPT expiresAt, which every tier
+  // may carry (see below). All of them are set by the mint event
   // and owned by the fold like every other column here. View-consumption
   // accounting (viewCount) deliberately does NOT live on this table - it
   // has a different writer (ShareService) and lives in GrantUsage below.
@@ -3062,8 +3063,24 @@ model Grant {
   resourceKind    String?
   projectId       String?
   createdByUserId String?
-  expiresAt       DateTime?
   maxViews        Int?
+
+  // When the grant stops granting - the ONE column here that is not
+  // resource-tier-only (ADR-092, "what falls out for free": time-boxed
+  // contractor access, break-glass elevation that revokes itself). A share
+  // link states it inside its mint terms; a binding-tier grant states it on
+  // the fact itself. Null on both tiers is the ordinary case: the grant
+  // stands until somebody revokes it.
+  //
+  // Nothing WRITES here when the moment passes. revokedAt stays null, the
+  // organization's authz epoch is not bumped, and the row survives as the
+  // audit record of access that once existed - an expiry is not a
+  // revocation and must never read as one. The rule that an elapsed row
+  // grants nothing lives at COLLECT (liveBindings / isLiveShareLink in
+  // @langwatch/authz-server's collector), which is what keeps the compat
+  // head - RoleBinding has no such column - answering identically for every
+  // row that has no expiry at all.
+  expiresAt DateTime?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())

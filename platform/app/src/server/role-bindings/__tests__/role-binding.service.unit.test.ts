@@ -191,6 +191,53 @@ describe("RoleBindingService create", () => {
     });
   });
 
+  // ADR-092's expiring grants, from the surface an operator actually uses:
+  // the create takes the date the access ends and hands it to the one writer.
+  describe("when the request carries the date its access ends", () => {
+    const FRIDAY = new Date("2099-12-31T23:59:59.000Z");
+
+    /** @scenario "Binding a role with an end date through the API" */
+    it("hands the end date to the writer alongside the rest of the fact", async () => {
+      await service.create({
+        ...bindingInput,
+        userId: "user_1",
+        expiresAt: FRIDAY,
+      });
+
+      expect(attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bindings: [
+            expect.objectContaining({ expiresAtMs: FRIDAY.getTime() }),
+          ],
+        }),
+      );
+    });
+
+    it("leaves the term off entirely when no end date is given", async () => {
+      await service.create({ ...bindingInput, userId: "user_1" });
+
+      const call = attachBindings.mock.calls[0] as [
+        { bindings: Array<Record<string, unknown>> },
+      ];
+      expect("expiresAtMs" in (call[0].bindings[0] ?? {})).toBe(false);
+    });
+
+    it("refuses an end date that has already passed, before any write", async () => {
+      await expect(
+        service.create({
+          ...bindingInput,
+          userId: "user_1",
+          expiresAt: new Date("2000-01-01T00:00:00.000Z"),
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_expiry_in_past",
+        httpStatus: 422,
+      });
+
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the role is CUSTOM", () => {
     it("requires a customRoleId", async () => {
       await expect(

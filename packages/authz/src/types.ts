@@ -85,6 +85,19 @@ export type CollectedBinding = {
   scopeId: string;
   /** Present when the binding arrived via a group membership. */
   viaGroupId?: string | null;
+  /**
+   * When this binding stops granting (ADR-092, "what falls out for free":
+   * expiring bindings). Absent or null is the ordinary case - the grant
+   * stands until somebody revokes it.
+   *
+   * A stored FACT like every other field here: the collector applies the
+   * policy, exactly as it does for `ShareLinkRow.expiresAt`. An expired
+   * binding is treated as ABSENT, never as revoked - no write happens at
+   * expiry, so the row keeps `revokedAt` null and stays readable as audit.
+   * Filtering it in SQL instead would put one rule in two query languages
+   * and let the compat and ledger heads drift apart.
+   */
+  expiresAt?: Date | null;
 };
 
 export type LegacyTeamMembership = {
