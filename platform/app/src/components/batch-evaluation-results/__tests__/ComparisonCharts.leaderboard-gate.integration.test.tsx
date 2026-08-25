@@ -30,7 +30,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 import { ComparisonCharts } from "../ComparisonCharts";
-import type { BatchComparisonColumn, ComparisonRunData } from "../types";
+import type { BatchComparisonColumn, ComparisonRunData } from "@langwatch/experiment-web";
 
 const EVALUATOR_ID = "comparison-1";
 

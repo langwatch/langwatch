@@ -25,8 +25,8 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
-import type { BatchTargetAggregate } from "./computeBatchAggregates";
-import type { BatchTargetColumn } from "./types";
+import type { BatchTargetAggregate } from "@langwatch/experiment-web";
+import type { BatchTargetColumn } from "@langwatch/experiment-web";
 
 type BatchTargetHeaderProps = {
   target: BatchTargetColumn;

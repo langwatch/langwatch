@@ -22,7 +22,7 @@ import {
   computeRunMetrics,
   computeTargetMetrics,
 } from "../ComparisonCharts";
-import type { BatchEvaluationData, ComparisonRunData } from "../types";
+import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -1,4 +1,7 @@
-import type { ExperimentService as ExperimentServiceContract } from "@langwatch/experiment-contract";
+import type {
+  ExperimentService as ExperimentServiceContract,
+  SerializedHandledError,
+} from "@langwatch/experiment-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PrismaExperimentRepository,
@@ -89,7 +92,7 @@ export type PostgresExperimentAdapterOptions = {
       cost?: number | null;
       duration?: number | null;
       error?: string | null;
-      domainError?: Record<string, unknown> | null;
+      domainError?: SerializedHandledError | null;
       traceId?: string | null;
       targets?: Array<{
         id: string;

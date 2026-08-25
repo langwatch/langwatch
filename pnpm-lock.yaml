@@ -1912,6 +1912,58 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/features/experiment/web:
+    dependencies:
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../contract
+      numeral:
+        specifier: ^2.0.6
+        version: 2.0.6
+      papaparse:
+        specifier: ^5.5.4
+        version: 5.5.4
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      usehooks-ts:
+        specifier: ^3.1.1
+        version: 3.1.1(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/numeral':
+        specifier: ^2.0.5
+        version: 2.0.5
+      '@types/papaparse':
+        specifier: ^5.3.15
+        version: 5.5.2
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^30.0.0
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@22.20.1)(typescript@7.0.2))(vite@8.1.2(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/features/gateway/contract:
     dependencies:
       zod:
@@ -3546,6 +3598,9 @@ importers:
       '@langwatch/experiment-server':
         specifier: workspace:*
         version: link:../../packages/features/experiment/server
+      '@langwatch/experiment-web':
+        specifier: workspace:*
+        version: link:../../packages/features/experiment/web
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../packages/features/github/contract

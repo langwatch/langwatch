@@ -32,9 +32,13 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { axisLabelProps, buildAxisLabels, truncateLabel } from "./chartAxisLabels";
+import {
+  axisLabelProps,
+  buildAxisLabels,
+  truncateLabel,
+} from "@langwatch/experiment-web";
 
-import type { BatchComparisonColumn } from "./types";
+import type { BatchComparisonColumn } from "@langwatch/experiment-web";
 
 /**
  * Fallback only, for a variant whose target this run has no colour for.

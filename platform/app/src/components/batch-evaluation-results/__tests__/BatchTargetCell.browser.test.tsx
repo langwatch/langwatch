@@ -16,7 +16,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 import { BatchTargetCell } from "../BatchTargetCell";
-import type { BatchTargetOutput } from "../types";
+import type { BatchTargetOutput } from "@langwatch/experiment-web";
 
 const longError =
   "gateway chat/completions: provider_error: the upstream model returned an " +

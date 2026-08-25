@@ -1,4 +1,10 @@
+import {
+  serializedHandledErrorSchema as canonicalSerializedHandledErrorSchema,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
 import { z } from "zod";
+
+export type { SerializedHandledError };
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 
@@ -66,21 +72,7 @@ export const experimentRunAggregateSchema = z
   .strict();
 export type ExperimentRunAggregate = z.infer<typeof experimentRunAggregateSchema>;
 
-export const serializedHandledErrorSchema = z
-  .object({
-    code: z.string(),
-    kind: z.string(),
-    meta: jsonRecordSchema,
-    traceId: z.string().optional(),
-    spanId: z.string().optional(),
-    traceUrl: z.string().optional(),
-    httpStatus: z.number(),
-    fault: z.enum(["customer", "platform", "provider"]),
-    tips: z.array(z.string()).optional(),
-    docsUrl: z.string().optional(),
-    reasons: z.array(z.unknown()),
-  })
-  .passthrough();
+export const serializedHandledErrorSchema = canonicalSerializedHandledErrorSchema;
 
 export const experimentRunTargetSchema = z
   .object({

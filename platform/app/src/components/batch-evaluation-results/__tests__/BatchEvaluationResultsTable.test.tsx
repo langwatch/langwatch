@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
-import type { BatchEvaluationData, ComparisonRunData } from "../types";
+import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-web";
 
 // Mock the drawer hook
 vi.mock("~/hooks/useDrawer", () => ({

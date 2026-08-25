@@ -29,7 +29,7 @@ export {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
   computeBatchTargetAggregates,
-} from "./computeBatchAggregates";
+} from "@langwatch/experiment-web";
 // CSV Export
 export {
   buildCsvData,
@@ -38,7 +38,7 @@ export {
   createCsvDownloader,
   downloadCsv,
   generateCsvContent,
-} from "./csvExport";
+} from "@langwatch/experiment-web";
 export { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 export { SingleRunTable } from "./SingleRunTable";
 // Table utilities
@@ -60,10 +60,10 @@ export {
   type BatchTargetOutput,
   isImageUrlHeuristic,
   transformBatchEvaluationData,
-} from "./types";
+} from "@langwatch/experiment-web";
 // Result display preferences (fields visibility + row height)
 export {
   DEFAULT_RESULT_FIELDS,
   type ResultField,
   useResultDisplayPreferences,
-} from "./useResultDisplayPreferences";
+} from "@langwatch/experiment-web";

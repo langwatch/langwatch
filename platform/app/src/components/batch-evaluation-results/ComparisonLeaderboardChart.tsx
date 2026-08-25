@@ -29,16 +29,16 @@ import {
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { useDrawer } from "~/hooks/useDrawer";
-import { axisLabelProps, buildAxisLabels } from "./chartAxisLabels";
-import type { BTLeaderboard } from "./computeBTLeaderboard";
+import { axisLabelProps, buildAxisLabels } from "@langwatch/experiment-web";
+import type { BTLeaderboard } from "@langwatch/experiment-web";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "./computeLeaderboardVerdict";
-import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
-import type { BatchComparisonColumn, BatchResultRow } from "./types";
-import { useBTLeaderboard } from "./useBTLeaderboard";
-import { useVariantMetrics } from "./useVariantMetrics";
+} from "@langwatch/experiment-web";
+import { formatLeaderboardHeadline } from "@langwatch/experiment-web";
+import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-web";
+import { useBTLeaderboard } from "@langwatch/experiment-web";
+import { useVariantMetrics } from "@langwatch/experiment-web";
 import { VARIANT_COLORS } from "./WinRateChart";
 
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */

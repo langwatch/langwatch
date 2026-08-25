@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAxisLabels, commonLabelPrefix } from "../chartAxisLabels";
+import { buildAxisLabels, commonLabelPrefix } from "@langwatch/experiment-web";
 
 describe("commonLabelPrefix", () => {
   describe("given names sharing a prefix that ends at a separator", () => {

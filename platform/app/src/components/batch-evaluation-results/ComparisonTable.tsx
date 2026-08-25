@@ -34,8 +34,8 @@ import type {
   BatchResultRow,
   BatchTargetColumn,
   ComparisonRunData,
-} from "./types";
-import { useResultsGrouping } from "./useResultsGrouping";
+} from "@langwatch/experiment-web";
+import { useResultsGrouping } from "@langwatch/experiment-web";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */

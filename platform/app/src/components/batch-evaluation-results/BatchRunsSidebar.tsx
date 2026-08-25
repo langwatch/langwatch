@@ -24,8 +24,12 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { WorkflowVersion } from "~/generated/prisma/client";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
-import { getRunDisplayName, RunDisplayName } from "./getRunDisplayName";
-import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
+import {
+  getRunDisplayName,
+  INTERRUPTED_THRESHOLD_MS,
+  isRunFinished,
+} from "@langwatch/experiment-web";
+import { RunDisplayName } from "./run-display-name";
 
 /**
  * Summary data for a single evaluation run

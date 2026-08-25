@@ -26,16 +26,16 @@ import {
   buildAxisLabels,
   chartHeightFor,
   truncateLabel,
-} from "./chartAxisLabels";
+} from "@langwatch/experiment-web";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
   BatchResultRow,
   BatchTargetColumn,
   ComparisonRunData,
-} from "./types";
+} from "@langwatch/experiment-web";
 import { RUN_COLORS } from "./useMultiRunData";
-import { useResultsGrouping } from "./useResultsGrouping";
+import { useResultsGrouping } from "@langwatch/experiment-web";
 import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 import { WinRateChart } from "./WinRateChart";
 

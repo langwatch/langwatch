@@ -1,3 +1,4 @@
+import { resolveExperimentVerdictLabel } from "@langwatch/experiment-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
@@ -6,6 +7,8 @@ import {
   type PairwiseEvaluatorConfig,
   type TargetConfig,
 } from "../types";
+
+export { resolveExperimentVerdictLabel as resolveVerdictLabel };
 
 /**
  * Reroutes a stored evaluator type to the judge that will actually run: a row
@@ -66,9 +69,7 @@ type ComparisonCarrier = {
  * mitigations the comparison judge offers rather than just the one it came in
  * with.
  */
-const fromPairwise = (
-  pairwise: PairwiseEvaluatorConfig,
-): ComparisonEvaluatorConfig => {
+const fromPairwise = (pairwise: PairwiseEvaluatorConfig): ComparisonEvaluatorConfig => {
   const variants = [pairwise.variantA, pairwise.variantB];
 
   const variantOutputPaths: Record<string, string[]> = {};
@@ -112,40 +113,11 @@ const normalizeCarrier = <T extends ComparisonCarrier>(carrier: T): T => {
   return { ...rest, comparison } as T;
 };
 
-export const normalizeEvaluators = (
-  evaluators: EvaluatorConfig[],
-): EvaluatorConfig[] => evaluators.map(normalizeCarrier);
+export const normalizeEvaluators = (evaluators: EvaluatorConfig[]): EvaluatorConfig[] =>
+  evaluators.map(normalizeCarrier);
 
 export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
   targets.map(normalizeCarrier);
-
-/**
- * Resolve a stored verdict label to the winning variant's target id.
- *
- * Runs before the merge stored slot letters (`"A"` / `"B"`); runs after store
- * the winning candidate's identifier directly. Both still live in the database,
- * so both must resolve. `"tie"` passes through untouched.
- *
- * A label that already matches one of `variants` is a current-shape verdict
- * naming a variant directly — return it as-is even when it is literally `"A"`
- * or `"B"` (a variant whose target id happens to be a slot letter), so the
- * slot-position mapping only fires for genuine legacy verdicts whose label
- * matches no variant. (A prompt HANDLE that is literally `"A"`/`"B"` still
- * can't be disambiguated here since the callers pass target ids, not handles —
- * an accepted, near-zero residual: handles aren't single uppercase letters.)
- */
-export const resolveVerdictLabel = ({
-  label,
-  variants,
-}: {
-  label: string;
-  variants: string[];
-}): string => {
-  if (variants.includes(label)) return label;
-  if (label === "A") return variants[0] ?? label;
-  if (label === "B") return variants[1] ?? label;
-  return label;
-};
 
 /**
  * Whether a stored verdict label names this variant.

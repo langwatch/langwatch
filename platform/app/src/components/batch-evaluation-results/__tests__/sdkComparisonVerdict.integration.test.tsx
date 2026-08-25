@@ -33,11 +33,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ExperimentRunEvaluation,
   ExperimentRunWithItems,
-} from "~/server/experiments-v3/services/types";
+} from "@langwatch/experiment-contract";
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
 import { ComparisonWinnerCell } from "../ComparisonWinnerCell";
-import type { BatchComparisonColumn, BatchComparisonVerdict } from "../types";
-import { transformBatchEvaluationData } from "../types";
+import type {
+  BatchComparisonColumn,
+  BatchComparisonVerdict,
+} from "@langwatch/experiment-web";
+import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 import { WinRateChart } from "../WinRateChart";
 
 // The target cell opens the trace drawer and peeks feature flags; neither has

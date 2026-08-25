@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchTargetCell } from "../BatchTargetCell";
-import type { BatchTargetOutput } from "../types";
+import type { BatchTargetOutput } from "@langwatch/experiment-web";
 
 // Mock the drawer hook
 vi.mock("~/hooks/useDrawer", () => ({

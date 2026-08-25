@@ -22,7 +22,7 @@ import {
   DEFAULT_ROW_HEIGHT,
   type RowHeight,
 } from "./tableUtils";
-import type { BatchEvaluatorResult, BatchTargetOutput } from "./types";
+import type { BatchEvaluatorResult, BatchTargetOutput } from "@langwatch/experiment-web";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;

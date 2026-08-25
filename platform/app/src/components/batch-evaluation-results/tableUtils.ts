@@ -4,42 +4,13 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
 import { getImageUrl } from "~/components/ExternalImage";
 
-/**
- * How much of a cell's content shows before it needs expanding. Applies
- * uniformly to every cell in a row (dataset columns via
- * {@link ExpandableDatasetCell}, target columns via {@link BatchTargetCell})
- * so a row's cells all clip at the same height.
- */
-export type RowHeight = "s" | "m" | "l";
-
-export const ROW_HEIGHT_OPTIONS: ReadonlyArray<{
-  value: RowHeight;
-  label: string;
-}> = [
-  { value: "s", label: "Small" },
-  { value: "m", label: "Medium" },
-  { value: "l", label: "Large" },
-];
-
-export const DEFAULT_ROW_HEIGHT: RowHeight = "m";
-
-/** Max height (px) for a cell's collapsed content, per row-height tier. */
-export const COLLAPSED_CELL_HEIGHT_PX: Record<RowHeight, number> = {
-  s: 60,
-  m: 140,
-  l: 360,
-};
-
-/**
- * Estimated row height for virtualization, per tier — keeps the
- * virtualizer's first-paint guess close to the real height so switching
- * tiers doesn't visibly jump before dynamic measurement catches up.
- */
-export const ESTIMATED_ROW_HEIGHT_PX: Record<RowHeight, number> = {
-  s: 100,
-  m: 180,
-  l: 400,
-};
+export {
+  COLLAPSED_CELL_HEIGHT_PX,
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
+  type RowHeight,
+  ROW_HEIGHT_OPTIONS,
+} from "@langwatch/experiment-web";
 
 /**
  * Calculate minimum table width based on column counts

@@ -26,12 +26,12 @@ import { useDrawer } from "~/hooks/useDrawer";
 import {
   computeJudgeIndependence,
   computeVerbosityProfile,
-} from "./batch-evaluation-results/computeJudgeBiasChecks";
+} from "@langwatch/experiment-web";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "./batch-evaluation-results/computeLeaderboardVerdict";
-import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
+} from "@langwatch/experiment-web";
+import { computeSampleAdequacy } from "@langwatch/experiment-web";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import {
   buildTrustChecks,
@@ -44,13 +44,10 @@ import {
 } from "./batch-evaluation-results/PairwiseLeaderboard";
 import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
 import { TradeoffSummaryLine } from "./batch-evaluation-results/TradeoffSummaryLine";
-import type {
-  BatchComparisonColumn,
-  BatchResultRow,
-} from "./batch-evaluation-results/types";
-import { useBTLeaderboard } from "./batch-evaluation-results/useBTLeaderboard";
+import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-web";
+import { useBTLeaderboard } from "@langwatch/experiment-web";
 import { useShowComparisonLeaderboard } from "./batch-evaluation-results/useShowComparisonLeaderboard";
-import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
+import { useVariantMetrics } from "@langwatch/experiment-web";
 import { Drawer } from "./ui/drawer";
 
 export type ComparisonLeaderboardDrawerProps = {

@@ -22,8 +22,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { GroupRowsButton } from "../BatchEvaluationResultsTable";
 import { ComparisonTable } from "../ComparisonTable";
-import type { ComparisonRunData } from "../types";
-import { useResultsGrouping } from "../useResultsGrouping";
+import type { ComparisonRunData } from "@langwatch/experiment-web";
+import { useResultsGrouping } from "@langwatch/experiment-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

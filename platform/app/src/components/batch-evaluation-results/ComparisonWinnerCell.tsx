@@ -33,7 +33,10 @@ import { useCallback, useRef, useState } from "react";
 import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
-import type { BatchComparisonColumn, BatchComparisonVerdict } from "./types";
+import type {
+  BatchComparisonColumn,
+  BatchComparisonVerdict,
+} from "@langwatch/experiment-web";
 
 /** Collapsed cell height cap. Long reasoning is faded out beyond this. */
 const CELL_MAX_HEIGHT = 140;

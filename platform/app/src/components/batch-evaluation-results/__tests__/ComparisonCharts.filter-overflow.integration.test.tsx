@@ -23,7 +23,7 @@ vi.mock("../useShowComparisonLeaderboard", () => ({
 }));
 
 import { ComparisonCharts } from "../ComparisonCharts";
-import type { ComparisonRunData } from "../types";
+import type { ComparisonRunData } from "@langwatch/experiment-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

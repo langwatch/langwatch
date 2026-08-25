@@ -28,7 +28,7 @@ import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
-import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
+import { getRunDisplayName } from "@langwatch/experiment-web";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import {
   BatchEvaluationV2EvaluationSummary,

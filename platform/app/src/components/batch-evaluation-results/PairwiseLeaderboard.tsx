@@ -1,13 +1,13 @@
 import { Box, HStack, Icon, Table, Text, VStack } from "@chakra-ui/react";
 import { LuArrowDown, LuArrowUp, LuArrowUpDown, LuTriangleAlert } from "react-icons/lu";
-import type { BTLeaderboard } from "./computeBTLeaderboard";
-import { winMatrixHasPairwiseDetail } from "./computeWinMatrixShape";
 import {
+  type BTLeaderboard,
   type RankedEntry,
   type SortDir,
   type SortKey,
   usePairwiseSort,
-} from "./usePairwiseSort";
+  winMatrixHasPairwiseDetail,
+} from "@langwatch/experiment-web";
 
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).

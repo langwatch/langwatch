@@ -21,13 +21,16 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 
-import { buildPairwiseComparisons } from "../buildPairwiseComparisons";
+import { buildPairwiseComparisons } from "@langwatch/experiment-web";
 import { ComparisonWinnerCell, resolveWinner } from "../ComparisonWinnerCell";
-import { buildCsvData, buildCsvHeaders } from "../csvExport";
-import type { BatchComparisonColumn, BatchEvaluationData } from "../types";
-import { transformBatchEvaluationData } from "../types";
+import { buildCsvData, buildCsvHeaders } from "@langwatch/experiment-web";
+import type {
+  BatchComparisonColumn,
+  BatchEvaluationData,
+} from "@langwatch/experiment-web";
+import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 import { WinRateChart } from "../WinRateChart";
 
 /** What select_best_compare stores when its two passes disagree. */

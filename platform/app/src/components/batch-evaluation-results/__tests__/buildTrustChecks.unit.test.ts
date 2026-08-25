@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { BTLeaderboard } from "../computeBTLeaderboard";
-import type { JudgeIndependence, VerbosityProfile } from "../computeJudgeBiasChecks";
-import type { SampleAdequacy } from "../computeSampleAdequacy";
+import type { BTLeaderboard } from "@langwatch/experiment-web";
+import type { JudgeIndependence, VerbosityProfile } from "@langwatch/experiment-web";
+import type { SampleAdequacy } from "@langwatch/experiment-web";
 import {
   buildTrustChecks,
   type LeaderboardTrustPanelProps,

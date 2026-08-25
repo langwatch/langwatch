@@ -43,9 +43,9 @@ import {
   ZAxis,
 } from "recharts";
 
-import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
-import { computeParetoDominance, type ParetoDominance } from "./computeParetoDominance";
-import type { VariantMetrics } from "./computeVariantMetrics";
+import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
+import { computeParetoDominance, type ParetoDominance } from "@langwatch/experiment-web";
+import type { VariantMetrics } from "@langwatch/experiment-web";
 import { VARIANT_COLORS } from "./WinRateChart";
 
 export type ParetoAxis = "cost" | "duration";

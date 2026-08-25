@@ -21,7 +21,7 @@ import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BatchComparisonColumn } from "../types";
+import type { BatchComparisonColumn } from "@langwatch/experiment-web";
 import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../WinRateChart";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the

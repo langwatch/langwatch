@@ -18,13 +18,13 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuCheck, LuInfo, LuTriangleAlert } from "react-icons/lu";
 
-import type { BTLeaderboard } from "./computeBTLeaderboard";
+import type { BTLeaderboard } from "@langwatch/experiment-web";
 import {
   type JudgeIndependence,
   VERBOSITY_NOTABLE_RATIO,
   type VerbosityProfile,
-} from "./computeJudgeBiasChecks";
-import type { SampleAdequacy } from "./computeSampleAdequacy";
+} from "@langwatch/experiment-web";
+import type { SampleAdequacy } from "@langwatch/experiment-web";
 
 export type LeaderboardTrustPanelProps = {
   leaderboard: BTLeaderboard;

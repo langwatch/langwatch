@@ -26,7 +26,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 import type {
   BatchComparisonColumn,
   BatchResultRow,
-} from "../batch-evaluation-results/types";
+} from "@langwatch/experiment-web";
 import { ComparisonLeaderboardDrawer } from "../ComparisonLeaderboardDrawer";
 
 const VARIANTS = ["target-1", "target-2", "target-3"];

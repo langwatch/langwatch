@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { trailingComparisonColumns } from "../SingleRunTable";
-import type { BatchComparisonColumn, BatchTargetColumn } from "../types";
+import type { BatchComparisonColumn, BatchTargetColumn } from "@langwatch/experiment-web";
 
 const targetColumn = (id: string): BatchTargetColumn => ({
   id,

@@ -331,12 +331,6 @@
         "~/server/annotations/annotationAnchorLabel",
         "~/server/tracer/types"
       ],
-      "platform/app/src/components/batch-evaluation-results/types.ts": [
-        "~/server/experiments-v3/services/types"
-      ],
-      "platform/app/src/components/batch-evaluation-results/useMultiRunData.ts": [
-        "~/server/experiments-v3/services/types"
-      ],
       "platform/app/src/components/CheckPassing.tsx": [
         "../server/evaluations/evaluators",
         "../server/evaluations/getEvaluator",

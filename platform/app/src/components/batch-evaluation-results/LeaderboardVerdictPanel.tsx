@@ -11,9 +11,9 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
-import type { BTLeaderboard } from "./computeBTLeaderboard";
-import type { CheaperAlternative, LeaderboardVerdict } from "./computeLeaderboardVerdict";
-import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
+import type { BTLeaderboard } from "@langwatch/experiment-web";
+import type { CheaperAlternative, LeaderboardVerdict } from "@langwatch/experiment-web";
+import { formatLeaderboardHeadline } from "@langwatch/experiment-web";
 
 export type LeaderboardVerdictPanelProps = {
   leaderboard: BTLeaderboard;

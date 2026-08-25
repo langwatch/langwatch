@@ -23,7 +23,7 @@ import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
 import {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
-} from "./computeBatchAggregates";
+} from "@langwatch/experiment-web";
 import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 import { TableSkeleton } from "./TableSkeleton";
 import {
@@ -40,7 +40,7 @@ import type {
   BatchEvaluationData,
   BatchResultRow,
   BatchTargetColumn,
-} from "./types";
+} from "@langwatch/experiment-web";
 
 type SingleRunTableProps = {
   /** Transformed batch evaluation data */

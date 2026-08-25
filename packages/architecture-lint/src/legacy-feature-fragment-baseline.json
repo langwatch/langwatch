@@ -1502,6 +1502,11 @@
       "kind": "legacy-implementation"
     },
     {
+      "feature": "experiment",
+      "file": "platform/app/src/components/experiments/DSPyExperiment.tsx",
+      "kind": "page-shell"
+    },
+    {
       "feature": "governance",
       "file": "platform/app/src/app/api/governance/[[...route]]/app.ts",
       "kind": "transport"

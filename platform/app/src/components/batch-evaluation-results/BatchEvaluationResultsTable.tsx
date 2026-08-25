@@ -22,8 +22,12 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { ComparisonTable } from "./ComparisonTable";
 import { SingleRunTable } from "./SingleRunTable";
 import { DEFAULT_ROW_HEIGHT, ROW_HEIGHT_OPTIONS, type RowHeight } from "./tableUtils";
-import type { BatchDatasetColumn, BatchEvaluationData, ComparisonRunData } from "./types";
-import type { ResultField } from "./useResultDisplayPreferences";
+import type {
+  BatchDatasetColumn,
+  BatchEvaluationData,
+  ComparisonRunData,
+} from "@langwatch/experiment-web";
+import type { ResultField } from "@langwatch/experiment-web";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */

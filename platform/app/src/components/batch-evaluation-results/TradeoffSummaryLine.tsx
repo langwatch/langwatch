@@ -11,10 +11,10 @@ import { HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { LuInfo, LuScissors } from "react-icons/lu";
 
-import type { BTLeaderboard } from "./computeBTLeaderboard";
-import { computeParetoDominance } from "./computeParetoDominance";
-import type { VariantMetrics } from "./computeVariantMetrics";
-import { formatTradeoffSummary } from "./formatTradeoffSummary";
+import type { BTLeaderboard } from "@langwatch/experiment-web";
+import { computeParetoDominance } from "@langwatch/experiment-web";
+import type { VariantMetrics } from "@langwatch/experiment-web";
+import { formatTradeoffSummary } from "@langwatch/experiment-web";
 
 export type TradeoffSummaryLineProps = {
   leaderboard: BTLeaderboard;
