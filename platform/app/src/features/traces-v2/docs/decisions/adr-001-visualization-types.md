@@ -2,7 +2,7 @@
 
 Status: ACCEPTED
 Date: 2026-04-22
-Relates to: `specs/traces-v2/visualizations.feature`, `flame-graph.feature`, `span-list.feature`
+Relates to: `specs/traces-v2/visualizations.feature`, `packages/features/trace/specs/flame-graph.feature`, `span-list.feature`
 
 ## Context
 
@@ -173,4 +173,4 @@ Considered but deferred. Langfuse offers a node graph showing logical flow, whic
 - **Waterfall is the default** — optimized for the 79% of traces with ≤5 spans
 - **Sibling grouping** is essential across waterfall and flame — driven by the data showing complex traces are flat-wide with repetitive siblings
 - **Span List cross-link** from waterfall sibling groups enables a smooth workflow for analyzing repeated spans
-- **Shared behavior** (colors, selection, hover, edge cases) is documented in `specs/traces-v2/visualizations.feature` and referenced by `flame-graph.feature` and `span-list.feature`
+- **Shared behavior** (colors, selection, hover, edge cases) is documented in `specs/traces-v2/visualizations.feature` and referenced by `packages/features/trace/specs/flame-graph.feature` and `span-list.feature`

@@ -4,7 +4,7 @@
  * The annotation queue walk: a bottom bar whose actions are named in words,
  * correcting the trace in the drawer, the traces this sitting counts, and the
  * hand-off that has to be answered before the queue celebrates.
- * See specs/annotations/annotation-queue-workflow.feature.
+ * See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";

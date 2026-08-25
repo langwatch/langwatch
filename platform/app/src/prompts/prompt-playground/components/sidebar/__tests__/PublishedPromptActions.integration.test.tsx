@@ -32,7 +32,7 @@ vi.mock("../../../prompt-playground-store/DraggableTabsBrowserStore", () => ({
   useDraggableTabsBrowserStore: () => ({ addTab: vi.fn() }),
 }));
 
-vi.mock("~/components/annotations/DeleteConfirmationDialog", () => ({
+vi.mock("~/components/ui/delete-confirmation-dialog", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 

@@ -1,9 +1,11 @@
 import { HStack, Skeleton, Text } from "@chakra-ui/react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type React from "react";
-import { AnnotationCommentsChip } from "~/components/annotations/AnnotationCommentsChip";
-import { AnnotationScoresChip } from "~/components/annotations/AnnotationScoresChip";
-import { AnnotationSuggestionsChip } from "~/components/annotations/AnnotationSuggestionsChip";
+import {
+  AnnotationCommentsChip,
+  AnnotationScoresChip,
+  AnnotationSuggestionsChip,
+} from "@langwatch/annotation-web";
 import { useScoreNamesById } from "~/hooks/useScoreNamesById";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";

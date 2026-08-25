@@ -8,7 +8,7 @@ import {
   LuPencil,
   LuTrash2,
 } from "react-icons/lu";
-import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";

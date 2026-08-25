@@ -1,9 +1,6 @@
 import { create } from "zustand";
-import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
-import type {
-  AnnotationMode,
-  ScoreOptions,
-} from "../components/TraceDrawer/conversationView/annotationForm.types";
+import type { AnnotationAnchorColumns } from "@langwatch/annotation-contract";
+import type { AnnotationMode, ScoreOptions } from "@langwatch/annotation-web";
 
 /** What the reviewer is writing, and which part of the trace it is about. */
 export interface AnnotationDraft extends AnnotationAnchorColumns {

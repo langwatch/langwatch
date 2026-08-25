@@ -1,18 +1,6 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  IconButton,
-  Input,
-  NativeSelect,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Input, Textarea } from "@chakra-ui/react";
+import { AnnotationScoreEditor } from "@langwatch/annotation-web";
 import { useEffect, useState } from "react";
-import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
 import {
   applyHandledErrorToForm,
@@ -22,9 +10,6 @@ import {
 import { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { FullWidthFormControl } from "../FullWidthFormControl";
-import { Checkbox } from "../ui/checkbox";
-import { Radio, RadioGroup } from "../ui/radio";
 import { toaster } from "../ui/toaster";
 
 type FormData = {
@@ -71,6 +56,7 @@ export const AddOrEditAnnotationScore = ({
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
     reset,
@@ -122,7 +108,7 @@ export const AddOrEditAnnotationScore = ({
   const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>([]);
 
   const onSubmit = (data: FormData) => {
-    if (scoreTypeOptions.length === 0 || scoreTypeOptions.every((opt) => !opt.trim())) {
+    if (scoreTypeOptions.every((option) => !option.trim())) {
       toaster.create({
         title: annotationScoreId
           ? "Error updating annotation score"
@@ -196,222 +182,38 @@ export const AddOrEditAnnotationScore = ({
   const watchDataType = watch("dataType");
 
   return (
-    <>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack gap={2} align="start">
-          <FormServerError form={form} />
-          <FullWidthFormControl
-            label="Name"
-            helper="Give it a name that makes it easy to identify this score metric"
-            invalid={!!errors.name}
-          >
-            <Input {...register("name")} required />
-            <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-          </FullWidthFormControl>
-          <FullWidthFormControl
-            label="Description"
-            helper="Provide a description of the score metric"
-            invalid={!!errors.description}
-          >
-            <Textarea {...register("description")} required autoresize maxHeight="6lh" />
-            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-          </FullWidthFormControl>
-          <FullWidthFormControl
-            label="Score Type"
-            helper={
-              watchDataType === "OPTION"
-                ? "Single selection from multiple options"
-                : watchDataType === "CHECKBOX"
-                  ? "Allow multiple selections with checkboxes"
-                  : "Select the score type for the score metric"
-            }
-            invalid={!!errors.dataType}
-          >
-            <HStack width="full">
-              <VStack align="start" width="full" gap={0}>
-                <NativeSelect.Root>
-                  <NativeSelect.Field {...register("dataType")}>
-                    <option value={AnnotationScoreDataType.OPTION}>
-                      Multiple choice
-                    </option>
-                    <option value={AnnotationScoreDataType.CHECKBOX}>Checkboxes</option>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </VStack>
-            </HStack>
-            <Field.ErrorText>{errors.dataType?.message}</Field.ErrorText>
-
-            {watchDataType === "OPTION" && (
-              <Field.Root mt={4}>
-                <VStack align="start" width="full" gap={2}>
-                  <RadioGroup
-                    verticalAlign="start"
-                    width="full"
-                    defaultValue={defaultRadioOption}
-                    value={defaultRadioOption}
-                  >
-                    <VStack align="start" width="full" gap={2}>
-                      {scoreTypeOptions.map((option, index) => (
-                        <HStack key={index} gap={2} width="full">
-                          <Radio
-                            value={option}
-                            onChange={(e) => {
-                              setDefaultRadioOption(e.target.value);
-                            }}
-                            onClick={() => {
-                              if (defaultRadioOption === option) {
-                                setTimeout(() => {
-                                  setDefaultRadioOption("");
-                                }, 100);
-                              }
-                            }}
-                          ></Radio>
-                          <Input
-                            placeholder="value"
-                            value={option}
-                            onChange={(e) => {
-                              if (defaultRadioOption === option) {
-                                setDefaultRadioOption("");
-                              }
-                              const newOptions = [...scoreTypeOptions];
-                              newOptions[index] = e.target.value;
-                              setScoreTypeOptions(newOptions);
-                            }}
-                          />
-                          <IconButton
-                            aria-label="Remove option"
-                            colorPalette="gray"
-                            onClick={() => {
-                              const newOptions = scoreTypeOptions.filter(
-                                (_, i) => i !== index,
-                              );
-                              setScoreTypeOptions(newOptions);
-                            }}
-                            disabled={scoreTypeOptions.length === 1}
-                          >
-                            <X />
-                          </IconButton>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </RadioGroup>
-
-                  <Button
-                    onClick={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
-                    size="sm"
-                    colorPalette="orange"
-                  >
-                    <Plus />
-                    Add Option
-                  </Button>
-                  {defaultRadioOption !== "" && (
-                    <Field.HelperText>
-                      <HStack>
-                        <X
-                          size={16}
-                          cursor="pointer"
-                          onClick={() => setDefaultRadioOption("")}
-                        />
-                        Default Option: <Text>{defaultRadioOption} </Text>
-                      </HStack>
-                    </Field.HelperText>
-                  )}
-                </VStack>
-              </Field.Root>
-            )}
-            {watchDataType === "CHECKBOX" && (
-              <Field.Root mt={4}>
-                <VStack align="start" width="full">
-                  {scoreTypeOptions.map((option, index) => (
-                    <HStack key={index} width="full">
-                      <Box
-                        onClick={(e) => {
-                          if (defaultCheckboxOption.includes(option)) {
-                            setTimeout(() => {
-                              setDefaultCheckboxOption(
-                                defaultCheckboxOption.filter((opt) => opt !== option),
-                              );
-                            }, 100);
-                          } else {
-                            if (option.trim() !== "") {
-                              setDefaultCheckboxOption([
-                                ...defaultCheckboxOption,
-                                option,
-                              ]);
-                            }
-                          }
-                        }}
-                      >
-                        <Checkbox
-                          value={option}
-                          checked={(defaultCheckboxOption || []).includes(option)}
-                          disabled={!option.trim()}
-                        />
-                      </Box>
-                      <Input
-                        placeholder="value"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...scoreTypeOptions];
-                          newOptions[index] = e.target.value;
-                          setScoreTypeOptions(newOptions);
-                        }}
-                      />
-                      <IconButton
-                        aria-label="Remove option"
-                        colorPalette="gray"
-                        onClick={() => {
-                          const newOptions = scoreTypeOptions.filter(
-                            (_, i) => i !== index,
-                          );
-                          setScoreTypeOptions(newOptions);
-                        }}
-                        disabled={scoreTypeOptions.length === 1}
-                      >
-                        <X />
-                      </IconButton>
-                    </HStack>
-                  ))}
-                  <Button
-                    onClick={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
-                    size="sm"
-                    colorPalette="orange"
-                  >
-                    <Plus />
-                    Add Option
-                  </Button>
-                  {(defaultCheckboxOption || []).length > 0 && (
-                    <Field.HelperText>
-                      <HStack>
-                        <X
-                          size={16}
-                          cursor="pointer"
-                          onClick={() => setDefaultCheckboxOption([])}
-                        />
-                        Default Options: <Text>{defaultCheckboxOption.join(", ")}</Text>
-                      </HStack>
-                    </Field.HelperText>
-                  )}
-                </VStack>
-              </Field.Root>
-            )}
-          </FullWidthFormControl>
-
-          <HStack width="full">
-            <Spacer />
-            <Button
-              colorPalette="orange"
-              type="submit"
-              minWidth="fit-content"
-              loading={upsertAnnotationScore.isPending}
-            >
-              {annotationScoreId ? "Update Score Metric" : "Add Score Metric"}
-            </Button>
-          </HStack>
-        </VStack>
-      </form>
-    </>
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <AnnotationScoreEditor
+        formError={<FormServerError form={form} />}
+        nameField={<Input {...register("name")} required />}
+        nameError={errors.name?.message}
+        descriptionField={
+          <Textarea {...register("description")} required autoresize maxHeight="6lh" />
+        }
+        descriptionError={errors.description?.message}
+        dataType={watchDataType}
+        dataTypeError={errors.dataType?.message}
+        onDataTypeChange={(dataType) => setValue("dataType", dataType)}
+        options={scoreTypeOptions}
+        onOptionChange={(index, option) => {
+          const nextOptions = [...scoreTypeOptions];
+          nextOptions[index] = option;
+          setScoreTypeOptions(nextOptions);
+        }}
+        onOptionRemove={(index) =>
+          setScoreTypeOptions(
+            scoreTypeOptions.filter((_, optionIndex) => optionIndex !== index),
+          )
+        }
+        onOptionAdd={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
+        defaultRadioOption={defaultRadioOption}
+        onDefaultRadioOptionChange={setDefaultRadioOption}
+        defaultCheckboxOptions={defaultCheckboxOption}
+        onDefaultCheckboxOptionsChange={setDefaultCheckboxOption}
+        isSaving={upsertAnnotationScore.isPending}
+        submitLabel={annotationScoreId ? "Update Score Metric" : "Add Score Metric"}
+      />
+    </form>
   );
 };

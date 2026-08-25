@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 /**
  * The all annotations page holds every annotation it loaded, and its export
  * carries all of them rather than the page on screen.
- * Spec: specs/annotations/annotations-list-selection.feature.
+ * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
  */
 
 const mocks = vi.hoisted(() => ({

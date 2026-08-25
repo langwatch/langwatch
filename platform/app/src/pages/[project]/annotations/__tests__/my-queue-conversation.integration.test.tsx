@@ -4,7 +4,7 @@
  * What the reviewer reads while walking their annotation queue: the trace's
  * whole thread as a conversation, expanded, with the reviewed turn marked, and
  * a threadless trace still read as a single-turn conversation.
- * See specs/annotations/annotation-queue-workflow.feature.
+ * See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,12 +1,17 @@
 import { Box, VStack } from "@chakra-ui/react";
+import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
+import {
+  AnnotateBody,
+  FormFooter,
+  readAnnotationScoreOptions,
+  SuggestBody,
+  type AnnotationFormState,
+} from "@langwatch/annotation-web";
 import { useEffect } from "react";
-import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
 } from "../../../stores/annotationDraftStore";
-import { AnnotateBody, FormFooter, SuggestBody } from "./AnnotationFormBody";
-import type { AnnotationFormState, ScoreOptions } from "./annotationForm.types";
 import { useAnnotationMutations } from "./useAnnotationForm";
 
 interface AnnotationEditorCardProps {
@@ -120,7 +125,7 @@ export function AnnotationEditorCard({
     patchDraft({
       comment: existing.comment ?? "",
       expectedOutput: existing.expectedOutput ?? "",
-      scoreOptions: (existing.scoreOptions as unknown as ScoreOptions) ?? {},
+      scoreOptions: readAnnotationScoreOptions(existing.scoreOptions),
       seededFromExisting: true,
     });
   }, [draft.annotationId, draft.seededFromExisting, existing, patchDraft]);

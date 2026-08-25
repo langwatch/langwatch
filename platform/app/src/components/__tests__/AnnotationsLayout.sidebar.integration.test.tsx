@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 /**
  * The annotations sidebar has to say which list is open.
- * Spec: specs/annotations/annotations-list-selection.feature.
+ * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
  */
 
 const mocks = vi.hoisted(() => ({

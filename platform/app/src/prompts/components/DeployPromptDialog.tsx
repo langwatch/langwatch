@@ -12,7 +12,7 @@ import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Info } from "react-feather";
 
-import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
 import { CopyButton } from "~/components/CopyButton";
 import {
   DialogBody,

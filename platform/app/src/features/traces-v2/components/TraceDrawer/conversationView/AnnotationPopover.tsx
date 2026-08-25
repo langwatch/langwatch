@@ -1,8 +1,12 @@
+import {
+  AnnotateBody,
+  FormFooter,
+  SuggestBody,
+  type PopoverAnnotationFormInput,
+} from "@langwatch/annotation-web";
 import { Popover } from "~/components/ui/popover";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
-import { AnnotateBody, FormFooter, SuggestBody } from "./AnnotationFormBody";
-import type { PopoverAnnotationFormInput } from "./annotationForm.types";
 import { usePopoverAnnotationForm } from "./useAnnotationForm";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {

@@ -18,7 +18,7 @@ import { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
+import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";

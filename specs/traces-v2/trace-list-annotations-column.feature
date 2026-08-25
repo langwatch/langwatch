@@ -2,7 +2,7 @@
 # Implementation:
 #   platform/app/src/features/traces-v2/components/TraceTable/registry/cells/trace/AnnotationsCell.tsx
 #   platform/app/src/features/traces-v2/hooks/useTraceListAnnotations.ts
-#   platform/app/src/components/annotations/AnnotationScoresChip.tsx
+#   packages/features/annotation/web/src/annotation-scores-chip.tsx
 #
 # Annotations are what reviewers left on a trace, and they live in Postgres,
 # while everything else on a row comes from the trace summary in ClickHouse.

@@ -1,16 +1,8 @@
 import { Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useRef, useState } from "react";
-import { Dialog } from "../ui/dialog";
 
-/**
- * Confirmation dialog for delete operations.
- *
- * Note: All interactive elements use stopPropagation() to prevent event bubbling.
- * This dialog is rendered inside clickable parent elements (e.g., table rows,
- * cards with click handlers), and without stopPropagation, clicks on the dialog
- * inputs and buttons would trigger the parent's click handlers, causing
- * unintended navigation or actions.
- */
+/** Shared destructive-action confirmation for app-owned feature composition. */
 export function DeleteConfirmationDialog({
   title = "Are you really sure?",
   description = "There is no going back, so if you're sure you want to delete this annotation score, type 'delete' below:",
@@ -30,6 +22,15 @@ export function DeleteConfirmationDialog({
   useEffect(() => {
     setConfirmationText("");
   }, [open]);
+
+  const confirmed = confirmationText.toLowerCase() === "delete";
+  const confirm = () => {
+    if (!confirmed) {
+      return;
+    }
+    onConfirm();
+    onClose();
+  };
 
   return (
     <Dialog.Root
@@ -52,18 +53,15 @@ export function DeleteConfirmationDialog({
               placeholder="Type 'delete' to confirm"
               value={confirmationText}
               autoFocus
-              onChange={(e) => {
-                e.stopPropagation();
-                setConfirmationText(e.target.value);
+              onChange={(event) => {
+                event.stopPropagation();
+                setConfirmationText(event.target.value);
               }}
               ref={inputRef}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === "Enter") {
-                  if (confirmationText.toLowerCase() === "delete") {
-                    onConfirm();
-                    onClose();
-                  }
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === "Enter") {
+                  confirm();
                 }
               }}
             />
@@ -73,8 +71,8 @@ export function DeleteConfirmationDialog({
           <Button
             variant="outline"
             mr={3}
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               onClose();
             }}
           >
@@ -82,14 +80,11 @@ export function DeleteConfirmationDialog({
           </Button>
           <Button
             colorPalette="red"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirmationText.toLowerCase() === "delete") {
-                onConfirm();
-                onClose();
-              }
+            onClick={(event) => {
+              event.stopPropagation();
+              confirm();
             }}
-            disabled={confirmationText.toLowerCase() !== "delete"}
+            disabled={!confirmed}
           >
             Delete
           </Button>

@@ -1,14 +1,21 @@
 import { Box, Button, HStack, Icon, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Checkbox, CheckboxGroup } from "@langwatch/design-system/checkbox";
+import { Popover } from "@langwatch/design-system/popover";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Checkbox, CheckboxGroup } from "~/components/ui/checkbox";
-import { Popover } from "~/components/ui/popover";
-import { Radio, RadioGroup } from "~/components/ui/radio";
+import { z } from "zod";
 import type {
   AnnotationFormState,
   AnnotationScoreOption,
   ScoreChipProps,
-} from "./annotationForm.types";
+} from "./annotation-form-types";
+
+const scoreOptionSchema = z.object({
+  label: z.string(),
+  value: z.union([z.string(), z.number()]),
+});
+const scoreOptionsSchema = z.array(scoreOptionSchema);
 
 /**
  * The project's active score keys, as chips the reviewer rates on.
@@ -32,23 +39,29 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
         Scores
       </Text>
       <HStack gap={1.5} wrap="wrap">
-        {state.scores.data.map((s) => (
-          <ScoreChip
-            key={s.id}
-            name={s.name}
-            description={s.description}
-            dataType={s.dataType!}
-            options={(s.options as unknown as AnnotationScoreOption[]) ?? []}
-            value={state.scoreOptions[s.id]?.value}
-            reason={state.scoreOptions[s.id]?.reason ?? ""}
-            onChange={(value, reason) =>
-              state.setScoreOptions((prev) => ({
-                ...prev,
-                [s.id]: { value, reason: reason ?? prev[s.id]?.reason ?? "" },
-              }))
-            }
-          />
-        ))}
+        {state.scores.data.map((s) => {
+          const parsedOptions = scoreOptionsSchema.safeParse(s.options);
+          const options: AnnotationScoreOption[] = parsedOptions.success
+            ? parsedOptions.data
+            : [];
+          return (
+            <ScoreChip
+              key={s.id}
+              name={s.name}
+              description={s.description}
+              dataType={s.dataType ?? "OPTION"}
+              options={options}
+              value={state.scoreOptions[s.id]?.value}
+              reason={state.scoreOptions[s.id]?.reason ?? ""}
+              onChange={(value, reason) =>
+                state.setScoreOptions((prev) => ({
+                  ...prev,
+                  [s.id]: { value, reason: reason ?? prev[s.id]?.reason ?? "" },
+                }))
+              }
+            />
+          );
+        })}
       </HStack>
     </VStack>
   );
@@ -59,7 +72,7 @@ function describeScoreValue(value: string | string[] | undefined): string | null
   if (value == null || value === "") return null;
   if (!Array.isArray(value)) return String(value);
   const [first] = value;
-  if (first === undefined) return null;
+  if (first === void 0) return null;
   return value.length === 1 ? first : `${value.length} selected`;
 }
 

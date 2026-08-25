@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DeleteConfirmationDialog } from "../components/annotations/DeleteConfirmationDialog";
+import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
 
 /**
  * Hook for managing dataset deletion confirmation dialog.

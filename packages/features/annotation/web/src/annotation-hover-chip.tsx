@@ -1,17 +1,8 @@
-import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, HoverCard, Portal, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { type AnnotationWithUser, annotationAnchorLabel } from "./annotationRow";
+import { annotationAnchorLabel, type AnnotationWithUser } from "./annotation-row";
 
-/**
- * Compact count of what reviewers wrote on a row, opening the writing itself on
- * hover. The cell stays one line wide however much was written, and the reader
- * still gets the text, who wrote it, when, and which part of the trace it was
- * left on, without leaving the list.
- *
- * Display-only and self-contained on purpose: the list renders rows for traces
- * that are not open anywhere, so it cannot lean on the trace drawer's stores.
- */
 export function AnnotationHoverChip({
   annotations,
   traceId,
@@ -22,25 +13,20 @@ export function AnnotationHoverChip({
   textOf,
 }: {
   annotations: AnnotationWithUser[];
-  /** The row's trace, which tells its own fields apart from a span's. */
   traceId: string;
   icon: ReactNode;
   testId: string;
-  /**
-   * What the pill counts, when that is not one per entry: a reviewer who gave
-   * three scores is one entry on the hover and three scores on the pill.
-   */
   count?: number;
-  /** What a screen reader hears on the pill, for a given count. */
   countLabel: (count: number) => string;
-  /** The writing this chip counts. An annotation without it is left out. */
   textOf: (annotation: AnnotationWithUser) => string | null;
 }) {
   const [open, setOpen] = useState(false);
   const written = annotations.filter((annotation) => textOf(annotation));
   const shownCount = count ?? written.length;
 
-  if (written.length === 0) return null;
+  if (written.length === 0) {
+    return null;
+  }
 
   return (
     <HoverCard.Root
@@ -99,7 +85,6 @@ export function AnnotationHoverChip({
   );
 }
 
-/** One entry of the hover list: who wrote it, when, where, and what. */
 function AnnotationHoverEntry({
   annotation,
   traceId,
@@ -135,8 +120,12 @@ function AnnotationHoverEntry({
 }
 
 function formatAnnotationTime(createdAt: Date | string | null): string {
-  if (!createdAt) return "";
+  if (!createdAt) {
+    return "";
+  }
   const date = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
   return date.toLocaleString();
 }

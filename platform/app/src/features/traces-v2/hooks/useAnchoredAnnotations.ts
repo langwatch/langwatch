@@ -1,10 +1,10 @@
 import { useMemo } from "react";
+import type { AnnotationAnchorKind } from "@langwatch/annotation-contract";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AnnotationAnchorKind } from "~/server/annotations/annotationAnchor";
 import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 

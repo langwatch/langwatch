@@ -1,8 +1,8 @@
 import { Button, HStack, Icon, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
-import { DiffCounts, DiffPanel, useOutputDiff } from "./AnnotationOutputDiff";
-import { ScoreFields } from "./AnnotationScoreFields";
-import type { AnnotationFormState } from "./annotationForm.types";
+import { DiffCounts, DiffPanel, useOutputDiff } from "./annotation-output-diff";
+import { ScoreFields } from "./annotation-score-fields";
+import type { AnnotationFormState } from "./annotation-form-types";
 
 export function AnnotateBody({ state }: { state: AnnotationFormState }) {
   return (

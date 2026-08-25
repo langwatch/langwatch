@@ -32,6 +32,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Edit } from "react-feather";
+import {
+  AnnotationAvatarGroup,
+  AnnotationCommentsChip,
+  AnnotationSuggestionsChip,
+  type AnnotationRow,
+  type AnnotationWithUser,
+  queueItemsToRows,
+  suggestionExportLine,
+} from "@langwatch/annotation-web";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
@@ -56,15 +65,7 @@ import { Pagination } from "../ui/Pagination";
 import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { toaster } from "../ui/toaster";
-import { AnnotationCommentsChip } from "./AnnotationCommentsChip";
-import { AnnotationSuggestionsChip } from "./AnnotationSuggestionsChip";
-import UserAvatarGroup from "./AvatarGroup";
-import {
-  type AnnotationRow,
-  type AnnotationWithUser,
-  queueItemsToRows,
-  suggestionExportLine,
-} from "./annotationRow";
+import { RandomColorAvatar } from "../RandomColorAvatar";
 
 const ChakraButton = chakra("button");
 
@@ -440,9 +441,16 @@ export const AnnotationsTable = ({
             }
           >
             <HStack>
-              <UserAvatarGroup
+              <AnnotationAvatarGroup
                 createdByUser={row.original.createdByUser}
                 annotations={row.original.annotations}
+                renderAvatar={(user) => (
+                  <RandomColorAvatar
+                    size="2xs"
+                    name={user.name ?? ""}
+                    image={user.image}
+                  />
+                )}
               />
             </HStack>
           </Tooltip>

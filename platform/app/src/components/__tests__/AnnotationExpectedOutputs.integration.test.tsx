@@ -4,7 +4,7 @@
  * Saved suggestions read as a list under the message output, and editing one
  * happens in the correction popover rather than in a textarea whose only save
  * button lived in another column.
- * See specs/annotations/annotation-queue-workflow.feature.
+ * See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

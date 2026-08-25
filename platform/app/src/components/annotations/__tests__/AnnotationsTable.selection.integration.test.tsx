@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 /**
  * Reviewers curate in the annotations list, send what they judged straight to a
  * dataset, and take what nobody can review out of the queue.
- * Spec: specs/annotations/annotations-list-selection.feature.
+ * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
  */
 
 type QueueItem = {
@@ -172,7 +172,7 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
 }));
 
 import { AnnotationsTable, type AnnotationsTableProps } from "../AnnotationsTable";
-import { groupedAnnotationsToRows } from "../annotationRow";
+import { groupedAnnotationsToRows } from "@langwatch/annotation-web";
 
 const setItems = (items: QueueItem[]) => {
   mocks.items = items.map((item) => ({

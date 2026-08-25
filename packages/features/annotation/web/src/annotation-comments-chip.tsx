@@ -1,12 +1,7 @@
 import { MessageCircle } from "lucide-react";
-import { AnnotationHoverChip } from "./AnnotationHoverChip";
-import type { AnnotationWithUser } from "./annotationRow";
+import { AnnotationHoverChip } from "./annotation-hover-chip";
+import type { AnnotationWithUser } from "./annotation-row";
 
-/**
- * The comments left on a row, as a count that opens the comments themselves on
- * hover. Each one names the part of the trace it was left on, since a comment
- * on one span says something different from a comment on the whole trace.
- */
 export function AnnotationCommentsChip({
   annotations,
   traceId,

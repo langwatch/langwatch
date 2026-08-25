@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  type AnnotationAnchorColumns,
+  describeAnnotationAnchor,
+} from "@langwatch/annotation-contract";
+import {
+  readAnnotationScoreOptions,
+  type AnnotationDraftValues,
+  type AnnotationFormState,
+  type AnnotationMode,
+  type AnnotationMutations,
+  type PopoverAnnotationFormInput,
+  type ScoreOptions,
+  type TraceAnnotation,
+} from "@langwatch/annotation-web";
 import { toaster } from "~/components/ui/toaster";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
-import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import { api } from "~/utils/api";
 import { useAnnotationQueueSessionStore } from "../../../stores/annotationQueueSessionStore";
 import { useAnnotationSessionStore } from "../../../stores/annotationSessionStore";
-import type {
-  AnnotationDraftValues,
-  AnnotationFormState,
-  AnnotationMode,
-  AnnotationMutations,
-  PopoverAnnotationFormInput,
-  ScoreOptions,
-  TraceAnnotation,
-} from "./annotationForm.types";
 
 /** The toast-and-invalidate pair every annotation write ends on. */
 function saveCallbacks({
@@ -203,7 +206,7 @@ function seedDraftValues({
     return {
       comment: existing.comment ?? "",
       expectedOutput: existing.expectedOutput ?? "",
-      scoreOptions: (existing.scoreOptions as unknown as ScoreOptions) ?? {},
+      scoreOptions: readAnnotationScoreOptions(existing.scoreOptions),
     };
   }
   return {

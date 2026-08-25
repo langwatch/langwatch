@@ -13,25 +13,37 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ScoreFields } from "../AnnotationScoreFields";
+import { ScoreFields } from "../src/annotation-score-fields";
+import type { AnnotationScore } from "@langwatch/annotation-contract";
 import type {
   AnnotationFormState,
   AnnotationScoreList,
   ScoreOptions,
-} from "../annotationForm.types";
+} from "../src/annotation-form-types";
 
-const SINGLE_CHOICE_SCORE = {
-  id: "score-1",
-  name: "Helpfulness",
-  description: "How much the answer helped",
-  dataType: "LIKERT",
-  options: [
-    { label: "Unhelpful", value: "unhelpful" },
-    { label: "Helpful", value: "helpful" },
-  ],
-};
+function score(over: Partial<AnnotationScore>): AnnotationScore {
+  return {
+    id: "score-1",
+    projectId: "project-1",
+    name: "Helpfulness",
+    createdAt: new Date("2026-08-25T08:00:00.000Z"),
+    updatedAt: new Date("2026-08-25T08:00:00.000Z"),
+    deletedAt: null,
+    description: "How much the answer helped",
+    active: true,
+    dataType: "LIKERT",
+    options: [
+      { label: "Unhelpful", value: "unhelpful" },
+      { label: "Helpful", value: "helpful" },
+    ],
+    defaultValue: null,
+    global: false,
+    ...over,
+  };
+}
 
-const MULTIPLE_CHOICE_SCORE = {
+const SINGLE_CHOICE_SCORE = score({});
+const MULTIPLE_CHOICE_SCORE = score({
   id: "score-2",
   name: "Traits",
   description: null,
@@ -40,10 +52,10 @@ const MULTIPLE_CHOICE_SCORE = {
     { label: "Concise", value: "concise" },
     { label: "Correct", value: "correct" },
   ],
-};
+});
 
 /** What the form holds while the reviewer is composing, read by the assertions. */
-const composed = { scoreOptions: {} as ScoreOptions };
+const composed: { scoreOptions: ScoreOptions } = { scoreOptions: {} };
 
 function makeState(over: Partial<AnnotationFormState>): AnnotationFormState {
   return {
@@ -93,15 +105,12 @@ function renderScores({
   scores = [SINGLE_CHOICE_SCORE],
   initial = {},
 }: {
-  scores?: unknown[];
+  scores?: AnnotationScoreList;
   initial?: ScoreOptions;
 } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <ScoreFieldsHost
-        scores={scores as unknown as AnnotationScoreList}
-        initial={initial}
-      />
+      <ScoreFieldsHost scores={scores} initial={initial} />
     </ChakraProvider>,
   );
 }

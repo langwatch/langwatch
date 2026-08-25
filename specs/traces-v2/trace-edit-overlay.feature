@@ -437,5 +437,5 @@ Feature: Correcting a trace without rewriting it
 
   # The end-of-queue dataset hand-off no longer stores marks on queue items.
   # Which traces a sitting keeps is collected in the browser for that sitting;
-  # see specs/annotations/annotation-queue-workflow.feature, Rule "The
-  # session's traces are collected as the queue is walked".
+  # see packages/features/annotation/specs/annotation-queue-workflow.feature,
+  # Rule "Session marks are local to this queue visit".

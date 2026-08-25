@@ -1,18 +1,11 @@
 import { Gauge } from "lucide-react";
-import { AnnotationHoverChip } from "./AnnotationHoverChip";
+import { AnnotationHoverChip } from "./annotation-hover-chip";
 import {
-  type AnnotationWithUser,
   annotationScoresLine,
   countAnnotationScores,
-} from "./annotationRow";
+  type AnnotationWithUser,
+} from "./annotation-row";
 
-/**
- * How a row was scored, as a count that opens the scores themselves on hover.
- *
- * The pill counts the scores given rather than the reviewers who gave them: a
- * reader asking "how much of this was judged" means the judgements, and one
- * reviewer answering three score keys is three of them.
- */
 export function AnnotationScoresChip({
   annotations,
   traceId,
@@ -20,7 +13,6 @@ export function AnnotationScoresChip({
 }: {
   annotations: AnnotationWithUser[];
   traceId: string;
-  /** The project's score names by id. Without it a score reads by its id. */
   scoreNamesById?: Map<string, string>;
 }) {
   return (

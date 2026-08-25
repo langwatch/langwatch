@@ -1,7 +1,7 @@
 /**
  * The traces one sitting at the annotation queue has collected: what counts
  * them in, what takes them back out, and why the reviewer's own choice outlives
- * the rule of thumb. See specs/annotations/annotation-queue-workflow.feature.
+ * the rule of thumb. See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {

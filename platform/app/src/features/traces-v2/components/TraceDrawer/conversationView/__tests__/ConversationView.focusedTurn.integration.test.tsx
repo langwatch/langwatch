@@ -5,7 +5,7 @@
  * once, and keeps it tinted for as long as it is the one being reviewed, so it
  * is still obvious after the reader has scrolled around themselves. Also the
  * session ticks, which only the queue asks for. See
- * specs/annotations/annotation-queue-workflow.feature.
+ * packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";

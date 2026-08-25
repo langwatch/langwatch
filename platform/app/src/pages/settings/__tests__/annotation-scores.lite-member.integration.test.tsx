@@ -111,7 +111,7 @@ vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: () => false,
 }));
 
-vi.mock("~/components/annotations/DeleteConfirmationDialog", () => ({
+vi.mock("~/components/ui/delete-confirmation-dialog", () => ({
   DeleteConfirmationDialog: () => <div data-testid="delete-dialog" />,
 }));
 

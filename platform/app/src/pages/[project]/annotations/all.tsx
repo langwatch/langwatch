@@ -7,7 +7,7 @@ import {
   annotationRatingExportLabel,
   groupedAnnotationsToRows,
   suggestionExportLine,
-} from "~/components/annotations/annotationRow";
+} from "@langwatch/annotation-web";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";

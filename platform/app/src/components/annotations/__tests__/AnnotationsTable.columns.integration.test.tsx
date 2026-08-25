@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 /**
  * The one annotations table behind the inbox, my queue, a single queue and all
  * annotations: its columns, its row actions, and its header controls.
- * Spec: specs/annotations/annotations-list-selection.feature.
+ * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -130,7 +130,10 @@ vi.mock("~/utils/downloadCsv", () => ({
 }));
 
 import { AnnotationsTable } from "../AnnotationsTable";
-import { type AnnotationWithUser, groupedAnnotationsToRows } from "../annotationRow";
+import {
+  type AnnotationWithUser,
+  groupedAnnotationsToRows,
+} from "@langwatch/annotation-web";
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
   id: "annotation-1",

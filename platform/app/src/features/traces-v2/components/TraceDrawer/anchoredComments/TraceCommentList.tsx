@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Crosshair, Lightbulb } from "lucide-react";
 import { UserAvatar } from "~/components/UserAvatar";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
