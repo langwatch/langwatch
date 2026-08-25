@@ -152,6 +152,18 @@ Feature: Evaluation execution - UI
     And every row of the column shows an error
     And the error names the evaluator and says to map its fields
 
+  # The cell drew "The evaluator failed to run. Check its configuration, then
+  # run again." for a cause we can name exactly. A reader who has not mapped a
+  # field has no way to guess that from "check its configuration", and the
+  # reading rule stands: the words a customer reads come from the error's code,
+  # not from a string the engine wrote.
+  @integration
+  Scenario: The cell says which evaluator had nothing to read
+    Given a row whose evaluator reported that no input resolved
+    When the cell draws its error
+    Then it names that evaluator and says to map its fields
+    And it does not fall back to the generic evaluator failure copy
+
   @unit
   Scenario: An evaluator that compares two fields lists both as required
     Given the workbench reads the fields of "exact_match" from the evaluator catalog

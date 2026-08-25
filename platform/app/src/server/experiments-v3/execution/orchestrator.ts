@@ -62,6 +62,7 @@ import {
   promptLoadKey,
   workflowLoadKey,
 } from "./dataLoader";
+import { EvaluatorNoInputsResolvedError } from "./errors";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
@@ -2117,7 +2118,7 @@ const evaluatorTargetNoInputsResult = ({
   rowIndex: cell.rowIndex,
   targetId: cell.targetId,
   output: undefined,
-  error: `${name} received no input for this row. Map its fields in the evaluator settings, then run again.`,
+  domainError: new EvaluatorNoInputsResolvedError(name).serialize(),
 });
 
 /**
@@ -2177,6 +2178,9 @@ const noInputsResolvedResult = ({
       evaluator,
     )} received no input for this row. Map its fields in the evaluator settings, then run again.`,
     traceback: [],
+    domainError: new EvaluatorNoInputsResolvedError(
+      evaluatorDisplayName(evaluator),
+    ).serialize(),
   },
 });
 

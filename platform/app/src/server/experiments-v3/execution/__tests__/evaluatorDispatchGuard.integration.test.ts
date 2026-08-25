@@ -255,10 +255,14 @@ describe("given an evaluator run as its own column", () => {
 
       const results = events.filter((e) => e.type === "target_result");
       expect(results).toHaveLength(1);
-      expect(results[0]?.error).toContain("Answer Correctness");
-      expect(results[0]?.error).toContain(
-        "Map its fields in the evaluator settings",
+      // The code, not the prose: the sentence the reader sees is drawn from
+      // the client registry, and the evaluator's name rides in `meta` for it.
+      expect(results[0]?.domainError?.code).toBe(
+        "evaluator_no_inputs_resolved",
       );
+      expect(results[0]?.domainError?.meta).toMatchObject({
+        evaluatorName: "Answer Correctness",
+      });
       expect(results[0]?.output).toBeUndefined();
       expect(evaluatorDispatches()).toHaveLength(0);
     });
