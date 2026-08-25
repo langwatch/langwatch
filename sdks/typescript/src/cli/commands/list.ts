@@ -7,7 +7,26 @@ import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-
 import { failSpinner } from "../utils/spinnerError";
 import type { CommandResult } from "../utils/output";
 
-export const listCommand = async (): Promise<CommandResult | void> => {
+export interface PromptListOptions {
+  /** How many prompts to return. All of them when absent. */
+  limit?: string;
+}
+
+/**
+ * `--limit` is the paging flag every other list command in this CLI takes, so a
+ * caller that has used one of those reaches for it here too. Reading it as a
+ * plain positive integer and ignoring anything else keeps a typo from silently
+ * returning one prompt.
+ */
+const resolveLimit = (raw: string | undefined): number | undefined => {
+  if (raw === undefined) return undefined;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+export const listCommand = async (
+  options: PromptListOptions = {},
+): Promise<CommandResult | void> => {
   try {
     // Check API key before doing anything else
     await resolveCredentials();
@@ -19,9 +38,13 @@ export const listCommand = async (): Promise<CommandResult | void> => {
 
     try {
       // Fetch all prompts
-      const allPrompts = await promptsApiService.getAll();
+      const fetched = await promptsApiService.getAll();
+      const limit = resolveLimit(options.limit);
+      const allPrompts =
+        limit === undefined ? fetched : fetched.slice(0, limit);
       const prompts = allPrompts.filter((prompt) => prompt.version);
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
+      const cut = allPrompts.length < fetched.length;
 
       spinner.succeed(
         `Found ${prompts.length} published prompt${
@@ -71,6 +94,15 @@ export const listCommand = async (): Promise<CommandResult | void> => {
             },
             emptyMessage: "No prompts found",
           });
+
+          if (cut) {
+            console.log();
+            console.log(
+              chalk.gray(
+                `Showing ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+              ),
+            );
+          }
 
           console.log();
           console.log(

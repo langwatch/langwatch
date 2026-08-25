@@ -936,11 +936,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     promptCmd
       .command("list")
       .description("List all available prompts on the server")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum prompts to return (default: all)"),
+    async (options: { limit?: string }) => {
       try {
         const { listCommand: impl } = await import("./commands/list.js");
-        return await impl();
+        return await impl(options);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });

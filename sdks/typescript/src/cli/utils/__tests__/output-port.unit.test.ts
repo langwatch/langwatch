@@ -100,6 +100,99 @@ describe("emitsResult", () => {
       expect(logged).toEqual([]);
     });
   });
+
+  // `--limit` is the flag about twenty commands page with, so a caller reads it
+  // as universal and the rest answered "unknown option '--limit'" plus a usage
+  // dump. It is a projection here, like `--jq`: the command fetched what it
+  // fetched, this decides how many rows are printed.
+  describe("when --limit caps the result", () => {
+    /** @scenario "A list is cut to the first rows on any list command" */
+    it("keeps the first n rows of a top-level array", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual([PAYLOAD[0]]);
+    });
+
+    /** @scenario "A cut list envelope keeps everything it says about itself" */
+    it("cuts the rows of a list envelope and keeps its other fields", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("envelope"), () => ({
+          data: { experiments: PAYLOAD, pagination: { totalHits: 2 } },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["envelope", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual({
+        experiments: [PAYLOAD[0]],
+        pagination: { totalHits: 2 },
+      });
+    });
+
+    /** @scenario "A payload that is not a list is left whole" */
+    it("leaves a payload with no single list alone", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("one"), () => ({
+          data: { id: "a1", tags: ["x"], versions: ["v1", "v2"] },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["one", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual({
+        id: "a1",
+        tags: ["x"],
+        versions: ["v1", "v2"],
+      });
+    });
+
+    /** @scenario "A command with its own paging flag keeps it" */
+    it("never caps on top of a command's own --limit", async () => {
+      let seen: string | undefined;
+      const program = buildProgram((p) => {
+        emitsResult(
+          p
+            .command("paged")
+            .option("--limit <n>", "Rows fetched per page; the walk covers all"),
+          (options: { limit?: string }) => {
+            seen = options.limit;
+            return { data: PAYLOAD, table: () => console.log("HUMAN TABLE") };
+          },
+        );
+      });
+      await program.parseAsync(["paged", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(seen).toBe("1");
+      expect(JSON.parse(logged[0]!)).toEqual(PAYLOAD);
+    });
+
+    it("counts what is left when --jq follows it", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "--limit", "1", "--jq", "length"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toBe(1);
+    });
+
+    it("ignores a limit that is not a positive number", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "-o", "json", "--limit", "nonsense"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual(PAYLOAD);
+    });
+
+    it("leaves the human table alone", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "--limit", "1"], { from: "user" });
+      expect(logged).toEqual(["HUMAN TABLE"]);
+    });
+  });
 });
 
 describe("isOutputAware", () => {
