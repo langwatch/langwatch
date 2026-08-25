@@ -189,11 +189,11 @@ export function CustomRoleCard({
       <Card.Body display="flex" flexDirection="column" gap={4} padding={5}>
         <HStack width="full" align="start" gap={3}>
           <VStack align="start" gap={1} flex={1} minWidth={0}>
-            <Text fontWeight="semibold" fontSize="md">
+            <Text fontWeight="semibold" fontSize="sm">
               {role.name}
             </Text>
             {role.description ? (
-              <Text fontSize="sm" color="fg.muted">
+              <Text fontSize="xs" color="fg.muted">
                 {role.description}
               </Text>
             ) : null}
