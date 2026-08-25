@@ -26,6 +26,7 @@
  * `afterAll`, so it never accumulates state in the account.
  */
 import crypto from "node:crypto";
+import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // env mock — the driver takes explicit credentials in this suite; the mock
@@ -37,7 +38,6 @@ vi.mock("~/env.mjs", () => ({
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { ObjectNotFoundError } from "../errors";
 import { StorageRegistry } from "../storage-registry";
-import { mintAzureBlobUri } from "../uri";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;
@@ -71,7 +71,7 @@ let driver: AzureBlobDriver;
 const writtenUris: string[] = [];
 
 function uriFor(bytes: Buffer): string {
-  const uri = mintAzureBlobUri({
+  const uri = mintAzureBlobStoredObjectUri({
     accountName: ACCOUNT_NAME!,
     container: CONTAINER!,
     projectId: PROJECT,
@@ -200,7 +200,7 @@ describeTokenAzure(
     }
 
     function tokenUriFor(bytes: Buffer): string {
-      const uri = mintAzureBlobUri({
+      const uri = mintAzureBlobStoredObjectUri({
         accountName: TOKEN_MODE_ACCOUNT!,
         container: CONTAINER!,
         projectId: `test-token-${RUN_ID}`,

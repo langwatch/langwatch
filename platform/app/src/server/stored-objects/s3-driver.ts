@@ -13,10 +13,10 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 import { createS3Client } from "~/server/storage";
 import { ObjectNotFoundError } from "./errors";
 import type { StorageDriver } from "./storage-driver";
-import { getUriScheme } from "./uri";
 
 /**
  * Decomposes an `s3://<bucket>/<key>` URI into its bucket and key parts.
@@ -25,7 +25,7 @@ import { getUriScheme } from "./uri";
  */
 function parseS3Uri(uri: string): { bucket: string; key: string } {
   // Throws if not "s3"
-  getUriScheme(uri);
+  getStoredObjectStorageScheme(uri);
 
   // s3://bucket/key  → strip "s3://"
   const withoutScheme = uri.slice("s3://".length);

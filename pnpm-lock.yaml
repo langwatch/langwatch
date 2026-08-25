@@ -3032,6 +3032,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../features/stored-object/contract
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -3594,6 +3597,9 @@ importers:
       '@langwatch/ssrf':
         specifier: workspace:*
         version: link:../../packages/ssrf
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/stored-object/contract
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../packages/features/suite/contract

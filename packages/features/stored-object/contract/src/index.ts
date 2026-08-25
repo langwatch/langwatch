@@ -6,4 +6,5 @@ export * from "./stored-object.commands";
 export * from "./stored-object.errors";
 export * from "./stored-object.queries";
 export * from "./stored-object.service";
+export * from "./storage-uri";
 export * from "./uploads";

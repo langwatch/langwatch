@@ -22,9 +22,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import { createLogger } from "@langwatch/observability";
+import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 import { ObjectNotFoundError } from "./errors";
 import type { StorageDriver } from "./storage-driver";
-import { getUriScheme } from "./uri";
 
 const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 
@@ -39,7 +39,7 @@ const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
  * @throws if the URI does not use the `file:` scheme.
  */
 function parseFileUri(uri: string): string {
-  const scheme = getUriScheme(uri);
+  const scheme = getStoredObjectStorageScheme(uri);
   if (scheme !== "file") {
     throw new Error(`LocalFilesystemDriver only handles file: URIs, got: "${uri}"`);
   }

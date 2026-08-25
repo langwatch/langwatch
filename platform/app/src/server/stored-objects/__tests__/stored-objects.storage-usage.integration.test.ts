@@ -13,6 +13,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
@@ -22,7 +23,6 @@ import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 import type { MintStorageUri } from "../stored-objects.service";
 import { StoredObjectsService } from "../stored-objects.service";
-import { mintFileUri } from "../uri";
 
 vi.mock("~/server/clickhouse/clickhouseClient", async () => {
   const actual = await vi.importActual<typeof clickhouseClientModule>(
@@ -62,7 +62,7 @@ function buildService(): StoredObjectsService {
   const registry = new StorageRegistry({ file: driver, s3: driver });
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
-    mintFileUri({ root: tmpDir, projectId: pid, sha256 });
+    mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
 }
 

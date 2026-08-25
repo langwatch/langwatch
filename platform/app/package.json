@@ -187,6 +187,7 @@
     "@langwatch/simulation-contract": "workspace:*",
     "@langwatch/simulation-server": "workspace:*",
     "@langwatch/ssrf": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",

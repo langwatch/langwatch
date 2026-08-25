@@ -84,7 +84,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { createStorageRegistry } from "../stored-objects-factory";
-import { mintS3Uri } from "../uri";
+import { mintS3StoredObjectUri } from "@langwatch/stored-object-contract";
 
 function resetTestState(): void {
   for (const key of Object.keys(mockEnv)) delete mockEnv[key];
@@ -101,7 +101,7 @@ async function roundTripS3Object(params: {
 }> {
   const destination = await resolveProjectStorageDestination(params.projectId);
   const registry = createStorageRegistry({ projectId: params.projectId });
-  const uri = mintS3Uri({
+  const uri = mintS3StoredObjectUri({
     bucket: params.expectedBucket,
     projectId: params.projectId,
     sha256: "abc123",

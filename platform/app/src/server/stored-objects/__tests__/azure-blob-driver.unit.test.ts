@@ -79,19 +79,20 @@ describe("AzureBlobDriver", () => {
     /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
     it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
       // Import lazily to keep the registry construction local to this test.
-      const { StorageRegistry } = await import("../storage-registry");
-      const { getUriScheme, mintAzureBlobUri } = await import("../uri");
+      const { getStoredObjectStorageScheme, mintAzureBlobStoredObjectUri } =
+        await import("@langwatch/stored-object-contract");
       const { LocalFilesystemDriver } = await import("../local-filesystem-driver");
       const { S3Driver } = await import("../s3-driver");
+      const { StorageRegistry } = await import("../storage-registry");
 
       // Scheme is in the supported set and is NOT s3/file.
-      const uri = mintAzureBlobUri({
+      const uri = mintAzureBlobStoredObjectUri({
         accountName: ACCOUNT_NAME,
         container: CONTAINER,
         projectId: "proj-1",
         sha256: "abc123",
       });
-      const scheme = getUriScheme(uri);
+      const scheme = getStoredObjectStorageScheme(uri);
       expect(scheme).toBe("azure-blob");
       expect(scheme).not.toBe("s3");
       expect(scheme).not.toBe("file");

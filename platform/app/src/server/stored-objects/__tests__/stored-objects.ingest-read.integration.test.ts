@@ -39,12 +39,12 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 import type { MintStorageUri } from "../stored-objects.service";
 import { StoredObjectsService } from "../stored-objects.service";
-import { mintFileUri } from "../uri";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any imports that trigger module load
@@ -222,7 +222,7 @@ function buildService(projectId: string): StoredObjectsService {
   // tmpDir is a `let` captured by reference — reads the current per-test value
   // at call time (set in beforeEach / withTmpStorage).
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
-    mintFileUri({ root: tmpDir, projectId: pid, sha256 });
+    mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
 }
 
@@ -432,7 +432,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
 
           // Delete the file from storage so the next GET gets an ENOENT
           const sha256 = sha256Of(bytes);
-          const storageUri = mintFileUri({
+          const storageUri = mintFileStoredObjectUri({
             root: tmpDir,
             projectId: PROJECT_A,
             sha256,

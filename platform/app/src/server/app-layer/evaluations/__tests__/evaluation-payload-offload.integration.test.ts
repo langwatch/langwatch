@@ -25,6 +25,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
+import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
@@ -40,7 +41,6 @@ import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
-import { mintFileUri } from "~/server/stored-objects/uri";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -80,7 +80,7 @@ function buildStoredObjects(): StoredObjectsService {
   const registry = new StorageRegistry({ file: driver, s3: driver });
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId, sha256 }) =>
-    mintFileUri({ root: tmpDir, projectId, sha256 });
+    mintFileStoredObjectUri({ root: tmpDir, projectId, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
 }
 

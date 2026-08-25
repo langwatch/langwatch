@@ -1,4 +1,8 @@
 import type { Readable } from "node:stream";
+import {
+  mintStoredObjectUri,
+  type StoredObjectStorageDestination,
+} from "@langwatch/stored-object-contract";
 
 export type TenantId = string;
 
@@ -15,10 +19,7 @@ export function tenantIdFromGroupId(groupId: string): string | null {
   return separator > 0 ? groupId.slice(0, separator) : null;
 }
 
-export type ProjectStorageDestination =
-  | { kind: "s3"; bucket: string }
-  | { kind: "file"; root: string }
-  | { kind: "azure"; accountName: string; container: string };
+export type ProjectStorageDestination = StoredObjectStorageDestination;
 
 export interface ObjectStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
@@ -33,18 +34,7 @@ export function mintUriForDestination({
   destination: ProjectStorageDestination;
   objectPath: string;
 }): string {
-  switch (destination.kind) {
-    case "s3":
-      return `s3://${destination.bucket}/${objectPath}`;
-    case "file": {
-      const root = destination.root.startsWith("/")
-        ? destination.root
-        : `/${destination.root}`;
-      return `file://${root}/${objectPath}`;
-    }
-    case "azure":
-      return `azure-blob://${destination.accountName}/${destination.container}/${objectPath}`;
-  }
+  return mintStoredObjectUri({ destination, objectPath });
 }
 
 export function redactStorageUrisInText(text: string): string {

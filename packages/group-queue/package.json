@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@langwatch/observability": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "fastq": "^1.20.1",
     "ioredis": "5.10.1",

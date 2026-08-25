@@ -20,12 +20,15 @@
  */
 import crypto from "node:crypto";
 import { Readable } from "node:stream";
+import {
+  getStoredObjectStorageScheme,
+  redactStoredObjectStorageErrorText,
+  redactStoredObjectStorageUri,
+} from "@langwatch/stored-object-contract";
 import type { AzureCredentials } from "./azure-credentials";
 import { getAzureBlobToken, invalidateAzureBlobToken } from "./azure-token-provider";
 import { ObjectNotFoundError } from "./errors";
-import { redactStorageErrorText, redactStorageUri } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
-import { getUriScheme } from "./uri";
 
 interface ParsedAzureBlobUri {
   accountName: string;
@@ -35,7 +38,7 @@ interface ParsedAzureBlobUri {
 
 /** Parses `azure-blob://{accountName}/{container}/{key...}` into its parts. */
 function parseAzureBlobUri(uri: string): ParsedAzureBlobUri {
-  const scheme = getUriScheme(uri); // throws on non-supported schemes
+  const scheme = getStoredObjectStorageScheme(uri); // throws on non-supported schemes
   if (scheme !== "azure-blob") {
     throw new Error(
       `Invalid Azure Blob URI scheme "${scheme}" in "${uri}" — expected "azure-blob"`,
@@ -272,12 +275,14 @@ export class AzureBlobDriver implements StorageDriver {
     }
     if (!response.ok) {
       throw new Error(
-        `Azure Blob GET failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
+        `Azure Blob GET failed for ${redactStoredObjectStorageUri(uri)}: ${response.status} ${response.statusText}`,
       );
     }
 
     if (!response.body) {
-      throw new Error(`Azure Blob GET returned empty body for ${redactStorageUri(uri)}`);
+      throw new Error(
+        `Azure Blob GET returned empty body for ${redactStoredObjectStorageUri(uri)}`,
+      );
     }
     return Readable.fromWeb(
       response.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>,
@@ -311,9 +316,11 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok) {
-      const body = redactStorageErrorText(await response.text().catch(() => ""));
+      const body = redactStoredObjectStorageErrorText(
+        await response.text().catch(() => ""),
+      );
       throw new Error(
-        `Azure Blob PUT failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText} ${body}`,
+        `Azure Blob PUT failed for ${redactStoredObjectStorageUri(uri)}: ${response.status} ${response.statusText} ${body}`,
       );
     }
   }
@@ -336,7 +343,7 @@ export class AzureBlobDriver implements StorageDriver {
     // success condition for callers (the row is going away anyway).
     if (!response.ok && response.status !== 404) {
       throw new Error(
-        `Azure Blob DELETE failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
+        `Azure Blob DELETE failed for ${redactStoredObjectStorageUri(uri)}: ${response.status} ${response.statusText}`,
       );
     }
   }
@@ -358,7 +365,7 @@ export class AzureBlobDriver implements StorageDriver {
     if (response.status === 404) return false;
     if (!response.ok) {
       throw new Error(
-        `Azure Blob HEAD failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
+        `Azure Blob HEAD failed for ${redactStoredObjectStorageUri(uri)}: ${response.status} ${response.statusText}`,
       );
     }
     return true;
@@ -391,7 +398,7 @@ export class AzureBlobDriver implements StorageDriver {
     }
     if (!response.ok) {
       throw new Error(
-        `Azure Blob HEAD failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
+        `Azure Blob HEAD failed for ${redactStoredObjectStorageUri(uri)}: ${response.status} ${response.statusText}`,
       );
     }
     // An ABSENT header must not read as size 0: Number(null) is 0, which is
@@ -407,7 +414,7 @@ export class AzureBlobDriver implements StorageDriver {
       contentLength < 0
     ) {
       throw new Error(
-        `Azure Blob HEAD returned no usable Content-Length for ${redactStorageUri(uri)}`,
+        `Azure Blob HEAD returned no usable Content-Length for ${redactStoredObjectStorageUri(uri)}`,
       );
     }
     return contentLength;
@@ -438,7 +445,9 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok && response.status !== 409) {
-      const body = redactStorageErrorText(await response.text().catch(() => ""));
+      const body = redactStoredObjectStorageErrorText(
+        await response.text().catch(() => ""),
+      );
       throw new Error(
         `Azure Blob container create failed for ${container}: ${response.status} ${response.statusText} ${body}`,
       );

@@ -44,13 +44,13 @@ import {
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import type { RecordSpanCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { extractInlineMediaFromEvent } from "../content-extractor";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 import type { MintStorageUri } from "../stored-objects.service";
 import { StoredObjectsService } from "../stored-objects.service";
-import { mintFileUri } from "../uri";
 
 // ---------------------------------------------------------------------------
 // Environment shims (no behavior mocking)
@@ -227,7 +227,7 @@ function buildService(projectId: string): StoredObjectsService {
   const registry = new StorageRegistry({ file: driver, s3: driver });
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
-    mintFileUri({ root: tmpDir, projectId: pid, sha256 });
+    mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
 }
 
@@ -370,7 +370,11 @@ describe("trace media extraction at the ingestion edge", () => {
       expect(row!.owner_kind).toBe("trace");
       expect(row!.sha256).toBe(sha256Of(wavOf(audio)));
       const stored = await readStoredBytes(
-        mintFileUri({ root: tmpDir, projectId: PROJECT, sha256: row!.sha256 }),
+        mintFileStoredObjectUri({
+          root: tmpDir,
+          projectId: PROJECT,
+          sha256: row!.sha256,
+        }),
       );
       expect(stored.equals(wavOf(audio))).toBe(true);
       expect(stored.subarray(44).equals(audio)).toBe(true);
@@ -803,7 +807,7 @@ describe("trace media extraction at the ingestion edge", () => {
       const blockerFile = path.join(tmpDir, "not-a-dir");
       await fs.writeFile(blockerFile, "x");
       const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
-        mintFileUri({ root: blockerFile, projectId: pid, sha256 });
+        mintFileStoredObjectUri({ root: blockerFile, projectId: pid, sha256 });
       const brokenService = new StoredObjectsService(repository, registry, mintUri);
 
       const audio = makeAudioBytes(4444);

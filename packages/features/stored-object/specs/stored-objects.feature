@@ -34,11 +34,13 @@ Feature: Stored Objects service and API
     And no Stored Object event projection, process manager or parallel lifecycle store exists
 
   @architecture @storage
-  Scenario: Stored Objects reuses the existing storage implementation
-    Given the application composes StoredObjectService
-    Then it injects one class adapter over the existing StorageRegistry
+  Scenario: Stored Objects has one portable storage URI owner
+    Given the application composes its existing storage drivers
+    Then @langwatch/stored-object-contract owns URI formatting and redaction
     And the existing S3, Azure Blob and local-filesystem drivers remain authoritative
-    And Stored Objects does not recreate provider registries, destination selection or credentials
+    And application composition owns lazy scheme dispatch
+    And validated application configuration retains destination selection and credentials
+    And inactive Azure configuration does not block S3 or local-filesystem traffic
 
   @integration @stored-objects
   Scenario: Internal storage is content addressed

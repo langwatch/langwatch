@@ -9,10 +9,13 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { chunkKey } from "@langwatch/dataset-contract";
-import { redactStorageUri } from "~/server/stored-objects/project-storage-destination";
+import {
+  mintAzureBlobStoredObjectUri,
+  mintS3StoredObjectUri,
+  redactStoredObjectStorageUri,
+} from "@langwatch/stored-object-contract";
 import type { StorageDriver } from "~/server/stored-objects/storage-driver";
 import type { StoredObject } from "~/server/stored-objects/stored-object";
-import { mintAzureBlobUri, mintS3Uri } from "~/server/stored-objects/uri";
 
 export type MigrationProvider = "s3" | "azure";
 
@@ -89,7 +92,8 @@ export function createMigrationStorageEndpoint({
       provider,
       scheme: "s3",
       driver,
-      storedObjectUri: (projectId, sha256) => mintS3Uri({ bucket, projectId, sha256 }),
+      storedObjectUri: (projectId, sha256) =>
+        mintS3StoredObjectUri({ bucket, projectId, sha256 }),
       datasetChunkUri: (projectId, datasetId, index) =>
         `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
     };
@@ -102,7 +106,7 @@ export function createMigrationStorageEndpoint({
     scheme: "azure-blob",
     driver,
     storedObjectUri: (projectId, sha256) =>
-      mintAzureBlobUri({ accountName, container, projectId, sha256 }),
+      mintAzureBlobStoredObjectUri({ accountName, container, projectId, sha256 }),
     datasetChunkUri: (projectId, datasetId, index) =>
       `azure-blob://${accountName}/${container}/${chunkKey(projectId, datasetId, index)}`,
   };
@@ -307,7 +311,7 @@ export class ObjectStorageMigration {
       return "skippedVerified";
     }
     throw new MigrationBlockedError(
-      `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
+      `Dataset chunk is missing from both providers: ${redactStoredObjectStorageUri(sourceUri)}`,
     );
   }
 
@@ -559,7 +563,7 @@ async function copyVerified({
   const sourceSha256 = sha256(sourceBytes);
   if (expectedSha256 && sourceSha256 !== expectedSha256) {
     throw new Error(
-      `Source object verification failed for ${redactStorageUri(sourceUri)}: expected ${expectedSha256}, got ${sourceSha256}`,
+      `Source object verification failed for ${redactStoredObjectStorageUri(sourceUri)}: expected ${expectedSha256}, got ${sourceSha256}`,
     );
   }
   if (await destination.driver.exists(destinationUri)) {
@@ -584,12 +588,14 @@ async function assertUriDigest(
   expectedSha256: string,
 ): Promise<void> {
   if (!(await driver.exists(uri))) {
-    throw new Error(`Destination object is missing: ${redactStorageUri(uri)}`);
+    throw new Error(
+      `Destination object is missing: ${redactStoredObjectStorageUri(uri)}`,
+    );
   }
   const actual = await sha256OfStream(await driver.get(uri));
   if (actual !== expectedSha256) {
     throw new Error(
-      `Destination object verification failed for ${redactStorageUri(uri)}: expected ${expectedSha256}, got ${actual}`,
+      `Destination object verification failed for ${redactStoredObjectStorageUri(uri)}: expected ${expectedSha256}, got ${actual}`,
     );
   }
 }

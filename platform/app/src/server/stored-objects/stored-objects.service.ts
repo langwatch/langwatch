@@ -8,6 +8,10 @@ import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import {
+  mintStoredObjectUri,
+  redactStoredObjectStorageUri,
+} from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -18,14 +22,10 @@ import {
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
 import { ObjectNotFoundError } from "./errors";
-import {
-  redactStorageUri,
-  resolveProjectStorageDestination,
-} from "./project-storage-destination";
+import { resolveProjectStorageDestination } from "./project-storage-destination";
 import type { StorageRegistry } from "./storage-registry";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
-import { mintUriForDestination } from "./uri";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -84,7 +84,7 @@ export async function defaultMintStorageUri({
   sha256: string;
 }): Promise<string> {
   const destination = await resolveProjectStorageDestination(projectId);
-  return mintUriForDestination({
+  return mintStoredObjectUri({
     destination,
     objectPath: `${projectId}/${sha256}`,
   });
@@ -189,7 +189,7 @@ export class StoredObjectsService {
               // Redact bucket / account / install-path segments — for
               // BYOC tenants, the raw URI would carry their private
               // bucket name into shared log sinks.
-              storageUri: redactStorageUri(storageUri),
+              storageUri: redactStoredObjectStorageUri(storageUri),
               error,
             },
             "Failed to PUT stored object bytes",
@@ -227,7 +227,7 @@ export class StoredObjectsService {
               {
                 projectId,
                 id,
-                storageUri: redactStorageUri(storageUri),
+                storageUri: redactStoredObjectStorageUri(storageUri),
                 deleteError,
                 insertError,
               },
@@ -329,7 +329,7 @@ export class StoredObjectsService {
             {
               projectId,
               id,
-              storageUri: redactStorageUri(row.storage_uri),
+              storageUri: redactStoredObjectStorageUri(row.storage_uri),
               error,
             },
             "Failed to GET stored object bytes",
@@ -411,7 +411,7 @@ export class StoredObjectsService {
               {
                 projectId,
                 id: row.id,
-                storageUri: redactStorageUri(row.storage_uri),
+                storageUri: redactStoredObjectStorageUri(row.storage_uri),
                 error,
               },
               "deleteOwnedBy: failed to delete bytes; row retained as retryable tombstone",

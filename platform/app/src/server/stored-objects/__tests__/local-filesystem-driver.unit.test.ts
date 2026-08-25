@@ -11,10 +11,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
+import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObjectNotFoundError } from "../errors";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
-import { mintFileUri } from "../uri";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,7 +53,7 @@ afterEach(async () => {
 describe("when put is called with bytes and a file URI", () => {
   /** @scenario "Local filesystem driver writes under the configured root using atomic rename" */
   it("writes the bytes to the final path", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-abc",
       sha256: "deadbeef1234",
@@ -70,7 +70,7 @@ describe("when put is called with bytes and a file URI", () => {
   it("creates intermediate directories", async () => {
     // URI with a deeply-nested structure: root / projectId / sha
     const deepRoot = path.join(tmpDir, "a", "b", "c");
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: deepRoot,
       projectId: "proj-xyz",
       sha256: "cafebabe9999",
@@ -91,7 +91,7 @@ describe("when put is called with bytes and a file URI", () => {
 
 describe("when put writes a temporary file first", () => {
   it("does not leave a .tmp.* file at the final path after a successful rename", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-atomic",
       sha256: "atomicsha256",
@@ -126,7 +126,7 @@ describe("Local filesystem driver write is atomic under interruption", () => {
   it("converges to a complete file when retried after an interrupted write", async () => {
     const projectId = "proj-interrupted";
     const sha256 = "interruptedsha256";
-    const uri = mintFileUri({ root: tmpDir, projectId, sha256 });
+    const uri = mintFileStoredObjectUri({ root: tmpDir, projectId, sha256 });
     const dir = path.join(tmpDir, projectId);
     const finalPath = path.join(dir, sha256);
 
@@ -155,7 +155,7 @@ describe("Local filesystem driver write is atomic under interruption", () => {
 
 describe("when get is called and the file exists", () => {
   it("streams the bytes", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-get",
       sha256: "getsha256",
@@ -171,7 +171,7 @@ describe("when get is called and the file exists", () => {
 
 describe("when get is called and the file does not exist", () => {
   it("throws ObjectNotFoundError", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-missing",
       sha256: "missingsha256",
@@ -187,7 +187,7 @@ describe("when get is called and the file does not exist", () => {
 
 describe("when exists is called and the file is present", () => {
   it("returns true", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-exists",
       sha256: "existssha256",
@@ -200,7 +200,7 @@ describe("when exists is called and the file is present", () => {
 
 describe("when exists is called and the file is missing", () => {
   it("returns false", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-no-exist",
       sha256: "noexistsha256",
@@ -216,7 +216,7 @@ describe("when exists is called and the file is missing", () => {
 
 describe("when delete is called and the file exists", () => {
   it("removes it", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-del",
       sha256: "delsha256",
@@ -231,7 +231,7 @@ describe("when delete is called and the file exists", () => {
 
 describe("when delete is called and the file does not exist", () => {
   it("is a no-op", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: tmpDir,
       projectId: "proj-del-noexist",
       sha256: "delnoexistsha256",
@@ -280,7 +280,7 @@ describe("given a storage root configured with a trailing slash", () => {
   // break every local-filesystem write on those installs — datasets and
   // scenario media included, none of which this containment check is about.
   it("stores and reads back through the collapsed path", async () => {
-    const uri = mintFileUri({
+    const uri = mintFileStoredObjectUri({
       root: `${tmpDir}/`,
       projectId: "proj-1",
       sha256: "abc123",

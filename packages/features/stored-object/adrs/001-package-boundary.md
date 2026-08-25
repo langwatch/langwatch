@@ -112,11 +112,12 @@ It does not depend on application source, provider SDKs, or Eventing.
 
 #### Existing storage is reused
 
-The application supplies one narrow `StoredObjectStorage` class backed by the
-existing `StorageRegistry` and its S3, Azure Blob and local-filesystem drivers.
-It supports only the operations Stored Objects needs: write, stat, read, delete
-and an optional signed direct-upload target. It does not recreate provider
-registries, destination resolution, locator formats or credentials.
+The portable contract owns the provider-neutral storage URI format and safe
+redaction. Application composition supplies the existing S3, Azure Blob and
+local-filesystem drivers, their lazy scheme registry, and validated destination
+and credential config. The future `StoredObjectStorage` adapter uses that same
+registry for write, stat, read, delete and optional direct upload; it does not
+recreate provider credentials or destination selection.
 
 Internal writes remain content addressed by authenticated project and SHA-256.
 They write through the existing registry and then upsert an `available` row. If

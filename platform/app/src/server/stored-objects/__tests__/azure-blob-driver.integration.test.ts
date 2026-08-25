@@ -26,6 +26,7 @@
  */
 import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -37,7 +38,6 @@ import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 import type { MintStorageUri } from "../stored-objects.service";
 import { StoredObjectsService } from "../stored-objects.service";
-import { mintAzureBlobUri } from "../uri";
 import {
   ensureAzuriteContainer,
   type StartedAzurite,
@@ -159,7 +159,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
     /** @scenario "Scenario media round-trips through Azure Blob when azure is the configured backend" */
     it("round-trips put/get/exists/delete through Azurite with a correctly signed path-style request", async () => {
       const bytes = Buffer.from("azurite round-trip payload", "utf8");
-      const uri = mintAzureBlobUri({
+      const uri = mintAzureBlobStoredObjectUri({
         accountName: azurite.accountName,
         container: CONTAINER,
         projectId: PROJECT,
@@ -195,7 +195,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
         endpointBaseUrl: `${azurite.endpointBaseUrl}/`,
       });
       const bytes = Buffer.from("trailing slash payload", "utf8");
-      const uri = mintAzureBlobUri({
+      const uri = mintAzureBlobStoredObjectUri({
         accountName: azurite.accountName,
         container: CONTAINER,
         projectId: PROJECT,
@@ -227,7 +227,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
      */
     it("stores and reads back an empty blob instead of failing authorization", async () => {
       const bytes = Buffer.alloc(0);
-      const uri = mintAzureBlobUri({
+      const uri = mintAzureBlobStoredObjectUri({
         accountName: azurite.accountName,
         container: CONTAINER,
         projectId: PROJECT,
@@ -263,7 +263,7 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
       });
       const repository = new StoredObjectsRepository();
       const mintUri: MintStorageUri = async ({ projectId, sha256 }) =>
-        mintAzureBlobUri({
+        mintAzureBlobStoredObjectUri({
           accountName: azurite.accountName,
           container: CONTAINER,
           projectId,

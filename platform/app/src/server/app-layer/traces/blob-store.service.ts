@@ -6,7 +6,7 @@ import type { Logger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { mintUriForDestination } from "~/server/stored-objects/uri";
+import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { streamToBuffer } from "~/utils/streamToBuffer";
 
 export interface S3ClientResolution {
@@ -449,7 +449,7 @@ export class BlobStore {
     }
 
     return {
-      uri: mintUriForDestination({
+      uri: mintStoredObjectUri({
         destination,
         objectPath: buildSpoolObjectPath({ projectId, traceId, spanId }),
       }),
