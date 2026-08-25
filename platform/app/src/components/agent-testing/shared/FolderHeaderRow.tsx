@@ -9,7 +9,11 @@
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { FG_MUTED, GROUP_HEADER_BG } from "./design";
+import {
+  FG_MUTED,
+  GROUP_HEADER_BG,
+  QUIET_BUTTON_SHADOW,
+} from "./design";
 
 export type FolderHeaderRowProps = {
   name: string;
@@ -51,6 +55,7 @@ export function FolderHeaderRow({
       paddingX={4}
       paddingY={2}
       background={GROUP_HEADER_BG}
+      boxShadow={QUIET_BUTTON_SHADOW}
       borderBottomWidth="1px"
       borderBottomColor="border.muted"
       borderTopWidth={separated ? "1px" : undefined}

@@ -15,7 +15,7 @@ import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { DIALOG_FIELD_STYLE } from "../shared/DialogFields";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { ParameterRow } from "./parameter-rows";
 
 /** What a secret with no value yet says under its row. */
@@ -78,6 +78,7 @@ export function ParameterRowsEditor({
         fontWeight="medium"
         color={FG_MUTED}
         cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
         _hover={{ color: "fg" }}
         aria-label="Add a parameter"
         disabled={disabled}
@@ -157,6 +158,7 @@ function EditableRow({
           alignItems="center"
           color={FG_MUTED}
           cursor="pointer"
+          boxShadow={QUIET_BUTTON_SHADOW}
           _hover={{ color: "red.fg" }}
           title="Remove"
           aria-label={`Remove parameter ${index + 1}`}
@@ -268,6 +270,7 @@ function LockToggle({
         color={isSecret ? "fg" : FG_MUTED}
         opacity={isSecret ? 1 : 0.5}
         background={isSecret ? "bg.muted" : "transparent"}
+        boxShadow={QUIET_BUTTON_SHADOW}
         cursor={disabled ? "default" : "pointer"}
         _hover={disabled ? undefined : { color: "fg", opacity: 1 }}
         aria-label={label}

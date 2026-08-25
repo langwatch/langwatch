@@ -8,7 +8,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, FileText, Folder } from "lucide-react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 
 /** One prompt as the picker lists it. */
 export type PromptEntry = {
@@ -57,6 +57,7 @@ function PromptRow({
       as="button"
       cursor="pointer"
       textAlign="left"
+      boxShadow={QUIET_BUTTON_SHADOW}
       borderWidth="1px"
       borderColor={isActive ? "blue.500" : "transparent"}
       background={isActive ? "blue.subtle" : undefined}

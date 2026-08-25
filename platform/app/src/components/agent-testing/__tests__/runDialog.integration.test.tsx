@@ -201,6 +201,23 @@ function casesDeclaring(parameters: unknown) {
   };
 }
 
+/**
+ * The style the emitted class carries for one element.
+ *
+ * A dialog lifts the buttons it holds, so a control that must stay flat says
+ * so itself. The style lives in a class rather than on the element, and jsdom
+ * does not read the emitted sheet, so the rule is read from the sheet by hand.
+ */
+function styleRuleOf(element: Element): string {
+  const className = [...element.classList].find((name) =>
+    name.startsWith("css-"),
+  );
+  const sheets = [...document.querySelectorAll("style")]
+    .map((style) => style.textContent ?? "")
+    .join("\n");
+  return sheets.match(new RegExp(`\\.${className}\\{[^}]*\\}`))?.[0] ?? "";
+}
+
 /** A refusal the way tRPC carries a handled error to the client. */
 function handledRejection(code: string, meta: Record<string, unknown> = {}) {
   return { data: { error: { code, httpStatus: 422, meta } } };
@@ -501,6 +518,28 @@ describe("<RunDialog/>", () => {
     expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
       "model=gpt-5-mini",
     );
+  });
+
+  /** @scenario "The quiet controls of the dialog are drawn flat" */
+  it("draws the add, the remove and the lock of a row with no shadow", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+
+    const quiet = [
+      screen.getByTestId("run-dialog-parameter-add-row"),
+      screen.getByTestId("run-dialog-parameter-remove-0"),
+      screen.getByTestId("run-dialog-parameter-lock-0"),
+      screen.getByRole("button", { name: "Remove the parameter overrides" }),
+    ];
+    for (const control of quiet) {
+      expect(styleRuleOf(control)).toContain("box-shadow:none");
+    }
   });
 
   /** @scenario "A row can be added and a row can be taken away" */

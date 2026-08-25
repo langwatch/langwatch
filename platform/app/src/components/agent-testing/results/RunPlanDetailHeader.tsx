@@ -51,16 +51,21 @@ export type RunPlanDetailHeaderProps = {
   onRunPlan?: () => void;
 };
 
-/** Which run is on screen: its number, its age and the note it carries. */
+/**
+ * Which run is on screen: its number, how it went and the note it carries.
+ *
+ * How it went reads beside the name, where a person looks first. The age of
+ * the run reads on the other end of the line, beside the controls.
+ */
 function RunSummary({ run }: { run: RunPlanDetailRun }) {
   return (
     <>
       <Text fontSize="12.5px" fontWeight="semibold">
         {run.title}
       </Text>
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        {run.timeAgo}
-      </Text>
+      {run.summary ? (
+        <RunMetricsSummary summary={run.summary} size="md" />
+      ) : null}
       {run.note ? (
         <Text
           fontSize="11.5px"
@@ -104,8 +109,10 @@ export function RunPlanDetailHeader({
       <Box flex={1} />
 
       <HStack gap={1.5}>
-        {run?.summary ? (
-          <RunMetricsSummary summary={run.summary} size="md" />
+        {run ? (
+          <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
+            {run.timeAgo}
+          </Text>
         ) : null}
 
         <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />

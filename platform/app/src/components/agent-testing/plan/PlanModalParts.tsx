@@ -9,7 +9,7 @@ import { Box, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
 import { describeError, FormServerError } from "~/features/errors";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import { PlanExecutionTab } from "./PlanExecutionTab";
 import { PlanGeneralTab } from "./PlanGeneralTab";
@@ -116,6 +116,7 @@ export function PlanModalFooter({ editor }: { editor: PlanEditorState }) {
         fontWeight="medium"
         color={FG_MUTED}
         cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
         _hover={{ background: "bg.muted", color: "fg" }}
       >
         Cancel

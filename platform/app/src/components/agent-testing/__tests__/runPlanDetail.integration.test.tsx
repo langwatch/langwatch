@@ -563,6 +563,28 @@ describe("<RunPlanDetail/>", () => {
     ).toBeInTheDocument();
   });
 
+  /** @scenario "The results header holds the run and the actions on one line" */
+  it("reads the run, then how it went, then the note, with its age beside the toggle", () => {
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const positionOf = (element: Element) => {
+      const all = [...line.querySelectorAll("*")];
+      return all.indexOf(element);
+    };
+
+    const name = within(line).getByText("Run #3");
+    const summary = within(line).getByTestId("run-metrics-summary");
+    const note = within(line).getByTestId("run-summary-note");
+    const age = within(line).getByText(/ago$/);
+    const toggle = within(line).getByTestId("view-mode-toggle");
+
+    expect(positionOf(name)).toBeLessThan(positionOf(summary));
+    expect(positionOf(summary)).toBeLessThan(positionOf(note));
+    expect(positionOf(note)).toBeLessThan(positionOf(age));
+    expect(positionOf(age)).toBeLessThan(positionOf(toggle));
+  });
+
   /** @scenario "The run header shows the note of the selected run" */
   it("shows the note of the selected run beside its name", () => {
     renderDetail();

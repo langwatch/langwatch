@@ -363,7 +363,7 @@ describe("the wide run detail drawer", () => {
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */
-  it("grows the conversation on the left while the judge has not run yet", () => {
+  it("grows the conversation on the left while the conversation is running", () => {
     setRunState(
       makeRunState({
         status: ScenarioRunStatus.IN_PROGRESS,
@@ -373,8 +373,8 @@ describe("the wide run detail drawer", () => {
     );
     const view = renderWide();
 
-    expect(screen.getByTestId("judge-pending")).toHaveTextContent(
-      "The judge has not run yet.",
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "The conversation is running",
     );
     expect(screen.getByText("I want my money back")).toBeInTheDocument();
 
@@ -395,7 +395,7 @@ describe("the wide run detail drawer", () => {
     );
 
     expect(screen.getByText("Let me check the order")).toBeInTheDocument();
-    expect(screen.getByTestId("judge-pending")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */
@@ -410,8 +410,43 @@ describe("the wide run detail drawer", () => {
     );
     renderWide();
 
-    expect(screen.getByTestId("judge-pending")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
     expect(screen.queryByText("0/0")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A finished conversation with no verdict yet says the judge is reading it" */
+  it("reads that the judge is reading the conversation until the verdict lands", () => {
+    setRunState(
+      makeRunState({
+        // The terminal status is stamped before the verdict is written.
+        status: ScenarioRunStatus.SUCCESS,
+        results: { verdict: null, metCriteria: [], unmetCriteria: [] },
+      }),
+    );
+    const view = renderWide();
+
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "The judge is reading the conversation",
+    );
+
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.SUCCESS,
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: ["stays polite"],
+          unmetCriteria: [],
+        },
+      }),
+    );
+    view.rerender(
+      <ChakraProvider value={defaultSystem}>
+        <AgentTestingRunDrawer open />
+      </ChakraProvider>,
+    );
+
+    expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
   });
 
   /** @scenario "The criteria appear the moment the run settles" */

@@ -28,9 +28,16 @@ import {
   SECRET_VALUE_MASK,
 } from "~/components/simulations/ScenarioRunDetailDrawer";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
-import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  isTerminalStatus,
+  ScenarioRunStatus,
+} from "~/server/scenarios/scenario-event.enums";
 import { orderVerdicts, RunVerdictPanel } from "./RunVerdictPanel";
-import { hasCriteria, type RunDetail } from "./useRunDrawerState";
+import {
+  hasCriteria,
+  type RunDetail,
+  type RunScenarioState,
+} from "./useRunDrawerState";
 
 /** How wide the results read beside the conversation. */
 const RESULTS_COLUMN_WIDTH = "310px";
@@ -101,6 +108,53 @@ function ConversationBox({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** What the results column says while a run has not reached a verdict. */
+const CONVERSATION_RUNNING_MESSAGE = "The conversation is running…";
+const JUDGE_READING_MESSAGE = "The judge is reading the conversation…";
+
+/**
+ * The statuses a run reaches once the judge has spoken. The verdict itself is
+ * written separately, so a run can carry one of these for a moment before its
+ * criteria arrive; the drawer rereads the run over that moment.
+ */
+const JUDGED_STATUSES = new Set<string>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+]);
+
+/**
+ * What the run is still doing, while it has no verdict to show.
+ *
+ * The conversation runs first and the judge reads it afterwards, so the status
+ * of the run is what separates the two: the judge speaks only once the run has
+ * finished, and a finished run whose criteria have not landed yet is one the
+ * judge has just read.
+ */
+function pendingMessageFor(scenarioState: RunScenarioState): string | null {
+  if (hasCriteria(scenarioState) || scenarioState.results?.error) return null;
+  if (!isTerminalStatus(scenarioState.status)) {
+    return CONVERSATION_RUNNING_MESSAGE;
+  }
+  return JUDGED_STATUSES.has(scenarioState.status)
+    ? JUDGE_READING_MESSAGE
+    : null;
+}
+
+/**
+ * What the run is doing, where its results will be. It reads as one quiet line
+ * rather than an empty column, so a live run says what it is waiting on.
+ */
+function PendingVerdictLine({ message }: { message: string }) {
+  return (
+    <HStack align="start" gap={2} data-testid="run-verdict-pending">
+      <Spinner size="xs" color="blue.solid" flexShrink={0} marginTop="1px" />
+      <Text fontSize="12px" color="fg.muted">
+        {message}
+      </Text>
+    </HStack>
+  );
+}
+
 /** The verdict of the judge, once it has one. */
 function ResultsSection({
   detail,
@@ -112,11 +166,10 @@ function ResultsSection({
   const { scenarioState } = detail;
   if (!scenarioState) return null;
 
-  // A run that has not settled has no verdict, whatever its stored results
-  // hold. Drawing the criteria then reads "0 of 0 met", which says the judge
-  // failed every criterion rather than that it has not spoken yet.
-  const isJudgePending =
-    !isTerminalStatus(scenarioState.status) && !hasCriteria(scenarioState);
+  // A run without a verdict has nothing to score. Drawing the criteria then
+  // reads "0 of 0 met", which says the judge failed every criterion rather
+  // than that it has not spoken yet.
+  const pendingMessage = pendingMessageFor(scenarioState);
 
   return (
     <Box
@@ -125,17 +178,8 @@ function ResultsSection({
       borderTopWidth={isFirst ? "0" : "1px"}
       borderColor="border.muted"
     >
-      {isJudgePending ? (
-        <VStack
-          align="center"
-          gap={2}
-          paddingY={8}
-          color="fg.muted"
-          data-testid="judge-pending"
-        >
-          <Spinner size="xs" />
-          <Text fontSize="sm">The judge has not run yet.</Text>
-        </VStack>
+      {pendingMessage ? (
+        <PendingVerdictLine message={pendingMessage} />
       ) : (
         <RunVerdictPanel
           verdicts={orderVerdicts({

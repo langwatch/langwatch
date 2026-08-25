@@ -103,8 +103,15 @@ Feature: The wide run detail drawer
     Given a running run open in the wide drawer
     When messages arrive
     Then the conversation grows on the left
-    And the results side reads that the judge has not run yet
+    And the results side reads "The conversation is running…" beside a spinner
     And it never reads a score of 0 out of 0
+
+  @integration
+  Scenario: A finished conversation with no verdict yet says the judge is reading it
+    Given a run open in the wide drawer whose conversation has ended
+    When the verdict has not been written yet
+    Then the results side reads "The judge is reading the conversation…" beside a spinner
+    And the criteria replace that line as soon as the verdict lands
 
   @integration
   Scenario: The criteria appear the moment the run settles

@@ -456,7 +456,7 @@ describe("the live one-off run in the drawer", () => {
   /** @scenario "The judge verdict appears after the conversation ends" */
   it("shows the verdict, each rubric, the duration and the cost when the judge finishes", () => {
     const view = renderDrawer();
-    expect(screen.getByTestId("judge-pending")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
 
     mockGetRunState.mockReturnValue({
       data: makeRunState({
@@ -477,7 +477,7 @@ describe("the live one-off run in the drawer", () => {
       </ChakraProvider>,
     );
 
-    expect(screen.queryByTestId("judge-pending")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
     expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/offers the refund/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("6.3s").length).toBeGreaterThan(0);

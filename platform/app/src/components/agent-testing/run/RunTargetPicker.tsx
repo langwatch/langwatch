@@ -11,7 +11,7 @@ import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 
 const AGENT_ICONS = {
   http: Globe,
@@ -149,6 +149,7 @@ export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
       <VStack
         as="button"
         cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
         justify="center"
         gap={1}
         height={AGENT_CARD_HEIGHT}

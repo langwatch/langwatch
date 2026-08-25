@@ -89,6 +89,13 @@ Feature: The run dialog
   # --- The parameter block ---
 
   @integration
+  Scenario: The quiet controls of the dialog are drawn flat
+    Given the run dialog in rows mode with one row
+    When "Add parameter", the row remove control, the row lock and the block remove control are read
+    Then none of them carries a shadow
+    And only the actions at the foot of the dialog are lifted
+
+  @integration
   Scenario: The parameter block offers a secret parameters toggle
     Given the run dialog with parameter overrides added
     When the top line of the block is read

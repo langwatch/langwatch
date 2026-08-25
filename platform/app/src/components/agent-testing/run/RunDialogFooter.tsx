@@ -11,7 +11,7 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { RunDialogController } from "./useRunDialogSubmit";
 
@@ -55,6 +55,7 @@ export function RunDialogFooter({
         fontWeight="medium"
         color={FG_MUTED}
         cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
         _hover={{ background: "bg.muted", color: "fg" }}
         _disabled={{ cursor: "not-allowed", opacity: 0.5 }}
       >

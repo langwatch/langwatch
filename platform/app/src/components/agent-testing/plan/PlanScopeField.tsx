@@ -16,7 +16,7 @@ import { PICKER_UNFILED_GROUP_NAME } from "~/components/suites/ScenarioPicker";
 import { Checkbox } from "~/components/ui/checkbox";
 import { TagPill } from "~/components/ui/TagPill";
 import type { SuiteScopeMode } from "~/server/suites/scope";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
 const SCOPE_CHOICES: { mode: SuiteScopeMode; label: string }[] = [
@@ -137,6 +137,7 @@ function LabelChoices({ editor }: { editor: PlanEditorState }) {
           type="button"
           cursor="pointer"
           borderRadius="full"
+          boxShadow={QUIET_BUTTON_SHADOW}
           opacity={chosen.includes(label) ? 1 : 0.4}
           _hover={{ opacity: chosen.includes(label) ? 1 : 0.7 }}
           aria-pressed={chosen.includes(label)}

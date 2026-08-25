@@ -55,10 +55,22 @@ export function orderVerdicts({
     .map((entry) => entry.verdict);
 }
 
+/** How tall the heading reads: the box both the icon and the capitals fill. */
+const HEADING_LINE_HEIGHT = "14px";
+
 /**
- * One heading of the panel. The icon sits in a box of its own with no line
- * height, so it centers on the capitals beside it rather than on the taller
- * line box of the text.
+ * The rhythm of the panel. The judge reasoning is a section of its own, so the
+ * space over its heading is the widest of the panel and the space under its
+ * paragraph is narrower than that.
+ */
+const SPACE_ABOVE_CRITERIA = 3.5;
+const SPACE_BELOW_CRITERIA = 6;
+const SPACE_BELOW_REASONING = 3.5;
+
+/**
+ * One heading of the panel. The icon and the capitals beside it share one line
+ * box of a fixed height, so both center on the same middle rather than each on
+ * a box of its own size.
  */
 function PanelHeading({
   children,
@@ -78,11 +90,23 @@ function PanelHeading({
       color={FG_MUTED}
     >
       {icon ? (
-        <Box as="span" display="flex" lineHeight={0} flexShrink={0}>
+        <Box
+          as="span"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          height={HEADING_LINE_HEIGHT}
+          lineHeight={0}
+          flexShrink={0}
+          // The capitals sit a little over the middle of the line box they
+          // fill, so the icon is lifted by the same amount and the two read as
+          // one line rather than as an icon that hangs under the word.
+          marginTop="-2px"
+        >
           {icon}
         </Box>
       ) : null}
-      <Text as="span" lineHeight="1">
+      <Text as="span" lineHeight={HEADING_LINE_HEIGHT}>
         {children}
       </Text>
     </HStack>
@@ -125,9 +149,8 @@ export function RunVerdictPanel({
   /** Why the run never reached a verdict, when that is what happened. */
   error?: string | null;
 }) {
-  return (
-    <VStack align="stretch" gap={2.5} data-testid="run-verdict-panel">
-      <PanelHeading icon={<Scale size={11} />}>Results</PanelHeading>
+  const body = (
+    <VStack align="stretch" gap={2.5} marginTop={SPACE_ABOVE_CRITERIA}>
       {error ? (
         <Text
           fontSize="11.5px"
@@ -138,19 +161,30 @@ export function RunVerdictPanel({
           {error}
         </Text>
       ) : null}
-      {verdicts.length > 0 ? (
-        <VStack align="stretch" gap={2.5}>
-          {verdicts.map((verdict, at) => (
+      {verdicts.length > 0
+        ? verdicts.map((verdict, at) => (
             <VerdictRow key={`${verdict.criterion}-${at}`} verdict={verdict} />
-          ))}
-        </VStack>
-      ) : error ? null : (
+          ))
+        : null}
+      {verdicts.length === 0 && !error ? (
         <Text fontSize="12px" color={FG_MUTED}>
           The judge scored no criteria for this run.
         </Text>
-      )}
+      ) : null}
+    </VStack>
+  );
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      paddingBottom={SPACE_BELOW_REASONING}
+      data-testid="run-verdict-panel"
+    >
+      <PanelHeading icon={<Scale size={13} />}>Results</PanelHeading>
+      {body}
       {reasoning ? (
-        <VStack align="stretch" gap={1.5} paddingTop={0.5}>
+        <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text
             fontSize="11.5px"

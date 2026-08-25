@@ -164,8 +164,9 @@ Feature: The Results tab
   Scenario: The results header holds the run and the actions on one line
     Given a run plan is open
     When the top of the results is read
-    Then the number of the selected run, how long ago it ran and its note read on the left
-    And the pass summary, the view toggle and the actions of the plan read on the right
+    Then the number of the selected run, its pass summary and its note read on the left, in that order
+    And how long ago it ran reads on the right, before the view toggle
+    And the view toggle and the actions of the plan read after it
     And they are all on the same line
     And the back control stays in the sidebar
 
