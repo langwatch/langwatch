@@ -165,6 +165,59 @@ Feature: Proving a domain by publishing a record
     Then it proves the domain only if one of them is the token it minted
     And comparing them leaks nothing about how nearly a value matched
 
+  # ── The file channel ───────────────────────────────────────────────────
+  # The same minted token, satisfiable a second way: served as the entire
+  # body of a plain-text file at the well-known https path. For the customer
+  # whose DNS is a ticket away but whose web server is not. One ceremony,
+  # one token, two channels — and the verified fact records which channel
+  # actually proved it, so the re-proof sweep re-reads the evidence where it
+  # lives.
+
+  @integration
+  Scenario: The administrator is offered the file channel beside the record
+    Given "acme"'s claim on "acme.com" is approved
+    When "ana" asks for the record to publish
+    Then she is also given the well-known path and the https address to serve
+      the same value at
+
+  @integration
+  Scenario: Serving the file proves the domain through the same ceremony
+    Given "ana" serves the value she was given at the well-known address on "acme.com"
+    When she asks LangWatch to check for the file
+    Then the file is fetched from exactly the address she was shown
+    And the domain is proved, and the claim decided, by that one act
+    And the proved fact names the served file as what proved it
+
+  @integration
+  Scenario: A file that is not served yet is not a failed proof
+    Given nothing is served at the well-known address on "acme.com"
+    When "ana" asks LangWatch to check for the file
+    Then it is refused with the code "sso_domain_file_not_found"
+    And no fact is recorded, and the record channel is exactly where it was
+    And the words say to serve the file and check again
+
+  @integration
+  Scenario: A fetch that could not happen says so, and blames nobody
+    Given fetching the file from "acme.com" fails rather than answering
+    When "ana" asks LangWatch to check for the file
+    Then it is refused with the code "sso_domain_fetch_failed", not with "sso_domain_file_not_found"
+    And no fact is recorded
+    And the words say to try again, and do not tell her to re-deploy the file
+
+  @unit
+  Scenario: A token read off https proves nothing
+    Given "acme.com" redirects the well-known address onto plain http
+    When LangWatch fetches the file
+    Then the answer is "we could not read it", never a proof
+    And a clean not-found stays the one answer that means the file is missing
+
+  @integration
+  Scenario: One token satisfies either channel
+    Given "ana" was given one value for "acme.com"
+    When she publishes it as the record instead of serving the file
+    Then the record check proves the domain
+    And the proved fact names the published record, not the file
+
   # ── Expiry and re-proof ────────────────────────────────────────────────
 
   @integration
@@ -318,6 +371,19 @@ Feature: Proving a domain by publishing a record
     Then she is emailed what to publish, where it goes, and the deadline
     And the mail carries no token value, because we keep only its fingerprint
     And a second mail at the deadline says what stopped and says existing members are unaffected
+
+  @integration
+  Scenario: A domain the file proved is re-read at its file, not at DNS
+    Given "acme.com" was proved by serving the verification file
+    When the sweep re-reads it and the file is still served
+    Then the file was fetched from its well-known address and DNS was never asked
+    And the connection's history is exactly as long as it was
+
+  @integration
+  Scenario: A file that has gone missing starts the same clock a missing record does
+    Given "acme.com" was proved by serving the verification file
+    When the sweep finds the well-known address answering without our token
+    Then the proof on "acme.com" is wavering, with the same deadline a missing record earns
 
   # ── Somebody else got there first ──────────────────────────────────────
 

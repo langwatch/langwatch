@@ -314,6 +314,7 @@ describe("how many identity providers an organization may register", () => {
         }),
       },
       proofs: { lookupTxtValues: async () => ({ outcome: "absent" }) },
+      files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
       license: { currentLicenseKey: async () => null },
       credentials: new InMemoryCredentials(),
       discovery: reachable,

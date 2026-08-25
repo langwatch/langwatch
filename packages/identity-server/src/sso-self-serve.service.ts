@@ -17,10 +17,14 @@ import {
   SsoActivationDomainUnprovedError,
   SsoActivationTestSignInMissingError,
   SsoConnectionAlreadyRegisteredError,
+  SSO_VERIFICATION_FILE_PATH,
   SsoDomainClaimPendingError,
+  SsoDomainFetchFailedError,
+  SsoDomainFileNotFoundError,
   SsoDomainLookupFailedError,
   SsoDomainProofNotFoundError,
   ssoDnsRecordName,
+  ssoVerificationFileUrl,
   SsoLicenseRequiredError,
   SsoSelfServeUnavailableError,
   ssoSelfServeAvailability,
@@ -111,6 +115,35 @@ export interface SsoDomainProofLookup {
     domain: string;
     name: string;
   }): Promise<SsoDomainTxtLookup>;
+}
+
+/**
+ * What a fetch of the verification file found — the published proof's second
+ * channel, with the TXT lookup's three answers and for the same reason.
+ *
+ * "Nothing is served there" (a clean not-found) is a fact about the
+ * customer's web server and something they can act on; a connection that was
+ * refused, timed out, or answered with a server error has told us nothing,
+ * and reporting it as an absent file would send an administrator to re-deploy
+ * a file that is already there. `values` is every non-empty line of the
+ * body, so a file holding the token plus a trailing newline still matches.
+ */
+export type SsoDomainFileFetch =
+  /** The path answered, and these are the lines it served. */
+  | { outcome: "served"; values: string[] }
+  /** The domain answered plainly that nothing is at the path. */
+  | { outcome: "absent" }
+  /** The fetch itself failed. This says nothing about the domain. */
+  | { outcome: "unreachable"; reason: string };
+
+/** Reading the verification file a customer serves. `url` is passed rather
+ *  than composed here so the one place that decides where the file lives is
+ *  the identity vocabulary, not each adapter. */
+export interface SsoDomainFileLookup {
+  fetchVerificationFile(args: {
+    domain: string;
+    url: string;
+  }): Promise<SsoDomainFileFetch>;
 }
 
 /** The evidence a self-hosted installation's licence is. Never the licence
@@ -255,6 +288,18 @@ export interface SelfServeDnsRecordLocation {
   /** The whole name: `_langwatch-verification.acme.com`. */
   name: string;
   type: typeof SSO_DNS_RECORD_TYPE;
+  /**
+   * The same token's second channel: serve it as the entire body of a
+   * plain-text file at this address instead of publishing the record — for
+   * the customer whose DNS is a ticket away but whose web server is not.
+   * Either channel satisfies the one outstanding ceremony.
+   */
+  file: {
+    /** The path, relative to the domain: `/.well-known/…`. */
+    path: string;
+    /** The whole address the check fetches. */
+    url: string;
+  };
 }
 
 /** The record as the setup surface renders it while one is outstanding. */
@@ -356,6 +401,8 @@ export interface SsoSelfServeServiceDeps {
   reads: SsoConnectionReadRepository;
   context: SsoSelfServeContextPort;
   proofs: SsoDomainProofLookup;
+  /** The published proof's second channel: the file the domain serves. */
+  files: SsoDomainFileLookup;
   license: SsoLicenseProofPort;
   /** Where a client secret or a SAML document goes, so the command can carry
    *  a reference to it instead (D09). */
@@ -938,6 +985,70 @@ export class SsoSelfServeService {
     await this.deps.connections().verifyDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain: normalized,
+      channel: "dns-txt",
+    });
+    return { proved: true };
+  }
+
+  /**
+   * Look for the file on the domain — the same ceremony's other channel.
+   *
+   * The one outstanding token satisfies either way: as the record above, or
+   * as the body of a file the domain serves at the well-known path. Serving
+   * it demonstrates the same thing publishing it does — control of the
+   * domain — so a match runs the same guard with the channel named, and the
+   * verified fact records where the evidence actually lives. That is what
+   * lets the re-proof sweep re-read a file-proved domain's file rather than
+   * hunting for a record nobody published.
+   *
+   * The three answers mirror the record check's, code for code: found is a
+   * proof, a clean not-found is the customer's next step said in file words,
+   * and a fetch that failed is not a verification failure at all — the
+   * ceremony is untouched and the same button works a minute later.
+   */
+  async checkDomainFile({
+    organizationId,
+    connectionId,
+    domain,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    domain: string;
+    actor: SelfServeActor;
+  }): Promise<{ proved: true }> {
+    await this.requireAvailable({ organizationId });
+    const state = await this.requireConnection({ connectionId });
+    const normalized = normalizeDomain(domain);
+    const pending = state.pendingVerification;
+    if (!pending || pending.domain !== normalized) {
+      throw new SsoDomainProofNotFoundError(
+        `connection ${connectionId}: no record is outstanding for ${normalized}`,
+      );
+    }
+    const url = ssoVerificationFileUrl({ domain: normalized });
+    const fetched = await this.deps.files.fetchVerificationFile({
+      domain: normalized,
+      url,
+    });
+    if (fetched.outcome === "unreachable") {
+      throw new SsoDomainFetchFailedError(
+        `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
+      );
+    }
+    const served = fetched.outcome === "served" ? fetched.values : [];
+    const matched = served.some((value) =>
+      safeEqual(`sha256:${sha256Hex(value.trim())}`, pending.tokenHash),
+    );
+    if (!matched) {
+      throw new SsoDomainFileNotFoundError(
+        `connection ${connectionId}: no matching file is served at ${url}`,
+      );
+    }
+    await this.deps.connections().verifyDomain({
+      ...this.command({ organizationId, connectionId, actor }),
+      domain: normalized,
+      channel: "https-file",
     });
     return { proved: true };
   }
@@ -1083,6 +1194,10 @@ function recordLocationFor({
     label: SSO_DNS_RECORD_NAME,
     name: ssoDnsRecordName({ domain }),
     type: SSO_DNS_RECORD_TYPE,
+    file: {
+      path: SSO_VERIFICATION_FILE_PATH,
+      url: ssoVerificationFileUrl({ domain }),
+    },
   };
 }
 

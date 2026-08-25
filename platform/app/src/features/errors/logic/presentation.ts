@@ -2126,6 +2126,19 @@ const presentations = {
     describe: () =>
       "Publish the record shown here on your domain, then check again. Changes to DNS can take a while to reach us.",
   },
+  sso_domain_file_not_found: {
+    title: "We couldn't find that file yet",
+    describe: () =>
+      "Serve the value shown here as a plain-text file at the well-known address, then check again.",
+  },
+  sso_domain_fetch_failed: {
+    // Deliberately not the words above: we did not look and find nothing —
+    // we could not read the file at all. The domain may be mid-deploy or
+    // refusing us, so the only true instruction is to try again.
+    title: "We couldn't reach that file just now",
+    describe: () =>
+      "Fetching the file from your domain didn't work this time. Nothing about your setup changed — check the address is served over https and try again in a few minutes.",
+  },
   sso_domain_lookup_failed: {
     // Deliberately NOT the words above. We did not look and find nothing —
     // we could not look, so "publish it and check again" would send an

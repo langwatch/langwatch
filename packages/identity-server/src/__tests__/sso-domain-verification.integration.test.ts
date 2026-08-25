@@ -11,6 +11,8 @@ import type { SsoConnectionLedger } from "../sso-connection-ledger";
 import { SsoConnectionService } from "../sso-connection.service";
 import type {
   SelfServeIssuedDnsRecord,
+  SsoDomainFileFetch,
+  SsoDomainFileLookup,
   SsoDomainProofLookup,
   SsoDomainTxtLookup,
   SsoLicenseProofPort,
@@ -118,8 +120,31 @@ class StubProofs implements SsoDomainProofLookup {
   }
 }
 
+/** The fetch seam — the published proof's other channel, same three answers. */
+class StubFiles implements SsoDomainFileLookup {
+  served: string[] = [];
+  unreachable: string | null = null;
+  asked: { domain: string; url: string }[] = [];
+
+  async fetchVerificationFile({
+    domain,
+    url,
+  }: {
+    domain: string;
+    url: string;
+  }): Promise<SsoDomainFileFetch> {
+    this.asked.push({ domain, url });
+    if (this.unreachable !== null) {
+      return { outcome: "unreachable", reason: this.unreachable };
+    }
+    if (this.served.length === 0) return { outcome: "absent" };
+    return { outcome: "served", values: this.served };
+  }
+}
+
 let connections: InMemoryConnections;
 let proofs: StubProofs;
+let files: StubFiles;
 let committed: {
   command: SsoConnectionCommand;
   facts: SsoConnectionFactInput[];
@@ -131,6 +156,7 @@ let selfServe: SsoSelfServeService;
 beforeEach(() => {
   connections = new InMemoryConnections();
   proofs = new StubProofs();
+  files = new StubFiles();
   committed = [];
   clock = T0;
   CONNECTION = "ssoc_acme";
@@ -163,6 +189,7 @@ beforeEach(() => {
     reads: connections,
     context: new StubContext(),
     proofs,
+    files,
     license: new StubLicenseProof(),
     credentials: new StubCredentials(),
     discovery: new StubDiscovery(),
@@ -452,6 +479,115 @@ describe("proving a domain by publishing a record", () => {
         expect(refusal.message).not.toContain(OTHER_ORG);
         expect(refusal.message).not.toContain("user_first");
         expect((await held())?.verifiedDomains).toEqual([]);
+      });
+    });
+  });
+});
+
+/**
+ * The same ceremony's other channel (the well-known file). One token is
+ * minted; serving it at the well-known path proves exactly what publishing
+ * it as a record proves, and the fact records which channel actually did.
+ */
+describe("proving a domain by serving the file", () => {
+  const checkFile = () =>
+    selfServe.checkDomainFile({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.com",
+      actor: ANA,
+    });
+
+  describe("given a record has been issued for a claim nobody has decided", () => {
+    /** @scenario "The administrator is offered the file channel beside the record" */
+    it("names the well-known path and address beside the record it issued", async () => {
+      const issued = await issuedRecord();
+
+      expect(issued.file).toEqual({
+        path: "/.well-known/langwatch-verification.txt",
+        url: "https://acme.com/.well-known/langwatch-verification.txt",
+      });
+      const view = await selfServe.getSetup({ organizationId: ORG });
+      expect(view.record?.file).toEqual(issued.file);
+    });
+
+    describe("when the file is served and checked", () => {
+      /** @scenario "Serving the file proves the domain through the same ceremony" */
+      it("fetches the address it asked for, then states the proved fact with the file as its method", async () => {
+        const issued = await issuedRecord();
+        // Whitespace survives a copy-paste into most editors, so a served
+        // line is trimmed before it is compared.
+        files.served = [` ${issued.value} `];
+        const before = recorded().length;
+
+        await checkFile();
+
+        expect(files.asked).toEqual([
+          {
+            domain: "acme.com",
+            url: "https://acme.com/.well-known/langwatch-verification.txt",
+          },
+        ]);
+        const state = await held();
+        expect(state?.state).toBe("VERIFIED");
+        expect(state?.verifiedDomains).toEqual(["acme.com"]);
+        // The file decides the claim exactly as the record does — it is the
+        // same published evidence — and the verified fact names the channel
+        // that actually proved it, so the re-proof sweep re-reads the file
+        // rather than hunting for a record nobody published.
+        expect(recorded().slice(before)).toEqual([
+          "domain_claim_approved",
+          "domain_verified",
+        ]);
+        expect(state?.domainVerifications).toEqual([
+          expect.objectContaining({ domain: "acme.com", method: "https-file" }),
+        ]);
+      });
+    });
+
+    describe("when the file is not served yet", () => {
+      /** @scenario "A file that is not served yet is not a failed proof" */
+      it("refuses with the file's own code and leaves the ceremony exactly where it was", async () => {
+        await issuedRecord();
+        const before = recorded().length;
+
+        const refusal = await refusalFrom(checkFile());
+
+        expect(refusal.code).toBe("sso_domain_file_not_found");
+        expect(recorded().slice(before)).toEqual([]);
+        // The record is untouched: the same token still satisfies either
+        // channel, so nothing was reissued and nothing expired.
+        const view = await selfServe.getSetup({ organizationId: ORG });
+        expect(view.record?.expired).toBe(false);
+      });
+    });
+
+    describe("when the fetch itself cannot be answered", () => {
+      /** @scenario "A fetch that could not happen says so, and blames nobody" */
+      it("refuses with its own code rather than as a missing file, and records nothing", async () => {
+        await issuedRecord();
+        files.unreachable = "connect_timeout";
+        const before = recorded().length;
+
+        const refusal = await refusalFrom(checkFile());
+
+        expect(refusal.code).toBe("sso_domain_fetch_failed");
+        expect(recorded().slice(before)).toEqual([]);
+      });
+    });
+
+    describe("when the record channel is used after the file was offered", () => {
+      /** @scenario "One token satisfies either channel" */
+      it("still proves through the record, recorded as the record", async () => {
+        const issued = await issuedRecord();
+        proofs.published = [issued.value];
+
+        await check();
+
+        const state = await held();
+        expect(state?.domainVerifications).toEqual([
+          expect.objectContaining({ domain: "acme.com", method: "dns-txt" }),
+        ]);
       });
     });
   });

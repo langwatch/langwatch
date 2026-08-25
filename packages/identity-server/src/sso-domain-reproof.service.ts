@@ -2,11 +2,16 @@ import {
   normalizeDomain,
   SSO_DNS_REPROOF_GRACE_MS,
   ssoDnsRecordName,
+  type SsoPublishedProofChannel,
+  ssoVerificationFileUrl,
 } from "@langwatch/identity";
 import { safeEqual, sha256Hex } from "./crypto/pkce";
 import { newSsoConnectionCommandId } from "./sso-connection-id";
 import type { SsoConnectionService } from "./sso-connection.service";
-import type { SsoDomainProofLookup } from "./sso-self-serve.service";
+import type {
+  SsoDomainFileLookup,
+  SsoDomainProofLookup,
+} from "./sso-self-serve.service";
 
 /**
  * Re-reading the records that prove domains (ADR-123).
@@ -29,10 +34,13 @@ import type { SsoDomainProofLookup } from "./sso-self-serve.service";
  *   the guards, which answer no facts when the world already says what the
  *   check found. Sweeping every few hours therefore costs a healthy
  *   connection exactly zero events, forever.
- * - ONLY RECORDS ARE RE-READ. A domain an operator attested, a licence
- *   proved or the grandfather migration carried over has no TXT record to be
- *   missing, so it is never asked about — and the guard refuses the command
- *   anyway if a caller gets that wrong.
+ * - ONLY PUBLISHED PROOFS ARE RE-READ. A domain an operator attested, a
+ *   licence proved or the grandfather migration carried over has no record
+ *   and no file to be missing, so it is never asked about — and the guard
+ *   refuses the command anyway if a caller gets that wrong. The two
+ *   published channels are each re-read where their evidence lives: a
+ *   record-proved domain's TXT name, a file-proved domain's well-known
+ *   address.
  */
 
 /** One domain to re-read, and the connection whose history will carry the
@@ -45,6 +53,13 @@ export interface SsoDomainReproofTarget {
    *  against it, which is what makes a re-read verification rather than "is
    *  anything at all published at our name". */
   tokenHash: string;
+  /**
+   * Which channel proved the domain — the verified fact's own answer — and
+   * therefore where the sweep re-reads: a record-proved domain's TXT name,
+   * a file-proved domain's well-known address. Asking DNS about a domain
+   * whose evidence is a file would find nothing and lapse it.
+   */
+  method: SsoPublishedProofChannel;
 }
 
 /**
@@ -97,6 +112,8 @@ export interface SsoDomainReproofServiceDeps {
   connections: () => SsoConnectionService;
   targets: SsoDomainReproofTargetRepository;
   proofs: SsoDomainProofLookup;
+  /** The file channel's re-read, for domains the file proved. */
+  files: SsoDomainFileLookup;
   notifier: SsoDomainReproofNotifier;
   /** How long a domain keeps vouching after its record goes missing. Passed
    *  in rather than read here, so the window is one composed constant. */
@@ -157,10 +174,19 @@ export class SsoDomainReproofService {
     outcome: SsoDomainReproofOutcome;
   }): Promise<void> {
     const domain = normalizeDomain(target.domain);
-    const lookup = await this.deps.proofs.lookupTxtValues({
-      domain,
-      name: ssoDnsRecordName({ domain }),
-    });
+    // The evidence is re-read where the verified fact says it lives: the
+    // TXT name for a record-proved domain, the well-known address for a
+    // file-proved one. Both answer in the same three outcomes.
+    const lookup =
+      target.method === "https-file"
+        ? await this.deps.files.fetchVerificationFile({
+            domain,
+            url: ssoVerificationFileUrl({ domain }),
+          })
+        : await this.deps.proofs.lookupTxtValues({
+            domain,
+            name: ssoDnsRecordName({ domain }),
+          });
     outcome.checked += 1;
     // The neutral answer, and the only one with no verb. Counted so an
     // operator can see a resolver having a bad day, and acted on in no other
@@ -170,7 +196,7 @@ export class SsoDomainReproofService {
       return;
     }
     const facts =
-      lookup.outcome === "published" &&
+      lookup.outcome !== "absent" &&
       matchesToken({ tokenHash: target.tokenHash, values: lookup.values })
         ? await this.deps
             .connections()

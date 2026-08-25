@@ -1,7 +1,9 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
+import { ArrowRight } from "lucide-react";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
+import { Link } from "../../ui/link";
 import { reportRefusal } from "./refusals";
 
 /**
@@ -43,10 +45,22 @@ export function GoLiveSection({
 
   if (goLive.activated) {
     return (
-      <Text color="fg.muted" fontSize="sm">
-        This connection is on. The banner at the top of the page says whether
-        sign-in is being decided by it yet.
-      </Text>
+      <VStack align="start" gap={3}>
+        <Text color="fg.muted" fontSize="sm">
+          This connection is on. The banner at the top of the page says whether
+          sign-in is being decided by it yet.
+        </Text>
+        <Text color="fg.muted" fontSize="sm">
+          Next, your identity provider can create and remove accounts here as
+          people join and leave — set that up in Directory.
+        </Text>
+        <Link href="/settings/directory">
+          <Button size="sm" variant="outline">
+            Set up provisioning
+            <ArrowRight size={14} />
+          </Button>
+        </Link>
+      </VStack>
     );
   }
 

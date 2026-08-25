@@ -152,6 +152,7 @@ import {
   DnsDomainProofLookup,
   EmailSsoDomainReproofNotifier,
   FeatureFlagSsoRoutingLookup,
+  HttpsDomainProofFileLookup,
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   LoggingBreakGlassWarningNotifier,
@@ -582,6 +583,7 @@ export function ssoSelfServe(): SsoSelfServeService {
       licenseProof,
     }),
     proofs: new DnsDomainProofLookup(),
+    files: new HttpsDomainProofFileLookup(),
     license: licenseProof,
     credentials: ssoCredentials,
     discovery: new HttpSsoIssuerDiscovery(),
@@ -611,6 +613,7 @@ export function ssoDomainReproof(): SsoDomainReproofService {
     connections: ssoConnections,
     targets: new PrismaSsoDomainReproofTargets(prisma),
     proofs: new DnsDomainProofLookup(),
+    files: new HttpsDomainProofFileLookup(),
     notifier: new EmailSsoDomainReproofNotifier(prisma),
     graceMs: SSO_DNS_REPROOF_GRACE_MS,
   });

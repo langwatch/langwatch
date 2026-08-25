@@ -240,6 +240,8 @@ export {
   SsoDomainClaimPendingError,
   SsoDomainClaimThrottledError,
   SsoDomainNotEligibleError,
+  SsoDomainFetchFailedError,
+  SsoDomainFileNotFoundError,
   SsoDomainLookupFailedError,
   SsoDomainProofExpiredError,
   SsoDomainProofNotFoundError,

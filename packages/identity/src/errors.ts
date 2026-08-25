@@ -516,6 +516,41 @@ export class SsoDomainLookupFailedError extends SsoConnectionCommandRefusedError
   }
 }
 
+/** The verification file is not being served at the well-known path yet —
+ *  the domain answered, and what it answered was not the token. Its own code
+ *  rather than the record's, because the remedy is different words: put the
+ *  file at the path, not publish a record and wait for DNS. */
+export class SsoDomainFileNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_file_not_found", "sso_domain_file_not_found", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainFileNotFoundError";
+  }
+}
+
+/**
+ * We could not FETCH the file at all — the domain did not answer, refused
+ * the connection, or answered with a server error. The same distinction the
+ * DNS pair draws, for the same reason: "we looked and it is not there" and
+ * "we could not look" have different next steps, and only the first one is
+ * the customer's. Stated as the customer's server being unreachable rather
+ * than as our failure, but with the try-again copy, because a deploy mid-
+ * flight and a hiccup of ours read identically from here.
+ */
+export class SsoDomainFetchFailedError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_fetch_failed", "sso_domain_fetch_failed", {
+      httpStatus: 503,
+      fault: "provider",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainFetchFailedError";
+  }
+}
+
 /**
  * The record was found and has passed its expiry, so it proves nothing. The
  * way forward costs no progress: asking again issues a fresh record against
