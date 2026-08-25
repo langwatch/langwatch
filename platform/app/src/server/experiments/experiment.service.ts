@@ -50,6 +50,12 @@ export interface WorkbenchStateView {
   state: PersistedEvaluationsV3State | null;
   version: number;
   updatedAt: Date;
+  /**
+   * Who wrote this version — "user", "langy" or "api". Absent for an
+   * experiment saved before versions were recorded, which is why a reader of
+   * this field says nothing rather than guessing.
+   */
+  actorLabel?: WorkbenchActorLabel;
 }
 
 export interface WorkbenchSaveResult {
@@ -502,6 +508,12 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
+    const actorLabel = await this.authorOfVersion({
+      projectId,
+      experimentId: row.id,
+      version: row.workbenchVersion,
+    });
+
     return {
       experimentId: row.id,
       slug: row.slug,
@@ -509,7 +521,44 @@ export class ExperimentService {
       state: (row.workbenchState as PersistedEvaluationsV3State | null) ?? null,
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
+      ...(actorLabel ? { actorLabel } : {}),
     };
+  }
+
+  /**
+   * Who wrote a given workbench version, when a version row says so.
+   *
+   * The reader is told a change came from "somewhere else" only because the
+   * page had no one to name. A change Langy made in the reader's own tab must
+   * read as Langy's, so both the version probe and a refused save carry this.
+   *
+   * The newest version row names the version asked about only when the two
+   * numbers agree. A workflow evaluation moves the counter without writing a
+   * row, so the newest row can describe an older version, and naming its
+   * author would credit a person for a write the platform made. No match means
+   * no name, which reads as "somewhere else" and is the honest answer.
+   */
+  private async authorOfVersion(
+    {
+      projectId,
+      experimentId,
+      version,
+    }: {
+      projectId: string;
+      experimentId: string;
+      version: number;
+    },
+    // On the refusal path this runs inside the save's own transaction, so it
+    // reads on that connection rather than borrowing a second one from the pool
+    // while the first is held open.
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<WorkbenchActorLabel | undefined> {
+    const [latest] = await this.repository.findVersions(
+      { projectId, experimentId, take: 1 },
+      options,
+    );
+    if (!latest || latest.version !== version) return undefined;
+    return latest.authorLabel as WorkbenchActorLabel;
   }
 
   /**
@@ -621,16 +670,37 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
-    const stale = new StaleWorkbenchStateError({
-      currentVersion: row.workbenchVersion,
-    });
+    // The version the caller is told to reload to is read again, not taken
+    // from `row` above. A refusal after the compare-and-set means a write
+    // committed between the two, and at READ COMMITTED that write is visible
+    // here: reporting the version read before it would send the client back to
+    // a version the server has already left, under the newer version's author.
+    const refuseAsStale = async (): Promise<never> => {
+      const current = await this.repository.findWorkbenchRow(
+        { projectId, id: row.id },
+        { tx },
+      );
+      if (!current) throw new ExperimentNotFoundError(row.id);
+      const actorLabel = await this.authorOfVersion(
+        {
+          projectId,
+          experimentId: current.id,
+          version: current.workbenchVersion,
+        },
+        { tx },
+      );
+      throw new StaleWorkbenchStateError({
+        currentVersion: current.workbenchVersion,
+        ...(actorLabel ? { actorLabel } : {}),
+      });
+    };
 
     // Refused before the write, not rolled back after it.
     if (
       expectedVersion !== undefined &&
       expectedVersion !== row.workbenchVersion
     ) {
-      throw stale;
+      await refuseAsStale();
     }
 
     const nextVersion = row.workbenchVersion + 1;
@@ -648,7 +718,7 @@ export class ExperimentService {
         { tx },
       );
     } catch (error) {
-      if (isRecordNotFoundError(error)) throw stale;
+      if (isRecordNotFoundError(error)) await refuseAsStale();
       throw error;
     }
 

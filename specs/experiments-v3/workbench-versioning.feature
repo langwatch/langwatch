@@ -72,6 +72,24 @@ Feature: Versioned workbench saves
     Then one is accepted and the other is refused as stale
     And the stored state is the accepted one
 
+  # The loser read one version and the winner left another behind. Reporting
+  # the version the loser read would send it back to a version the server has
+  # already left, and it would save into the same refusal again.
+  @regression @integration
+  Scenario: A refusal names the version the server holds now
+    Given two saves of one evaluation that both read the same version
+    When the second is refused after the first was accepted
+    Then the refusal carries the version the first save created
+
+  # A workflow evaluation moves the counter without writing a version row, so
+  # the newest row can describe an older version. Naming its author would
+  # credit a person for a write the platform made.
+  @regression @integration
+  Scenario: A version with no row of its own names nobody
+    Given an evaluation whose counter moved without a version row
+    When a caller reads the workbench state
+    Then no author is named
+
   @regression @integration
   Scenario: An archived evaluation refuses a save
     Given an evaluation that was archived

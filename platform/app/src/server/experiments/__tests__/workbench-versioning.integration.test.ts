@@ -195,7 +195,39 @@ describe("workbench versioning", () => {
           expect.unreachable("the save should have been refused");
         } catch (error) {
           const meta = HandledError.isHandled(error) ? error.meta : {};
-          expect(meta).toEqual({ currentVersion: version + 1 });
+          expect(meta).toEqual({
+            currentVersion: version + 1,
+            actorLabel: "user",
+          });
+        }
+      });
+
+      /** @scenario "A refused save names who holds the newer version" */
+      it("names Langy when Langy wrote the newer version", async () => {
+        const { experimentId, version } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Langy's candidate"),
+          expectedVersion: version,
+          actor: { label: "langy" },
+        });
+
+        try {
+          await service.saveWorkbenchState({
+            projectId: project.id,
+            id: experimentId,
+            state: stateNamed("The reader's own edit"),
+            expectedVersion: version,
+            actor: { label: "user" },
+          });
+          expect.unreachable("the save should have been refused");
+        } catch (error) {
+          const meta = HandledError.isHandled(error) ? error.meta : {};
+          expect(meta).toEqual({
+            currentVersion: version + 1,
+            actorLabel: "langy",
+          });
         }
       });
     });
@@ -420,49 +452,65 @@ describe("workbench versioning", () => {
   });
 
   describe("given two saves of the same evaluation that both read one version", () => {
+    // Neither save names an expected version, so the pre-check is skipped and
+    // the only thing that can refuse one of them is the compare-and-set itself:
+    // the update matches no row, Prisma raises P2025, and the seam turns that
+    // into the stale answer.
+    const raceTwoSaves = async () => {
+      const { experimentId, version } = await createEvaluation();
+
+      let releaseWaitingWriter: () => void = () => undefined;
+      const otherWriterHasRead = new Promise<void>((resolve) => {
+        releaseWaitingWriter = resolve;
+      });
+
+      // Whichever writer reads first waits there. The other reads the same
+      // stored version while it waits, updates and commits. Only then does the
+      // waiting one try its compare-and-set, which now matches no row.
+      let isFirstRead = true;
+      const racingService = gatedService(async () => {
+        if (!isFirstRead) {
+          releaseWaitingWriter();
+          return;
+        }
+        isFirstRead = false;
+        await otherWriterHasRead;
+      });
+
+      const attempt = async (
+        name: string,
+      ): Promise<{
+        name: string;
+        code: string;
+        meta: Record<string, unknown>;
+      }> => {
+        try {
+          await racingService.saveWorkbenchState({
+            projectId: project.id,
+            id: experimentId,
+            state: stateNamed(name),
+            actor: { label: "user" },
+          });
+          return { name, code: "no_error", meta: {} };
+        } catch (error) {
+          if (!HandledError.isHandled(error)) {
+            return { name, code: "not_handled", meta: {} };
+          }
+          return { name, code: error.code, meta: error.meta ?? {} };
+        }
+      };
+
+      const outcomes = await Promise.all([
+        attempt("Writer A"),
+        attempt("Writer B"),
+      ]);
+      return { experimentId, version, outcomes };
+    };
+
     describe("when they race in the database", () => {
-      // Neither save names an expected version, so the pre-check is skipped
-      // and the only thing that can refuse one of them is the compare-and-set
-      // itself: the update matches no row, Prisma raises P2025, and the seam
-      // turns that into the stale answer.
       /** @scenario Two saves that race are not both accepted */
       it("accepts one and refuses the other as stale", async () => {
-        const { experimentId, version } = await createEvaluation();
-
-        let releaseWaitingWriter: () => void = () => undefined;
-        const otherWriterHasRead = new Promise<void>((resolve) => {
-          releaseWaitingWriter = resolve;
-        });
-
-        // Whichever writer reads first waits there. The other reads the same
-        // stored version while it waits, updates and commits. Only then does
-        // the waiting one try its compare-and-set, which now matches no row.
-        let isFirstRead = true;
-        const racingService = gatedService(async () => {
-          if (!isFirstRead) {
-            releaseWaitingWriter();
-            return;
-          }
-          isFirstRead = false;
-          await otherWriterHasRead;
-        });
-
-        const attempt = async (name: string) => ({
-          name,
-          code: await codeOf(
-            racingService.saveWorkbenchState({
-              projectId: project.id,
-              id: experimentId,
-              state: stateNamed(name),
-              actor: { label: "user" },
-            }),
-          ),
-        });
-
-        const outcomes = await Promise.all([
-          attempt("Writer A"),
-          attempt("Writer B"),
-        ]);
+        const { experimentId, version, outcomes } = await raceTwoSaves();
 
         const accepted = outcomes.filter((one) => one.code === "no_error");
         const refused = outcomes.filter(
@@ -478,6 +526,53 @@ describe("workbench versioning", () => {
           accepted[0]?.name,
         );
         expect(row.workbenchVersion).toBe(version + 1);
+      });
+
+      /** @scenario "A refusal names the version the server holds now" */
+      it("tells the refused writer the version the winner created", async () => {
+        const { version, outcomes } = await raceTwoSaves();
+
+        // The refused writer read `version` before the winner committed.
+        // Sending that number back would point it at a version the server has
+        // already left, and its next save would be refused all over again.
+        const refused = outcomes.find(
+          (one) => one.code === "experiment_stale_workbench_state",
+        );
+        expect(refused?.meta).toEqual({
+          currentVersion: version + 1,
+          actorLabel: "user",
+        });
+      });
+    });
+  });
+
+  describe("given an evaluation whose counter moved without a version row", () => {
+    describe("when the workbench state is read", () => {
+      /** @scenario "A version with no row of its own names nobody" */
+      it("names nobody, rather than the author of the older version", async () => {
+        const { experimentId } = await createEvaluation();
+        expect(
+          (
+            await service.getWorkbenchState({
+              projectId: project.id,
+              id: experimentId,
+            })
+          ).actorLabel,
+        ).toBe("user");
+
+        // What a workflow evaluation does: it refreshes the state and moves the
+        // counter, and writes no version row, because there is nothing there a
+        // person would want to restore.
+        await prisma.experiment.updateMany({
+          where: { id: experimentId, projectId: project.id },
+          data: { workbenchVersion: { increment: 1 } },
+        });
+
+        const view = await service.getWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+        });
+        expect(view.actorLabel).toBeUndefined();
       });
     });
   });
