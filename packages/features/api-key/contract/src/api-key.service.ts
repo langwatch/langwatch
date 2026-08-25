@@ -30,6 +30,10 @@ export abstract class ApiKeyService {
   abstract tryResolveToken(
     input: ApiKeyTokenResolutionInput,
   ): Promise<ResolvedApiKeyToken | null>;
+  /** Rotates a deprecated project credential while preserving its wire format. */
+  abstract regenerateLegacyProjectKey(input: {
+    projectId: string;
+  }): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   abstract resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

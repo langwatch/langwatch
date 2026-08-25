@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
@@ -12,6 +13,9 @@ import { ApiKeyTokenAdapter } from "../src/adapters/api-key-token.api-key-token.
 
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: StoredApiKey[] = [];
+  legacyProjectId: string | null = null;
+  legacyProjectRotationSucceeds = true;
+  regeneratedLegacyProject: { projectId: string; token: string } | null = null;
   create(input: ApiKeyCreateRecord): Promise<StoredApiKey> { const now = new Date(); const row = { ...input, id: `key-${this.rows.length + 1}`, revokedAt: input.startsDisabled ? now : null, lastUsedAt: null, createdAt: now, updatedAt: now, roleBindings: input.roleBindings.map((binding, index) => ({ ...binding, id: `binding-${index + 1}` })) } as StoredApiKey; this.rows.push(row); return Promise.resolve(row); }
   activate({ id }: { id: string }): Promise<StoredApiKey> { return this.update({ id, revokedAt: null }); }
   tryFindByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> { return Promise.resolve(this.rows.find((row) => row.lookupId === lookupId) ?? null); }
@@ -26,6 +30,11 @@ class MemoryApiKeys extends ApiKeyRepository {
   get(id: string): StoredApiKey | undefined { return this.rows.find((row) => row.id === id); }
   tryFindIngestKey(): Promise<StoredApiKey | null> { return Promise.resolve(null); }
   findIngestKeysForProject(): Promise<StoredApiKey[]> { return Promise.resolve([]); }
+  tryFindLegacyProjectId(): Promise<string | null> { return Promise.resolve(this.legacyProjectId); }
+  rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
+    this.regeneratedLegacyProject = input;
+    return Promise.resolve(this.legacyProjectRotationSucceeds);
+  }
   tryFindPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> { return Promise.resolve(null); }
 }
 
@@ -98,7 +107,6 @@ function dependencies(
     projects: {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
-      tryGetWithTeamByLegacyApiKey: vi.fn().mockResolvedValue(null),
       getById: vi.fn().mockResolvedValue(null),
       listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
       listActiveByScopes: vi
@@ -153,11 +161,13 @@ describe("API-key service", () => {
   });
 
   it("falls back to the deprecated project credential after a current-shape miss", async () => {
+    const repository = new MemoryApiKeys();
+    repository.legacyProjectId = resolvedProject.id;
     const projects = {
-      tryGetWithTeamByLegacyApiKey: vi.fn().mockResolvedValue(resolvedProject),
+      tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     } as unknown as ProjectService;
     const service = new ApiKeyService(
-      new MemoryApiKeys(),
+      repository,
       dependencies({ projects }),
     );
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
@@ -166,7 +176,7 @@ describe("API-key service", () => {
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
-    expect(projects.tryGetWithTeamByLegacyApiKey).toHaveBeenCalledWith(token);
+    expect(projects.tryGetWithTeam).toHaveBeenCalledWith(resolvedProject.id);
   });
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
@@ -179,6 +189,30 @@ describe("API-key service", () => {
     await expect(service.tryVerify({ token: created.token })).resolves.toMatchObject({ id: created.apiKey.id });
     await new Promise((resolve) => setImmediate(resolve));
     expect(repository.get(created.apiKey.id)!.hashedSecret).not.toBe(createHash("sha256").update(secret).digest("hex"));
+  });
+
+  it("rotates the deprecated project credential through its repository", async () => {
+    const repository = new MemoryApiKeys();
+    const service = new ApiKeyService(repository, dependencies());
+
+    const token = await service.regenerateLegacyProjectKey({
+      projectId: "project-1",
+    });
+    expect(token).toMatch(/^sk-lw-[A-Za-z0-9]{48}$/);
+    expect(repository.regeneratedLegacyProject).toEqual({
+      projectId: "project-1",
+      token,
+    });
+  });
+
+  it("throws when the project credential cannot be rotated", async () => {
+    const repository = new MemoryApiKeys();
+    repository.legacyProjectRotationSucceeds = false;
+    const service = new ApiKeyService(repository, dependencies());
+
+    await expect(
+      service.regenerateLegacyProjectKey({ projectId: "missing" }),
+    ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
   });
 
   it("defaults an unowned service key to organization ADMIN", async () => {

@@ -42,6 +42,20 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
   async upgradeHash(input: { id: string; hashedSecret: string }): Promise<void> { await this.update({ id: input.id, hashedSecret: input.hashedSecret }); }
   tryFindIngestKey(input: { organizationId: string; projectId: string; sourceType: string }): Promise<StoredApiKey | null> { return this.database.apiKey.findFirst({ where: { organizationId: input.organizationId, ingestSourceType: input.sourceType, revokedAt: null, roleBindings: { some: { scopeType: "PROJECT", scopeId: input.projectId } } }, include: { roleBindings: true }, orderBy: { createdAt: "desc" } }); }
   findIngestKeysForProject(input: { organizationId: string; projectId: string }): Promise<StoredApiKey[]> { return this.database.apiKey.findMany({ where: { organizationId: input.organizationId, ingestSourceType: { not: null }, revokedAt: null, roleBindings: { some: { scopeType: "PROJECT", scopeId: input.projectId } } }, include: { roleBindings: true }, orderBy: { createdAt: "desc" } }); }
+  async tryFindLegacyProjectId(input: { token: string }): Promise<string | null> {
+    const row = await this.database.project.findUnique({
+      where: { apiKey: input.token, archivedAt: null },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+  async rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
+    const result = await this.database.project.updateMany({
+      where: { id: input.projectId, archivedAt: null },
+      data: { apiKey: input.token },
+    });
+    return result.count > 0;
+  }
   async tryFindPersonalWorkspaceOwner(input: { organizationId: string; scopeId: string }): Promise<{ ownerUserId: string | null } | null> {
     const team = await this.database.team.findFirst({ where: { id: input.scopeId, organizationId: input.organizationId, isPersonal: true }, select: { ownerUserId: true } });
     if (team) return team;

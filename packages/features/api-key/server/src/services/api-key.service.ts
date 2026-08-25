@@ -126,6 +126,16 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.tryResolveLegacyProjectKey(parsed.token);
   }
 
+  async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
+    const token = this.options.tokens.generateLegacyProjectKey();
+    const rotated = await this.repository.rotateLegacyProjectKey({
+      projectId: input.projectId,
+      token,
+    });
+    if (!rotated) throw new ApiKeyNotFoundError(input.projectId);
+    return token;
+  }
+
   async resolveOrganizationToken(input: {
     token: string;
   }): Promise<OrganizationApiKeyResolution> {
@@ -471,14 +481,13 @@ export class ApiKeyService extends ApiKeyCapability {
   private async tryResolveLegacyProjectKey(
     token: string,
   ): Promise<ResolvedApiKeyToken | null> {
-    const project = await this.options.projects.tryGetWithTeamByLegacyApiKey(
-      token,
-    );
+    const projectId = await this.repository.tryFindLegacyProjectId({ token });
+    if (!projectId) return null;
+    const project = await this.options.projects.tryGetWithTeam(projectId);
     return project
       ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project })
       : null;
   }
-
   private async tryResolveCurrentApiKey(
     token: string,
     projectId: string | null,

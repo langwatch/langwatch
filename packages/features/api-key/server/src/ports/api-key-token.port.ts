@@ -4,6 +4,7 @@ export abstract class ApiKeyTokenPort {
     lookupId: string;
     hashedSecret: string;
   };
+  abstract generateLegacyProjectKey(): string;
   abstract verify(
     secret: string,
     hashedSecret: string,

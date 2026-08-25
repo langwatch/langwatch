@@ -22,6 +22,10 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenPort {
     return ApiKeyTokenAdapter.generateApiKeyToken(this.pepper, options);
   }
 
+  generateLegacyProjectKey(): string {
+    return `${API_KEY_PREFIX}${ApiKeyTokenAdapter.randomText(48)}`;
+  }
+
   verify(secret: string, hashedSecret: string) {
     return ApiKeyTokenAdapter.verifyApiKeySecret(secret, hashedSecret, this.pepper);
   }

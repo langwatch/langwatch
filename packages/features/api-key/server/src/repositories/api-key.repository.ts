@@ -19,6 +19,8 @@ export abstract class ApiKeyRepository {
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
   abstract tryFindIngestKey(input: { organizationId: string; projectId: string; sourceType: string }): Promise<StoredApiKey | null>;
   abstract findIngestKeysForProject(input: { organizationId: string; projectId: string }): Promise<StoredApiKey[]>;
+  abstract tryFindLegacyProjectId(input: { token: string }): Promise<string | null>;
+  abstract rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Resolves personal team/project ownership without leaking foreign persistence to the service. */
   abstract tryFindPersonalWorkspaceOwner(input: { organizationId: string; scopeId: string }): Promise<{ ownerUserId: string | null } | null>;
 }
