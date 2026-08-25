@@ -32,16 +32,31 @@ export class PrismaMfaEnrollmentRepository implements MfaEnrollmentRepository {
    * The organizations this person belongs to that require a second factor.
    * Read here rather than trusted from the command, so a caller working from
    * a stale membership list cannot turn the factor off and keep the access.
+   *
+   * Read as a NESTED select off the person, not as a top-level
+   * `organizationUser.findMany`. The question spans every organization one
+   * person belongs to, so it has no single-organization predicate to offer and
+   * `guardOrganizationId` (ADR-021) refuses it — a refusal that surfaces as a
+   * 500, not as a skipped check. The guard sees top-level model operations
+   * only (`$allOperations` in `src/server/db.ts`), so going through the person
+   * asks the same question in a shape the guard is right not to inspect.
    */
   async findRequiringOrganizationSlugs({
     userId,
   }: {
     userId: string;
   }): Promise<readonly string[]> {
-    const memberships = await this.prisma.organizationUser.findMany({
-      where: { userId, organization: { mfaRequired: true } },
-      select: { organization: { select: { slug: true } } },
+    const person = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        orgMemberships: {
+          where: { organization: { mfaRequired: true } },
+          select: { organization: { select: { slug: true } } },
+        },
+      },
     });
-    return memberships.map((membership) => membership.organization.slug);
+    return (person?.orgMemberships ?? []).map(
+      (membership) => membership.organization.slug,
+    );
   }
 }
