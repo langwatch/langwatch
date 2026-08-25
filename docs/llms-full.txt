@@ -19677,8 +19677,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch claude` accepts the same flags, the same subcommands and the same keyboard shortcuts as `claude`, and it returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
@@ -20419,8 +20417,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch gemini` accepts the same flags and the same subcommands as `gemini`, and it returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper prints a warning in that case. The telemetry path works with either.
 </Note>
@@ -20480,6 +20476,12 @@ Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt 
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Open a new terminal. The `gemini` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
@@ -20577,8 +20579,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Warning>
   The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool prints a note about the change every time it takes that route.
 </Warning>
@@ -20663,6 +20663,12 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Open a new terminal. The `copilot` and `code` functions are read from the shell start file when a shell begins, so a terminal that was already open does not have them.
 
@@ -21057,8 +21063,8 @@ A manual block reports the tokens, the model and the timing of each turn, and wi
 # FILE: ./coding-agents/opencode.mdx
 
 ---
-title: opencode Monitoring with OpenTelemetry
-sidebarTitle: opencode
+title: OpenCode Monitoring with OpenTelemetry
+sidebarTitle: OpenCode
 description: Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 keywords:
   - opencode monitoring
@@ -21068,11 +21074,11 @@ keywords:
   - opencode cost
 ---
 
-[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
+[OpenCode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
 
 There are two ways to set it up:
 
-- `langwatch opencode` starts opencode and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch opencode` starts OpenCode and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument opencode` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
 ## Before you start
@@ -21097,8 +21103,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch opencode` accepts the same flags as `opencode` and returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own providers, LangWatch never creates one for you.
 </Note>
@@ -21121,7 +21125,7 @@ The command writes two things:
 Open a new terminal after the command, or read the start file again, so the function is in place.
 
 <Note>
-  The shell function needs zsh, bash or fish. On Windows, start opencode with `langwatch opencode` each time instead.
+  The shell function needs zsh, bash or fish. On Windows, start OpenCode with `langwatch opencode` each time instead.
 </Note>
 
 ### Choose where the telemetry goes
@@ -21135,7 +21139,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument opencode --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument opencode --personal` | Back to your personal workspace |
 
-The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts opencode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before opencode reads it.
+The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts OpenCode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before OpenCode reads it.
 
 ### Remove the setup
 
@@ -21149,18 +21153,18 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 Open your personal page at `/me`, or open the project you pinned opencode to.
 
-- **[Sessions](/coding-agents/sessions)**: one row per opencode session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per OpenCode session, with the context it carried and how long it worked.
 - **Traces**: one trace per turn, with each model call and each tool call in order.
 - **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
 - **Content**: the arguments of each tool call and the result it returned.
 
-LangWatch keeps the model calls and the tool calls, and drops the internal work opencode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
+LangWatch keeps the model calls and the tool calls, and drops the internal work OpenCode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 ## Content and privacy
 
-opencode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+OpenCode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
 
 ## Route through the LangWatch AI Gateway
 
@@ -21169,6 +21173,12 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
@@ -21176,7 +21186,7 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
   </Accordion>
 
   <Accordion title="The command reports that it could not write the shell start file">
-    The shell is not zsh, bash or fish. Start opencode with `langwatch opencode` each time, which needs no start file.
+    The shell is not zsh, bash or fish. Start OpenCode with `langwatch opencode` each time, which needs no start file.
   </Accordion>
 
   <Accordion title="The OpenTelemetry flag stays off">
@@ -21229,7 +21239,7 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
+  A plain `export` applies the key to every program the shell starts, not to OpenCode alone. To keep it to OpenCode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
 
   ```bash
   opencode() {
@@ -21265,34 +21275,56 @@ keywords:
   - opentelemetry coding agents
 ---
 
-One command per tool connects an agent, for example:
+## Getting started
 
-```bash
-npx langwatch claude
-```
 
-LangWatch then records each session with its token cost, its context use, the conversation, and the pull requests it drove. When the [data privacy policy](/coding-agents/privacy) drops content, the session keeps its cost and token counts, and the conversation text is not stored.
+  ### Claude Code
 
-## Start here
+    ```bash
+    npx langwatch claude
+    ```
 
-<CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/coding-agents/quickstart">
-    One command per tool. Sign-in happens on the first run.
-  </Card>
-  <Card title="Track your Claude Code usage" icon="chart-line" href="/coding-agents/claude-code-usage">
-    The full walkthrough, for pay-per-token keys and for 5x and 20x plans.
-  </Card>
-</CardGroup>
+  ### Codex
+
+    ```bash
+    npx langwatch codex
+    ```
+
+  ### GitHub Copilot
+
+    ```bash
+    npx langwatch copilot
+    ```
+
+  ### Gemini CLI
+
+    ```bash
+    npx langwatch gemini
+    ```
+
+  ### OpenCode
+
+    ```bash
+    npx langwatch opencode
+    ```
+
+  ### Cursor
+
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+
+
+
+The first run opens a browser to sign you in, then starts your agent. Your plan keeps billing as before: LangWatch reads only the telemetry the agent already emits. The [quickstart](/coding-agents/quickstart) shows what to open next.
 
 ## Set up your agent
 
 <CardGroup cols={3}>
-  <Card title="Claude Code" href="/coding-agents/claude-code" />
-  <Card title="Codex" href="/coding-agents/openai-codex" />
-  <Card title="GitHub Copilot" href="/coding-agents/github-copilot-cli" />
-  <Card title="Gemini CLI" href="/coding-agents/gemini-cli" />
-  <Card title="opencode" href="/coding-agents/opencode" />
-  <Card title="Cursor and Aider" href="/ai-gateway/cli/cursor">
+  <Card title="Claude Code" icon="square-terminal" href="/coding-agents/claude-code" />
+  <Card title="Codex" icon="terminal" href="/coding-agents/openai-codex" />
+  <Card title="GitHub Copilot" icon="github" href="/coding-agents/github-copilot-cli" />
+  <Card title="Gemini CLI" icon="gem" href="/coding-agents/gemini-cli" />
+  <Card title="OpenCode" icon="code" href="/coding-agents/opencode" />
+  <Card title="Cursor and Aider" icon="route" href="/ai-gateway/cli/overview">
     Through the LangWatch AI Gateway.
   </Card>
 </CardGroup>
@@ -21362,7 +21394,7 @@ keywords:
   - track claude code without spying
 ---
 
-The first question to settle: can your manager read what you typed? The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored.
+Your sessions land in a project that only you own. An administrator reads them only through an audited path that shows a banner for the whole visit. And you can drop the conversation content at the organization level, before it is ever stored.
 
 ## Where your data lands
 
@@ -21426,7 +21458,7 @@ keywords:
 
 Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
 
-<Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that drove the branch. A branch with no pull request yet keeps its row so the work still has a price.">
+<Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that worked on the branch. A branch with no pull request yet keeps its row.">
   ![Pull requests list](/images/coding-agents/pull-requests-list.png)
 </Frame>
 
@@ -21485,7 +21517,7 @@ keywords:
   - langwatch cli
 ---
 
-Run your agent through the LangWatch wrapper: the agent starts as usual, and its sessions report to LangWatch. The first run opens a browser sign-in and asks one question before the agent starts.
+Run your agent through the LangWatch wrapper. The first run opens a browser to sign you in, then starts your agent.
 
 
   ### Claude Code
@@ -21512,7 +21544,7 @@ Run your agent through the LangWatch wrapper: the agent starts as usual, and its
     npx langwatch gemini
     ```
 
-  ### opencode
+  ### OpenCode
 
     ```bash
     npx langwatch opencode
@@ -21520,32 +21552,30 @@ Run your agent through the LangWatch wrapper: the agent starts as usual, and its
 
   ### Cursor
 
-    Cursor routes through the LangWatch AI Gateway rather than a telemetry wrapper. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
 
 
 
-The question asks how to connect. **Using a subscription**, the first answer, keeps your own plan and your own login, and LangWatch receives telemetry only. **Using an API key** routes the model calls through the LangWatch AI Gateway under your organization's budgets and policies. On a subscription plan, take the first answer. LangWatch remembers the answer per tool, and each agent's page covers the question in full, for example [Claude Code](/coding-agents/claude-code#run-claude-code-through-the-wrapper).
-
-You may not see the question at all: when your organization allows one path only, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan. `--tool-mode` sets it explicitly on any run.
+Each agent's page covers the first-run setup in full, for example [Claude Code](/coding-agents/claude-code).
 
 ## What you see now
 
 Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
-<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it drove.">
+<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it created.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
 </Frame>
 
-- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The [data privacy policy](/coding-agents/privacy) can drop content; the session then shows its numbers without the conversation.
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation.
 - Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
 - Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
 
 ## Expand from here
 
-- **Make plain runs report too.** `langwatch instrument <tool>` writes the connection persistently and exits, so `claude` without the wrapper reports as well. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
-- **Send a machine's telemetry to a team project** with `--project`, or wire servers and CI with an ingest key and no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
-- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback on top of the telemetry. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
-- **Worried who sees what you type?** [Privacy](/coding-agents/privacy) states the boundaries exactly.
+- **Run plain commands with reporting on.** `langwatch instrument <tool>` writes the connection and exits, so `claude` without the wrapper reports too. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
+- **Send a machine to a team project** with `--project`, or wire servers and CI with no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
+- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
+- **Control what gets stored.** [Privacy](/coding-agents/privacy) states who can read your sessions, and you can drop the conversation content while keeping the cost and token counts.
 
 ---
 
@@ -21579,11 +21609,11 @@ langwatch ingest context
 
 LangWatch attributes the session to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through shell commands in a directory the session never natively entered.
 
-A standing agent that runs from a scratch directory and works on one checkout after another attributes each piece of work correctly by declaring as it goes.
+A standing agent that runs from a scratch directory and works on one checkout after another declares in each checkout, and each piece of work attributes to its own repository and branch.
 
 You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also tell a session "declare your working context" at any time.
 
-The command resolves which session is asking on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
+The command identifies the session on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
 
 ## From branch to pull request
 
@@ -21694,7 +21724,7 @@ One row per session, over the last 90 days. Every column sorts; a third click on
 | Column | What it shows |
 | --- | --- |
 | **Session** | The session's title, lifted from the agent's own generated conversation title. |
-| **Agent** | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, opencode. |
+| **Agent** | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode. |
 | **Last update** | When the session last did anything. |
 | **Context** | Peak context: the most tokens the session carried into a single model call. |
 | **Compactions** | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
@@ -21785,7 +21815,7 @@ By default a coding agent reports to your personal workspace. Pin it to a team p
 langwatch instrument claude --project acme-app
 ```
 
-This mints an ingest key for this device, scoped to the project, and holds the tool to it. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
+This mints an ingest key for this device, scoped to the project, and pins the tool to the project. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
 
 The wrapper takes the same flag and then starts the agent:
 

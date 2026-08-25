@@ -12,34 +12,50 @@ keywords:
   - opentelemetry coding agents
 ---
 
-One command per tool connects an agent, for example:
+## Getting started
 
-```bash
-npx langwatch claude
-```
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    npx langwatch claude
+    ```
+  </Tab>
+  <Tab title="Codex">
+    ```bash
+    npx langwatch codex
+    ```
+  </Tab>
+  <Tab title="GitHub Copilot">
+    ```bash
+    npx langwatch copilot
+    ```
+  </Tab>
+  <Tab title="Gemini CLI">
+    ```bash
+    npx langwatch gemini
+    ```
+  </Tab>
+  <Tab title="OpenCode">
+    ```bash
+    npx langwatch opencode
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+  </Tab>
+</Tabs>
 
-LangWatch then records each session with its token cost, its context use, the conversation, and the pull requests it drove. When the [data privacy policy](/coding-agents/privacy) drops content, the session keeps its cost and token counts, and the conversation text is not stored.
-
-## Start here
-
-<CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/coding-agents/quickstart">
-    One command per tool. Sign-in happens on the first run.
-  </Card>
-  <Card title="Track your Claude Code usage" icon="chart-line" href="/coding-agents/claude-code-usage">
-    The full walkthrough, for pay-per-token keys and for 5x and 20x plans.
-  </Card>
-</CardGroup>
+The first run opens a browser to sign you in, then starts your agent. Your plan keeps billing as before: LangWatch reads only the telemetry the agent already emits. The [quickstart](/coding-agents/quickstart) shows what to open next.
 
 ## Set up your agent
 
 <CardGroup cols={3}>
-  <Card title="Claude Code" href="/coding-agents/claude-code" />
-  <Card title="Codex" href="/coding-agents/openai-codex" />
-  <Card title="GitHub Copilot" href="/coding-agents/github-copilot-cli" />
-  <Card title="Gemini CLI" href="/coding-agents/gemini-cli" />
-  <Card title="opencode" href="/coding-agents/opencode" />
-  <Card title="Cursor and Aider" href="/ai-gateway/cli/cursor">
+  <Card title="Claude Code" icon="square-terminal" href="/coding-agents/claude-code" />
+  <Card title="Codex" icon="terminal" href="/coding-agents/openai-codex" />
+  <Card title="GitHub Copilot" icon="github" href="/coding-agents/github-copilot-cli" />
+  <Card title="Gemini CLI" icon="gem" href="/coding-agents/gemini-cli" />
+  <Card title="OpenCode" icon="code" href="/coding-agents/opencode" />
+  <Card title="Cursor and Aider" icon="route" href="/ai-gateway/cli/overview">
     Through the LangWatch AI Gateway.
   </Card>
 </CardGroup>

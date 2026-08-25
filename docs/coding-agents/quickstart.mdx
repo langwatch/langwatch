@@ -10,7 +10,7 @@ keywords:
   - langwatch cli
 ---
 
-Run your agent through the LangWatch wrapper: the agent starts as usual, and its sessions report to LangWatch. The first run opens a browser sign-in and asks one question before the agent starts.
+Run your agent through the LangWatch wrapper. The first run opens a browser to sign you in, then starts your agent.
 
 <Tabs>
   <Tab title="Claude Code">
@@ -33,35 +33,33 @@ Run your agent through the LangWatch wrapper: the agent starts as usual, and its
     npx langwatch gemini
     ```
   </Tab>
-  <Tab title="opencode">
+  <Tab title="OpenCode">
     ```bash
     npx langwatch opencode
     ```
   </Tab>
   <Tab title="Cursor">
-    Cursor routes through the LangWatch AI Gateway rather than a telemetry wrapper. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
   </Tab>
 </Tabs>
 
-The question asks how to connect. **Using a subscription**, the first answer, keeps your own plan and your own login, and LangWatch receives telemetry only. **Using an API key** routes the model calls through the LangWatch AI Gateway under your organization's budgets and policies. On a subscription plan, take the first answer. LangWatch remembers the answer per tool, and each agent's page covers the question in full, for example [Claude Code](/coding-agents/claude-code#run-claude-code-through-the-wrapper).
-
-You may not see the question at all: when your organization allows one path only, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan. `--tool-mode` sets it explicitly on any run.
+Each agent's page covers the first-run setup in full, for example [Claude Code](/coding-agents/claude-code).
 
 ## What you see now
 
 Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
-<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it drove.">
+<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it created.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
 </Frame>
 
-- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The [data privacy policy](/coding-agents/privacy) can drop content; the session then shows its numbers without the conversation.
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation.
 - Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
 - Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
 
 ## Expand from here
 
-- **Make plain runs report too.** `langwatch instrument <tool>` writes the connection persistently and exits, so `claude` without the wrapper reports as well. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
-- **Send a machine's telemetry to a team project** with `--project`, or wire servers and CI with an ingest key and no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
-- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback on top of the telemetry. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
-- **Worried who sees what you type?** [Privacy](/coding-agents/privacy) states the boundaries exactly.
+- **Run plain commands with reporting on.** `langwatch instrument <tool>` writes the connection and exits, so `claude` without the wrapper reports too. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
+- **Send a machine to a team project** with `--project`, or wire servers and CI with no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
+- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
+- **Control what gets stored.** [Privacy](/coding-agents/privacy) states who can read your sessions, and you can drop the conversation content while keeping the cost and token counts.

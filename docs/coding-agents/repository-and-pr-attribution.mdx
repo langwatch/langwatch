@@ -26,11 +26,11 @@ langwatch ingest context
 
 LangWatch attributes the session to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through shell commands in a directory the session never natively entered.
 
-A standing agent that runs from a scratch directory and works on one checkout after another attributes each piece of work correctly by declaring as it goes.
+A standing agent that runs from a scratch directory and works on one checkout after another declares in each checkout, and each piece of work attributes to its own repository and branch.
 
 You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also tell a session "declare your working context" at any time.
 
-The command resolves which session is asking on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
+The command identifies the session on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
 
 ## From branch to pull request
 

@@ -1,6 +1,6 @@
 ---
-title: opencode Monitoring with OpenTelemetry
-sidebarTitle: opencode
+title: OpenCode Monitoring with OpenTelemetry
+sidebarTitle: OpenCode
 description: Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 keywords:
   - opencode monitoring
@@ -10,11 +10,11 @@ keywords:
   - opencode cost
 ---
 
-[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
+[OpenCode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
 
 There are two ways to set it up:
 
-- `langwatch opencode` starts opencode and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch opencode` starts OpenCode and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument opencode` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
 ## Before you start
@@ -39,8 +39,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch opencode` accepts the same flags as `opencode` and returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own providers, LangWatch never creates one for you.
 </Note>
@@ -63,7 +61,7 @@ The command writes two things:
 Open a new terminal after the command, or read the start file again, so the function is in place.
 
 <Note>
-  The shell function needs zsh, bash or fish. On Windows, start opencode with `langwatch opencode` each time instead.
+  The shell function needs zsh, bash or fish. On Windows, start OpenCode with `langwatch opencode` each time instead.
 </Note>
 
 ### Choose where the telemetry goes
@@ -77,7 +75,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument opencode --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument opencode --personal` | Back to your personal workspace |
 
-The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts opencode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before opencode reads it.
+The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts OpenCode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before OpenCode reads it.
 
 ### Remove the setup
 
@@ -91,18 +89,18 @@ This deletes every connection the command-line tool wrote, for every tool.
 
 Open your personal page at `/me`, or open the project you pinned opencode to.
 
-- **[Sessions](/coding-agents/sessions)**: one row per opencode session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per OpenCode session, with the context it carried and how long it worked.
 - **Traces**: one trace per turn, with each model call and each tool call in order.
 - **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
 - **Content**: the arguments of each tool call and the result it returned.
 
-LangWatch keeps the model calls and the tool calls, and drops the internal work opencode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
+LangWatch keeps the model calls and the tool calls, and drops the internal work OpenCode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 ## Content and privacy
 
-opencode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+OpenCode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
 
 ## Route through the LangWatch AI Gateway
 
@@ -111,6 +109,12 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
@@ -118,7 +122,7 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
   </Accordion>
 
   <Accordion title="The command reports that it could not write the shell start file">
-    The shell is not zsh, bash or fish. Start opencode with `langwatch opencode` each time, which needs no start file.
+    The shell is not zsh, bash or fish. Start OpenCode with `langwatch opencode` each time, which needs no start file.
   </Accordion>
 
   <Accordion title="The OpenTelemetry flag stays off">
@@ -171,7 +175,7 @@ The header takes an ingest key (`ik-lw-…`), which can create traces and nothin
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
+  A plain `export` applies the key to every program the shell starts, not to OpenCode alone. To keep it to OpenCode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
 
   ```bash
   opencode() {

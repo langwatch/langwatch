@@ -18,7 +18,7 @@ By default a coding agent reports to your personal workspace. Pin it to a team p
 langwatch instrument claude --project acme-app
 ```
 
-This mints an ingest key for this device, scoped to the project, and holds the tool to it. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
+This mints an ingest key for this device, scoped to the project, and pins the tool to the project. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
 
 The wrapper takes the same flag and then starts the agent:
 

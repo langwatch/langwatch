@@ -39,8 +39,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch gemini` accepts the same flags and the same subcommands as `gemini`, and it returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper prints a warning in that case. The telemetry path works with either.
 </Note>
@@ -100,6 +98,12 @@ Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt 
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Open a new terminal. The `gemini` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
