@@ -40,10 +40,6 @@ vi.mock("@langwatch/workflow-web", () => ({
     }),
 }));
 
-vi.mock("~/optimization_studio/utils/mergeLocalConfigs", () => ({
-  mergeLocalConfigsIntoDsl: (nodes: any) => nodes,
-}));
-
 vi.mock("../../../components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));

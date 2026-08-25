@@ -3,7 +3,7 @@ import {
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
-import { nodeErrorToDomainError } from "./nodeErrorDomain";
+import { nodeErrorToDomainError } from "@langwatch/workflow-contract";
 
 /**
  * An errored execution state, as the studio reads it.

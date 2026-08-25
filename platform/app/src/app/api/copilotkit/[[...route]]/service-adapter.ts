@@ -12,16 +12,16 @@ import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import {
+  buildWorkflowLlmConfig,
+  buildLlmSignatureNode,
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
-import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
@@ -393,7 +393,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       enable_tracing: true,
       nodes: [
         {
-          ...LlmSignatureNodeFactory.build({
+          ...buildLlmSignatureNode({
             id: nodeId,
             data: nodeData,
           }),
@@ -451,9 +451,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          // Use shared buildLLMConfig for consistent camelCase to snake_case conversion
+          // Use the Workflow contract for camelCase-to-snake_case conversion.
           // and reasoning mapping across all execution entry points
-          value: buildLLMConfig(formValues.version.configData.llm),
+          value: buildWorkflowLlmConfig(formValues.version.configData.llm),
         },
         {
           identifier: "prompting_technique",

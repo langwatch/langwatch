@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
+import { nodeErrorToDomainError } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {

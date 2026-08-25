@@ -46,12 +46,60 @@ export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 export const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
 export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
 export type ChatMessage = { role?: "system" | "user" | "assistant"; content?: string };
-export type LocalPromptConfig = {
-  llm: LLMConfig & { maxTokens?: number };
-  messages: ChatMessage[];
-  inputs: Array<{ identifier: string; type: LlmConfigInputType }>;
-  outputs: Array<{ identifier: string; type: LlmConfigOutputType }>;
-};
+
+const localPromptLlmConfigSchema = z.object({
+  model: z.string(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional(),
+  topP: z.number().optional(),
+  frequencyPenalty: z.number().optional(),
+  presencePenalty: z.number().optional(),
+  seed: z.number().optional(),
+  topK: z.number().optional(),
+  minP: z.number().optional(),
+  repetitionPenalty: z.number().optional(),
+  reasoning: z.string().optional(),
+  verbosity: z.string().optional(),
+  litellmParams: z.record(z.string(), z.string()).optional(),
+});
+
+const localPromptMessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.string(),
+});
+
+const localPromptInputSchema = z.object({
+  identifier: z.string(),
+  type: z.enum([
+    "str",
+    "float",
+    "bool",
+    "image",
+    "list[str]",
+    "list[float]",
+    "list[int]",
+    "list[bool]",
+    "dict",
+    "list",
+  ]),
+});
+
+const localPromptOutputSchema = z.object({
+  identifier: z.string(),
+  type: z.enum(LlmConfigOutputTypes),
+  json_schema: z.unknown().optional(),
+});
+
+export const localPromptConfigSchema = z.object({
+  llm: localPromptLlmConfigSchema,
+  messages: z.array(localPromptMessageSchema),
+  inputs: z.array(localPromptInputSchema),
+  outputs: z.array(localPromptOutputSchema),
+});
+
+export type LocalPromptMessage = z.infer<typeof localPromptMessageSchema>;
+export type LocalPromptLlmConfig = z.infer<typeof localPromptLlmConfigSchema>;
+export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 export const FIELD_TYPES = AGENT_FIELD_TYPES;
 export type Field = AgentField;

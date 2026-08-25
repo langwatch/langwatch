@@ -8,7 +8,7 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
-import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
+import { LlmSignatureNodeFactory } from "@langwatch/workflow-web";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 
 const logger = createLogger("invokeLLM");

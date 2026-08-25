@@ -38,7 +38,7 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "~/optimization_studio/utils/codeAgentConfig";
+} from "@langwatch/workflow-web";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "@langwatch/workflow-web";

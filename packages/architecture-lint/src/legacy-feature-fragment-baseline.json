@@ -5263,11 +5263,6 @@
     },
     {
       "feature": "prompt",
-      "file": "platform/app/src/prompts/llmConfigBuilder.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "prompt",
       "file": "platform/app/src/prompts/modals/DemonstrationsModal.tsx",
       "kind": "legacy-implementation"
     },

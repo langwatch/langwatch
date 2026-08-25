@@ -26,9 +26,9 @@ import {
 import { migrateDSLVersion } from "@langwatch/workflow-contract";
 import {
   clearDsl,
+  mergeLocalConfigsIntoDsl,
   recursiveAlphabeticallySortedKeys,
 } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";

@@ -33,9 +33,12 @@ import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
-import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
-import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
+import {
+  nodeErrorToDomainError,
+  type ExecutionState,
+  type StudioServerEvent,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";

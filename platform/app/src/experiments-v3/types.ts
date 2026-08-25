@@ -5,12 +5,14 @@ import type {
   CellPosition,
   RowHeightMode,
 } from "~/components/datasets/editor/DatasetTableContext";
-import type { Field } from "@langwatch/workflow-contract";
 import {
   fieldSchema,
   HTTP_METHODS,
   httpAuthSchema,
   httpHeaderSchema,
+  localPromptConfigSchema,
+  type Field,
+  type LocalPromptConfig,
 } from "@langwatch/workflow-contract";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
@@ -97,59 +99,8 @@ export type DatasetReference = {
   savedRecords?: SavedRecord[];
 };
 
-// fieldSchema is owned by the Workflow contract.
-
-/**
- * Zod schema for local prompt config validation.
- */
-export const localPromptConfigSchema = z.object({
-  llm: z.object({
-    model: z.string(),
-    temperature: z.number().optional(),
-    maxTokens: z.number().optional(),
-    topP: z.number().optional(),
-    frequencyPenalty: z.number().optional(),
-    presencePenalty: z.number().optional(),
-    seed: z.number().optional(),
-    topK: z.number().optional(),
-    minP: z.number().optional(),
-    repetitionPenalty: z.number().optional(),
-    reasoning: z.string().optional(),
-    verbosity: z.string().optional(),
-    litellmParams: z.record(z.string(), z.string()).optional(),
-  }),
-  messages: z.array(
-    z.object({
-      role: z.enum(["user", "assistant", "system"]),
-      content: z.string(),
-    }),
-  ),
-  inputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.enum([
-        "str",
-        "float",
-        "bool",
-        "image",
-        "list[str]",
-        "list[float]",
-        "list[int]",
-        "list[bool]",
-        "dict",
-        "list",
-      ]),
-    }),
-  ),
-  outputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.enum(["str", "float", "bool", "json_schema"]),
-      json_schema: z.unknown().optional(),
-    }),
-  ),
-});
-export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
+export { localPromptConfigSchema };
+export type { LocalPromptConfig };
 
 /**
  * Zod schema for local evaluator config validation.

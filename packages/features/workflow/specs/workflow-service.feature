@@ -47,6 +47,12 @@ Feature: Workflow service boundary
     Then it uses the Workflow browser surface
     And application modules retain only compatibility imports
 
+  Scenario: Local configuration dispatch stays portable
+    Given a browser or API dispatches unsaved local Studio configuration
+    When it materializes execution DSL or a default LLM node
+    Then it uses the Workflow contract
+    And no backend imports the Workflow browser surface
+
   Scenario: Code-node Python language support is portable browser behaviour
     Given the Studio code editor registers Python providers
     When it completes, validates, formats, hovers, or offers quick fixes

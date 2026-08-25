@@ -46,7 +46,7 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "~/optimization_studio/utils/codeAgentConfig";
+} from "@langwatch/workflow-web";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";

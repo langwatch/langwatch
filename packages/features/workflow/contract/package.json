@@ -25,6 +25,8 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

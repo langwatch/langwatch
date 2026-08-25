@@ -10,3 +10,7 @@ export * from "./studio-optimization";
 export * from "./workflow.commands";
 export * from "./workflow.errors";
 export * from "./workflow.service";
+export * from "./workflow-node-error";
+export * from "./llm-signature-node-factory";
+export * from "./merge-local-configs";
+export * from "./workflow-llm-config";

@@ -8,10 +8,6 @@
       ],
       "platform/app/src/app/api/copilotkit/[[...route]]/service-adapter.ts": [
         "~/optimization_studio/server/addEnvs",
-        "~/optimization_studio/server/loadDatasets",
-        "~/optimization_studio/types/events",
-        "~/optimization_studio/utils/llmSignatureNodeFactory",
-        "~/prompts/schemas",
         "~/prompts/schemas/version-metadata-schema",
         "~/prompts/types"
       ],
@@ -27,8 +23,7 @@
       "platform/app/src/app/api/shared/platform-url.ts": ["~/env.mjs"],
       "platform/app/src/app/api/workflows/post_event/post-event.ts": [
         "../../../../optimization_studio/server/addEnvs",
-        "../../../../optimization_studio/server/lambda",
-        "../../../../optimization_studio/types/events"
+        "../../../../optimization_studio/server/lambda"
       ],
       "platform/app/src/server.mts": ["./env-load", "./instrumentation.node", "./start"],
       "platform/app/src/server/analytics/saved-workbench-charts/errors.ts": [
@@ -65,9 +60,6 @@
         "~/shared/traces/media-refs"
       ],
       "platform/app/src/server/api/routers/user.ts": ["../../../env.mjs"],
-      "platform/app/src/server/api/routers/workflows.ts": [
-        "../../../optimization_studio/utils/mergeLocalConfigs"
-      ],
       "platform/app/src/server/app-layer/automations/delivery/sendSlackWebhook.ts": [
         "~/env.mjs"
       ],
@@ -156,14 +148,7 @@
         "~/experiments-v3/utils/emptyRowDetection",
         "~/experiments-v3/utils/normalizeComparison",
         "~/experiments-v3/utils/variantDisambiguation",
-        "~/optimization_studio/server/addEnvs",
-        "~/optimization_studio/server/loadDatasets",
-        "~/optimization_studio/types/events",
-        "~/optimization_studio/utils/nodeErrorDomain"
-      ],
-      "platform/app/src/server/experiments-v3/execution/resultMapper.ts": [
-        "~/optimization_studio/types/events",
-        "~/optimization_studio/utils/nodeErrorDomain"
+        "~/optimization_studio/server/addEnvs"
       ],
       "platform/app/src/server/experiments-v3/execution/types.ts": [
         "~/experiments-v3/types"
@@ -231,9 +216,7 @@
       "platform/app/src/server/routes/misc.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/playground.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/workflows.ts": [
-        "~/optimization_studio/server/addEnvs",
-        "~/optimization_studio/server/loadDatasets",
-        "~/optimization_studio/types/events"
+        "~/optimization_studio/server/addEnvs"
       ],
       "platform/app/src/server/scenarios/errors.ts": ["~/features/errors/logic/codes"],
       "platform/app/src/server/scenarios/execution/child-environment.ts": ["~/env.mjs"],
@@ -264,8 +247,7 @@
       "platform/app/src/server/usageStatsWorker.ts": ["~/env.mjs"],
       "platform/app/src/server/websockets/trpc-ws.ts": ["~/env.mjs"],
       "platform/app/src/server/workflows/runWorkflow.ts": [
-        "../../optimization_studio/server/addEnvs",
-        "../../optimization_studio/types/events"
+        "../../optimization_studio/server/addEnvs"
       ],
       "platform/app/src/server/workflows/workflowEvaluation.service.ts": [
         "~/experiments-v3/types",
@@ -1619,9 +1601,6 @@
       ],
       "platform/app/src/optimization_studio/utils/datasetUtils.ts": [
         "../../server/datasets/types"
-      ],
-      "platform/app/src/optimization_studio/utils/mergeLocalConfigs.ts": [
-        "~/server/prompt-config/llmConfigBuilder"
       ],
       "platform/app/src/optimization_studio/utils/registryUtils.ts": [
         "../../server/evaluations/evaluatorDisplayNames",

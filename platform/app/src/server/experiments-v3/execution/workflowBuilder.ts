@@ -32,7 +32,7 @@ import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
-import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
+import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "~/server/tracer/types";
 import type { ExecutionCell, WorkflowBuilderInput, WorkflowBuilderOutput } from "./types";
@@ -484,7 +484,7 @@ export const buildSignatureNodeFromPrompt = ({
     type: output.type as Field["type"],
   }));
 
-  const llmConfig = buildLLMConfig({
+  const llmConfig = buildWorkflowLlmConfig({
     model: prompt.model,
     temperature: prompt.temperature,
     maxTokens: prompt.maxTokens,
@@ -631,7 +631,7 @@ export const buildSignatureNodeFromLocalConfig = ({
     type: output.type as Field["type"],
   }));
 
-  const llmConfig = buildLLMConfig({
+  const llmConfig = buildWorkflowLlmConfig({
     model: localConfig.llm.model,
     temperature: localConfig.llm.temperature,
     maxTokens: localConfig.llm.maxTokens,
