@@ -13,6 +13,7 @@ import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
+import { PromptTemplateFieldsProvider } from "~/experiments-v3/components/PromptTemplateFieldsProvider";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
@@ -554,69 +555,71 @@ export default function ExperimentsWorkbenchPage() {
 
   return (
     <DashboardLayout backgroundColor="bg.panel">
-      <VStack
-        width="full"
-        height="calc(100vh - 50px)"
-        gap={0}
-        align="stretch"
-        overflow="hidden"
-      >
-        {/* Header */}
-        <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
-          <EditableHeading
-            value={name}
-            onSave={setName}
-            isLoading={isLoadingExperiment}
-          />
-          <Spacer />
-          <HStack gap={2}>
-            <AutosaveStatus
-              evaluationState={autosaveStatus.evaluation}
-              datasetState={autosaveStatus.dataset}
-              evaluationError={autosaveStatus.evaluationError}
-              datasetError={autosaveStatus.datasetError}
-            />
-            <UndoRedo />
-            <TableSettingsMenu disabled={isLoadingExperiment} />
-            <HistoryButton disabled={isLoadingExperiment} />
-            <VersionHistoryButton disabled={isLoadingExperiment} />
-            <RunEvaluationButton
-              disabled={isLoadingExperiment || isLoadingDatasets}
-            />
-          </HStack>
-        </HStack>
-
-        {staleWorkbench && (
-          <WorkbenchStaleBanner
-            actorLabel={staleWorkbench.actorLabel}
-            onReload={reloadStaleWorkbench}
-          />
-        )}
-
-        {/* Main content - table container with config panel */}
-        <Box
-          flex={1}
-          position="relative"
+      <PromptTemplateFieldsProvider>
+        <VStack
+          width="full"
+          height="calc(100vh - 50px)"
+          gap={0}
+          align="stretch"
           overflow="hidden"
-          marginLeft={4}
-          borderTopLeftRadius="xl"
-          borderLeft="1px solid"
-          borderTop="1px solid"
-          borderColor="border.emphasized"
-          bg="bg.panel"
         >
-          <Box position="absolute" inset={0} overflow="auto">
-            <EvaluationsV3Table
-              isLoadingExperiment={isLoadingExperiment}
-              isLoadingDatasets={isLoadingDatasets}
-              onOptimizeTarget={optimizeTarget}
+          {/* Header */}
+          <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
+            <EditableHeading
+              value={name}
+              onSave={setName}
+              isLoading={isLoadingExperiment}
             />
-          </Box>
-        </Box>
-      </VStack>
+            <Spacer />
+            <HStack gap={2}>
+              <AutosaveStatus
+                evaluationState={autosaveStatus.evaluation}
+                datasetState={autosaveStatus.dataset}
+                evaluationError={autosaveStatus.evaluationError}
+                datasetError={autosaveStatus.datasetError}
+              />
+              <UndoRedo />
+              <TableSettingsMenu disabled={isLoadingExperiment} />
+              <HistoryButton disabled={isLoadingExperiment} />
+              <VersionHistoryButton disabled={isLoadingExperiment} />
+              <RunEvaluationButton
+                disabled={isLoadingExperiment || isLoadingDatasets}
+              />
+            </HStack>
+          </HStack>
 
-      {/* Load saved dataset records - renders nothing, just triggers fetches */}
-      <SavedDatasetLoaders datasets={datasets} />
+          {staleWorkbench && (
+            <WorkbenchStaleBanner
+              actorLabel={staleWorkbench.actorLabel}
+              onReload={reloadStaleWorkbench}
+            />
+          )}
+
+          {/* Main content - table container with config panel */}
+          <Box
+            flex={1}
+            position="relative"
+            overflow="hidden"
+            marginLeft={4}
+            borderTopLeftRadius="xl"
+            borderLeft="1px solid"
+            borderTop="1px solid"
+            borderColor="border.emphasized"
+            bg="bg.panel"
+          >
+            <Box position="absolute" inset={0} overflow="auto">
+              <EvaluationsV3Table
+                isLoadingExperiment={isLoadingExperiment}
+                isLoadingDatasets={isLoadingDatasets}
+                onOptimizeTarget={optimizeTarget}
+              />
+            </Box>
+          </Box>
+        </VStack>
+
+        {/* Load saved dataset records - renders nothing, just triggers fetches */}
+        <SavedDatasetLoaders datasets={datasets} />
+      </PromptTemplateFieldsProvider>
     </DashboardLayout>
   );
 }
