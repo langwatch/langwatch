@@ -169,7 +169,7 @@ describe("Feature: reading a project secret value", () => {
     ]);
   });
 
-  describe("given a caller that can manage secrets", () => {
+  describe("when the caller can manage secrets", () => {
     /** @scenario "A stored secret is read back by its name" */
     it("reads the stored value back by name", async () => {
       const res = await readValue(SESSION_SECRET_NAME, manageToken);
@@ -229,7 +229,7 @@ describe("Feature: reading a project secret value", () => {
     });
   });
 
-  describe("given a caller that cannot manage secrets", () => {
+  describe("when the caller cannot manage secrets", () => {
     /** @scenario "A caller that can only view secrets cannot read a value" */
     it("refuses a caller that holds only secrets:view", async () => {
       const res = await readValue(SESSION_SECRET_NAME, viewOnlyToken);

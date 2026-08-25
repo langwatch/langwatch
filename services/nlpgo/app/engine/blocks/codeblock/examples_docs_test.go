@@ -32,8 +32,8 @@ func TestExamplesPublishedInTheDocsMatchTheCommittedFile(t *testing.T) {
 			doc, err := os.ReadFile(filepath.Join(repoRoot, page))
 			require.NoError(t, err)
 
-			published, found := fencedBlock(string(doc), "python "+exampleName)
-			require.True(t, found,
+			published, isFound := fencedBlock(string(doc), "python "+exampleName)
+			require.True(t, isFound,
 				"%s carries no ```python %s fence; the docs must publish the whole example",
 				page, exampleName)
 

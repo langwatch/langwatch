@@ -58,13 +58,19 @@ def read_stored_session():
     """Return the stored session while it is fresh, else None."""
     try:
         entry = json.loads(langwatch.secrets.get_value(SESSION_SECRET_NAME))
-        issued_at = float(entry["issued_at"])
         session = entry["session"]
-    except Exception as error:  # noqa: BLE001 - no session is a valid answer
-        report(error, "this row logs in")
+        age = time.time() - float(entry["issued_at"])
+    except Exception:  # noqa: BLE001 - no stored session is a valid answer
+        report("is not stored yet, or could not be read", "this row logs in")
         return None
 
-    if time.time() - issued_at >= SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
+    # Anything this agent did not write is a miss, never a token to send: an
+    # empty or non-string session becomes an empty Bearer header, and an age
+    # that is negative or not a number comes from a hand-written entry.
+    if not isinstance(session, str) or not session:
+        report("does not hold a session", "this row logs in")
+        return None
+    if not 0 <= age < SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
         return None
     return session
 
@@ -92,17 +98,17 @@ def store_session(session):
     entry = json.dumps({"session": session, "issued_at": int(time.time())})
     try:
         langwatch.secrets.set(SESSION_SECRET_NAME, entry)
-    except Exception as error:  # noqa: BLE001 - the row must still answer
-        report(error, "the next row will log in again")
+    except Exception:  # noqa: BLE001 - the row must still answer
+        report("could not be stored", "the next row will log in again")
 
 
-def report(error, consequence):
-    """Name a failure on stderr by its type. An error message can quote the
-    credential that caused it, so the message is dropped."""
-    print(
-        f"{SESSION_SECRET_NAME}: {type(error).__name__}, {consequence}",
-        file=sys.stderr,
-    )
+def report(state, consequence):
+    """Say on stderr what the store did, in this agent's own words.
+
+    Nothing from the exception reaches the output. An error message can quote
+    the credential that caused it, and a run shows stderr.
+    """
+    print(f"{SESSION_SECRET_NAME} {state}, {consequence}", file=sys.stderr)
 
 
 def secret(name):

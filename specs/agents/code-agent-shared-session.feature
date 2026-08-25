@@ -73,6 +73,15 @@ Feature: A code agent shares one login session across the rows of a run
   # ===========================================================================
 
   @integration
+  Scenario: A stored entry that holds no usable session is a miss
+    Given a stored entry with an empty session, a session that is not text, an
+      issue time in the future, an issue time that is not a number, or no entry
+      shape at all
+    When the committed example runs one row
+    Then the row logs in rather than sending the stored value as a token
+    And the row returns the answer
+
+  @integration
   Scenario: A rejected login names the failure and keeps the password out of it
     Given the stub login service rejects the credentials
     When the committed example runs one row

@@ -96,6 +96,15 @@ secured.access(requires("secrets:manage")).get(
           },
         },
       },
+      // The only route in this family that a caller can reach with a valid key
+      // and still be refused on a grain, so 403 is documented here and not in
+      // the shared base responses.
+      403: {
+        description: "The API key cannot manage secrets",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
       404: {
         description: "Secret not found",
         content: {

@@ -23264,6 +23264,18 @@ export interface operations {
                     };
                 };
             };
+            /** @description The API key cannot manage secrets */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
             /** @description Secret not found */
             404: {
                 headers: {
