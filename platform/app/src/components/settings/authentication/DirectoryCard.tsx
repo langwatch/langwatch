@@ -1,4 +1,4 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { Link } from "~/components/ui/link";
@@ -55,9 +55,14 @@ export function DirectoryCard({
   }
 
   if (reconciliation.isLoading) {
+    // The card's two detail rows, as placeholders: the shape is known
+    // before the data is, so nothing jumps when it arrives.
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        <Spinner size="sm" />
+        <VStack align="stretch" gap={3}>
+          <Skeleton height="4" width="40%" />
+          <Skeleton height="4" width="60%" />
+        </VStack>
       </OverviewCard>
     );
   }

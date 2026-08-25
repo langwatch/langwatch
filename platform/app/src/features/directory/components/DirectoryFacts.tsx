@@ -1,4 +1,4 @@
-import { HStack, Spinner, Text } from "@chakra-ui/react";
+import { HStack, Skeleton, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 
@@ -100,6 +100,6 @@ export function DirectoryFactUnavailable({
       </Text>
     );
   }
-  if (isLoading) return <Spinner size="xs" />;
+  if (isLoading) return <Skeleton height="3.5" width="24" />;
   return <>{children}</>;
 }

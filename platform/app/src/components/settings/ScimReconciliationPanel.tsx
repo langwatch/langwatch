@@ -6,6 +6,7 @@ import {
   Heading,
   HStack,
   SimpleGrid,
+  Skeleton,
   Spacer,
   Text,
   VStack,
@@ -48,10 +49,23 @@ export function ScimReconciliationPanel({
   });
 
   if (reconciliation.isLoading) {
+    // Three hairline rows, the shape the reconciliation list takes when it
+    // arrives — a wait that already looks like the answer.
     return (
-      <Text color="fg.muted" fontSize="sm">
-        Reading what your identity provider has done…
-      </Text>
+      <VStack align="stretch" gap={0} data-testid="scim-reconciliation-loading">
+        {[0, 1, 2].map((row) => (
+          <HStack
+            key={row}
+            justify="space-between"
+            paddingY={2.5}
+            borderBottomWidth={row < 2 ? "1px" : "0"}
+            borderColor="border.muted"
+          >
+            <Skeleton height="3.5" width="36" />
+            <Skeleton height="3.5" width="16" />
+          </HStack>
+        ))}
+      </VStack>
     );
   }
 

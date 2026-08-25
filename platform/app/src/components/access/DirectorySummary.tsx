@@ -2,7 +2,7 @@ import {
   Card,
   HStack,
   SimpleGrid,
-  Spinner,
+  Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -67,7 +67,26 @@ export function DirectorySummary({
   }
 
   if (reconciliation.isLoading) {
-    return <Spinner size="sm" />;
+    // The shape is known before the data is, so the wait shows the five
+    // tiles rather than a spinner the content then displaces.
+    return (
+      <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full">
+        {[0, 1, 2, 3, 4].map((tile) => (
+          <VStack
+            key={tile}
+            align="start"
+            gap={2}
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="lg"
+            padding={3}
+          >
+            <Skeleton height="2.5" width="16" />
+            <Skeleton height="4" width="24" />
+          </VStack>
+        ))}
+      </SimpleGrid>
+    );
   }
 
   return (
