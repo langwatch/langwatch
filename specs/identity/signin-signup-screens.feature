@@ -523,6 +523,38 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     Then the screen says the link expired and offers to send a fresh one
     And the expired token verifies nothing
 
+  # A LINK OPENED TWICE IS NOT A LINK THAT EXPIRED, and saying so was the
+  # single most common way this screen lied. Spending the token deleted its
+  # row, so the second visit could not tell "you used this a moment ago" from
+  # "this was never issued" and called both expired — to somebody holding a
+  # link that had just arrived and had just worked. What follows is a person
+  # pressing "send a fresh one" over and over at a screen that had already
+  # done its job.
+  #
+  # A second opening asks the same question and deserves the same answer: the
+  # address is confirmed. Nothing is created twice — the row is marked spent
+  # rather than deleted, so it can never confirm or create anything again —
+  # and the grace window means a link stays honest for as long as it is
+  # plausibly still in somebody's inbox.
+  @unit
+  Scenario: Opening a confirmation link a second time confirms, rather than refusing
+    Given I opened my confirmation link and my address is confirmed
+    When I open the same link again
+    Then the screen carries on as though it had just worked
+    And nothing is created a second time
+
+  @unit
+  Scenario: A spent link stops working once its grace window closes
+    Given I opened my confirmation link long enough ago that it is past its grace
+    When I open the same link again
+    Then the screen says the link expired and offers to send a fresh one
+
+  @unit
+  Scenario: A link nobody ever issued is refused the way an expired one is
+    When I open a confirmation link that was never issued
+    Then the screen says the link expired and offers to send a fresh one
+    And the answer never says whether that link was ever issued
+
   # The identifier-verification LANDING never spends the link — a mail scanner
   # following it must consume nothing — so it cannot learn that a token is
   # dead. What it can know without asking anybody is that no token arrived.

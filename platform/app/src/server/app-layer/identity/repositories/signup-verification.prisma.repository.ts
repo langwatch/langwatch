@@ -33,25 +33,86 @@ export class PrismaSignUpVerificationTokenStore
   }
 
   /**
-   * Deleting is the claim. A token that survived the delete never existed or
-   * was already spent, and one that is deleted but out of date is refused all
-   * the same — the row goes either way, so a spent link cannot be replayed
-   * even by the racer that lost.
+   * Renaming the row is the claim.
+   *
+   * The identifier moves into a namespace nothing can spend from, which is
+   * what makes the token single-use: `readPendingSignUp` refuses the marker,
+   * and a second `claim` sees it is already marked and answers null. The
+   * update is CONDITIONAL on the identifier it read, so two openings racing
+   * each other cannot both win — the loser's `updateMany` matches no row.
+   *
+   * `keepSpentUntil` rides in on `expires`, which stays true to its name: the
+   * row is dead after it either way. Passing null deletes instead, for the
+   * caller whose spent token must leave nothing to find.
    */
   async claim({
+    token,
+    now,
+    keepSpentUntil,
+  }: {
+    token: string;
+    now: Date;
+    keepSpentUntil: Date | null;
+  }): Promise<{ identifier: string } | null> {
+    if (!keepSpentUntil) {
+      const deleted = await this.prisma.verificationToken
+        .delete({
+          where: { token },
+          select: { identifier: true, expires: true },
+        })
+        .catch(() => null);
+      if (!deleted || deleted.expires <= now) return null;
+      return liveIdentifier(deleted.identifier);
+    }
+
+    const row = await this.prisma.verificationToken.findUnique({
+      where: { token },
+      select: { identifier: true, expires: true },
+    });
+    if (!row || row.expires <= now) return null;
+
+    const live = liveIdentifier(row.identifier);
+    if (!live) return null;
+
+    const marked = await this.prisma.verificationToken.updateMany({
+      where: { token, identifier: row.identifier },
+      data: {
+        identifier: `${SPENT_NAMESPACE}${row.identifier}`,
+        expires: keepSpentUntil,
+      },
+    });
+    if (marked.count === 0) return null;
+
+    return live;
+  }
+
+  async findSpent({
     token,
     now,
   }: {
     token: string;
     now: Date;
   }): Promise<{ identifier: string } | null> {
-    const claimed = await this.prisma.verificationToken
-      .delete({ where: { token }, select: { identifier: true, expires: true } })
-      .catch(() => null);
-
-    if (!claimed || claimed.expires <= now) return null;
-    return { identifier: claimed.identifier };
+    const row = await this.prisma.verificationToken.findUnique({
+      where: { token },
+      select: { identifier: true, expires: true },
+    });
+    if (!row || row.expires <= now) return null;
+    if (!row.identifier.startsWith(SPENT_NAMESPACE)) return null;
+    return { identifier: row.identifier.slice(SPENT_NAMESPACE.length) };
   }
+}
+
+/**
+ * The namespace a spent row is moved into. Deliberately not one any caller
+ * can spend from: the marker exists to be RECOGNISED, never to be claimed.
+ */
+const SPENT_NAMESPACE = "identity-signup-spent:";
+
+/** Refuses a row that has already been marked, so nothing is spent twice. */
+function liveIdentifier(identifier: string): { identifier: string } | null {
+  if (identifier.startsWith(SPENT_NAMESPACE)) return null;
+  return { identifier };
 }
 
 /**

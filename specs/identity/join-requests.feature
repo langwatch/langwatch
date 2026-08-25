@@ -214,6 +214,16 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the pending requests and the pending invitations are in one panel
     And each request shows who is asking and when they asked
 
+  # An empty panel is not the same as a panel that failed to load, and from
+  # the browser they look identical. A tab somebody opened on purpose owes
+  # them a sentence either way.
+  @integration
+  Scenario: An empty request list says it is empty
+    Given "acme" has nobody waiting to join
+    When "ana" opens the members area
+    Then the panel says nobody is waiting rather than rendering blank
+    And there is nothing to approve or reject
+
   @unit
   Scenario: Answering a request needs the authority that already gates inviting
     Given a member of "acme" who cannot invite colleagues

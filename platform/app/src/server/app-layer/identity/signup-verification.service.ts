@@ -38,10 +38,31 @@ export interface SignUpVerificationTokenStore {
   /**
    * Spends a token: returns the identifier it was issued for and makes it
    * unusable, or answers null for a token that never existed, was already
-   * spent, or has expired. One answer for all three on purpose — see
-   * `completeVerification`.
+   * spent, or has expired.
+   *
+   * `keepSpentUntil` says what "unusable" leaves behind. A date keeps the row
+   * as a spent MARKER until then, which is what lets `findSpent` recognise
+   * somebody opening their own link a second time; null removes it outright,
+   * for a token whose second use must look like nothing at all.
+   *
+   * Either way the token can never be spent twice — that is the whole point of
+   * the method, and the marker is not a claimable token.
    */
-  claim(input: { token: string; now: Date }): Promise<{
+  claim(input: {
+    token: string;
+    now: Date;
+    keepSpentUntil: Date | null;
+  }): Promise<{
+    identifier: string;
+  } | null>;
+  /**
+   * The identifier a token was spent for, while its marker is still live.
+   *
+   * Null once the grace window closes, and null for a token this store never
+   * issued — so the only thing this can tell anybody is what they themselves
+   * did with a link they held.
+   */
+  findSpent(input: { token: string; now: Date }): Promise<{
     identifier: string;
   } | null>;
 }
@@ -125,6 +146,23 @@ export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
  * caller must not be able to make about an address they do not hold.
  */
 const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
+
+/**
+ * How long a spent confirmation link keeps telling the truth about itself.
+ *
+ * A link that has been opened once is still sitting in an inbox, and it will
+ * be opened again — a refresh, a restored tab, a second click, a phone after a
+ * laptop. Spending it used to REMOVE its row, which left the next opening
+ * indistinguishable from a token nobody ever issued, so the screen called a
+ * link that had just worked expired and offered to send another. People
+ * pressed that button until they gave up.
+ *
+ * So the row survives as a marker, and a second opening gets the same answer
+ * as the first: the address is confirmed. A day is the window because that is
+ * roughly how long a confirmation email stays near the top of an inbox; past
+ * it, "expired" is finally the honest word.
+ */
+export const SPENT_LINK_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Half an hour: long enough to choose a password on the very next screen,
@@ -217,10 +255,20 @@ export class SignUpVerificationService {
      */
     addressProof: string | null;
   }> {
-    const claimed = await this.deps.tokens.claim({ token, now: this.now() });
+    const now = this.now();
+    const claimed = await this.deps.tokens.claim({
+      token,
+      now,
+      keepSpentUntil: new Date(now.getTime() + SPENT_LINK_GRACE_MS),
+    });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
 
     if (!pending) {
+      // Not necessarily a dead link: far more often it is this link, opened a
+      // second time by the person it was sent to. That deserves the answer it
+      // gave the first time rather than a refusal — see `reopenSpentLink`.
+      const reopened = await this.reopenSpentLink({ token });
+      if (reopened) return reopened;
       throw new IdentityVerificationExpiredError();
     }
 
@@ -284,7 +332,15 @@ export class SignUpVerificationService {
     token: string;
     email: string;
   }): Promise<boolean> {
-    const claimed = await this.deps.tokens.claim({ token, now: this.now() });
+    // Removed outright rather than marked, unlike a confirmation link. A link
+    // is opened by a person who may open it again; a proof is spent once by
+    // the screen that was handed it, and a second use is not somebody
+    // repeating themselves — so it leaves nothing behind to recognise.
+    const claimed = await this.deps.tokens.claim({
+      token,
+      now: this.now(),
+      keepSpentUntil: null,
+    });
     if (!claimed?.identifier.startsWith(CONFIRMED_ADDRESS_NAMESPACE)) {
       return false;
     }
@@ -303,6 +359,58 @@ export class SignUpVerificationService {
     await this.deps.accounts.markAddressConfirmed({
       email: normalizeIdentifierValue(email),
     });
+  }
+
+  /**
+   * The same link, opened again while its marker is still live.
+   *
+   * The answer is the answer the first opening gave, because the question has
+   * not changed: this address is confirmed. Nothing is created — the account
+   * already exists by now, or it does not and the screen still has a password
+   * to collect — and nothing is confirmed twice.
+   *
+   * It says nothing to anybody who did not hold a real link. A token this
+   * store never issued, and one whose grace has run out, both answer null and
+   * fall through to the refusal, so this cannot be asked which links exist.
+   */
+  private async reopenSpentLink({ token }: { token: string }): Promise<{
+    email: string;
+    accountCreated: boolean;
+    accountExists: boolean;
+    addressProof: string | null;
+  } | null> {
+    const spent = await this.deps.tokens.findSpent({ token, now: this.now() });
+    const pending = spent ? readPendingSignUp(spent.identifier) : null;
+    if (!pending) return null;
+
+    const state = await this.deps.directory.stateFor({ email: pending.email });
+
+    // The account was made between the two openings and its address never
+    // caught up — the register call's own proof did not land. This link is
+    // still the proof it always was, so it finishes the job now.
+    if (state === "awaiting_confirmation") {
+      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+    }
+
+    // Still no account: the first opening handed the screen a proof and the
+    // password was never chosen. A fresh proof costs nothing anybody has not
+    // already earned — the same address, proven by the same link, and the
+    // proof is single-use and short-lived on its own account.
+    if (state === "unknown") {
+      return {
+        email: pending.email,
+        accountCreated: false,
+        accountExists: false,
+        addressProof: await this.issueAddressProof({ email: pending.email }),
+      };
+    }
+
+    return {
+      email: pending.email,
+      accountCreated: false,
+      accountExists: true,
+      addressProof: null,
+    };
   }
 
   private async issueAddressProof({

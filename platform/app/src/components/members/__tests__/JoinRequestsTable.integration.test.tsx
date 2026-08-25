@@ -158,12 +158,11 @@ describe("given nothing is waiting", () => {
   afterEach(() => cleanup());
 
   describe("when the members area renders", () => {
-    /** @scenario With the flag off nothing here exists */
+    /** @scenario An empty request list says it is empty */
     it("says so rather than leaving the tab blank", () => {
-      // The flag being off looks exactly like this from the browser: the
-      // procedure answers an empty list. A tab a reader opened on purpose
-      // has to say it is empty — a blank panel reads as a page that failed
-      // to load, and there is nothing to approve either way.
+      // A tab a reader opened on purpose has to say it is empty — a blank
+      // panel reads as a page that failed to load, and there is nothing to
+      // approve either way.
       renderPanel([]);
 
       expect(screen.getByTestId("join-requests-list").textContent).toContain(
