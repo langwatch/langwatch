@@ -81,7 +81,7 @@ describe("SCIM group deletion", () => {
       const prisma = createMockPrisma();
 
       const error = await serviceFor(prisma).deleteGroup({
-        externalScimId: "group-1",
+        scimResourceId: "group-1",
         organizationId: "org-1",
       });
 
@@ -106,7 +106,7 @@ describe("SCIM group deletion", () => {
       const prisma = createMockPrisma();
 
       await serviceFor(prisma).deleteGroup({
-        externalScimId: "group-1",
+        scimResourceId: "group-1",
         organizationId: "org-1",
       });
 
@@ -125,7 +125,7 @@ describe("SCIM group deletion", () => {
       const prisma = createMockPrisma();
 
       await serviceFor(prisma).deleteGroup({
-        externalScimId: "group-1",
+        scimResourceId: "group-1",
         organizationId: "org-1",
       });
 
@@ -142,7 +142,7 @@ describe("SCIM group deletion", () => {
       const prisma = createMockPrisma({ findFirst });
 
       const result = await serviceFor(prisma).getGroup({
-        externalScimId: "group-1",
+        scimResourceId: "group-1",
         organizationId: "org-1",
       });
 
@@ -163,7 +163,7 @@ describe("SCIM group deletion", () => {
       });
 
       const error = await serviceFor(prisma).deleteGroup({
-        externalScimId: "group-1",
+        scimResourceId: "group-1",
         organizationId: "org-1",
       });
 
