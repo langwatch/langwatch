@@ -1,10 +1,16 @@
-import { Box, Code, HStack, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
-import { useCallback } from "react";
 import {
-  AddMessageButton,
-  MessageRoleLabel,
-  RemoveMessageButton,
-} from "../../ui/messages";
+  Box,
+  Button,
+  Code,
+  HStack,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Minus, Plus } from "lucide-react";
+import { useCallback } from "react";
 
 export type TestMessage = {
   role: "user" | "assistant";
@@ -17,19 +23,81 @@ export type TestMessagesBuilderProps = {
   disabled?: boolean;
 };
 
+function MessageRoleLabel({ role }: { role: TestMessage["role"] }) {
+  return (
+    <Text
+      fontSize="xs"
+      textTransform="none"
+      fontWeight="normal"
+      color="fg.muted"
+      backgroundColor="bg.muted"
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="lg"
+      display="inline-block"
+    >
+      {role === "user" ? "User" : "Assistant"}
+    </Text>
+  );
+}
+
+function RemoveMessageButton({
+  onRemove,
+  disabled = false,
+}: {
+  onRemove: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      onClick={onRemove}
+      type="button"
+      disabled={disabled}
+    >
+      <Minus />
+    </Button>
+  );
+}
+
+function AddMessageButton({
+  onAdd,
+  disabled,
+}: {
+  onAdd: (role: TestMessage["role"]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button size="xs" variant="outline" type="button" disabled={disabled}>
+          <Plus /> Add
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content portalled={false}>
+        <Menu.Item value="add-user" onClick={() => onAdd("user")}>
+          User
+        </Menu.Item>
+        <Menu.Item value="add-assistant" onClick={() => onAdd("assistant")}>
+          Assistant
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 /**
  * Single message row - matches the prompt playground UI
  */
 function MessageRow({
   message,
-  index,
   onChange,
   onRemove,
   disabled,
   canRemove,
 }: {
   message: TestMessage;
-  index: number;
   onChange: (message: TestMessage) => void;
   onRemove: () => void;
   disabled?: boolean;
@@ -115,7 +183,6 @@ export function TestMessagesBuilder({
           <MessageRow
             key={index}
             message={message}
-            index={index}
             onChange={(msg) => handleMessageChange(index, msg)}
             onRemove={() => handleRemove(index)}
             disabled={disabled}

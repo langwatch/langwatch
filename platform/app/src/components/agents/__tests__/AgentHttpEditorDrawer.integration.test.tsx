@@ -13,7 +13,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentHttpEditorDrawer } from "../AgentHttpEditorDrawer";
+import {
+  AgentHttpEditorDrawer,
+  type AgentHttpEditorDrawerProps,
+} from "../AgentHttpEditorDrawer";
 
 // -- Transitive-dependency mocks (mirrors AgentCodeEditorDrawer.test.tsx) --
 
@@ -119,9 +122,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderHttpDrawer(
-  props: Partial<Parameters<typeof AgentHttpEditorDrawer>[0]> = {},
-) {
+function renderHttpDrawer(props: Partial<AgentHttpEditorDrawerProps> = {}) {
   return render(<AgentHttpEditorDrawer open={true} {...props} />, {
     wrapper: Wrapper,
   });

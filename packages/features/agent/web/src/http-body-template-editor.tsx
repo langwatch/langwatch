@@ -4,7 +4,7 @@ import { Box, Code, Text, Textarea, VStack } from "@chakra-ui/react";
  * Standard variables available for HTTP agent body templates.
  * These are provided at runtime by the Scenario/Workflow execution.
  */
-export const STANDARD_AGENT_VARIABLES = [
+export const STANDARD_HTTP_AGENT_VARIABLES = [
   { name: "input", description: "The user's input message to the agent" },
   {
     name: "threadId",
@@ -55,7 +55,7 @@ export function BodyTemplateEditor({
           Available Variables
         </Text>
         <VStack align="stretch" gap={1}>
-          {STANDARD_AGENT_VARIABLES.map((v) => (
+          {STANDARD_HTTP_AGENT_VARIABLES.map((v) => (
             <Text key={v.name} fontSize="xs">
               <Code fontSize="xs" colorPalette="blue">
                 {`{{${v.name}}}`}

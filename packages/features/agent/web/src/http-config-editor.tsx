@@ -1,13 +1,13 @@
 import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
-import { AuthConfigSection } from "./AuthConfigSection";
-import { BodyTemplateEditor } from "./BodyTemplateEditor";
-import { HeadersConfigSection } from "./HeadersConfigSection";
-import { HttpMethodSelector } from "./HttpMethodSelector";
-import { HttpTestPanel, type HttpTestResult } from "./HttpTestPanel";
-import { OutputPathInput } from "./OutputPathInput";
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
+import { AuthConfigSection } from "./http-auth-config-section";
+import { BodyTemplateEditor } from "./http-body-template-editor";
+import { HeadersConfigSection } from "./http-headers-config-section";
+import { HttpMethodSelector } from "./http-method-selector";
+import { HttpTestPanel, type HttpTestResult } from "./http-test-panel";
+import { OutputPathInput } from "./http-output-path-input";
 
 export type HttpConfigEditorProps = {
   url: string;

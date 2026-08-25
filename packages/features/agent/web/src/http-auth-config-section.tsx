@@ -1,5 +1,5 @@
 import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
-import type { HttpAuth, HttpAuthType } from "@langwatch/workflow-contract";
+import type { HttpAuth, HttpAuthType } from "@langwatch/agent-contract";
 
 export type AuthConfigSectionProps = {
   value: HttpAuth | undefined;

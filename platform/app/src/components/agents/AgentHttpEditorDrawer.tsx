@@ -1,26 +1,22 @@
 import {
-  Box,
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Input,
-  Spinner,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
+  AgentHttpEditorDrawer as AgentHttpEditor,
+  type AgentHttpEditorPresentation,
+} from "@langwatch/agent-web";
 import {
-  isScenarioMappingValid,
-  ScenarioInputMappingSection,
-} from "~/components/suites/ScenarioInputMappingSection";
-import { Drawer } from "~/components/ui/drawer";
+  agentInputBindingSchema,
+  FIELD_TYPES,
+  type AgentWithFields,
+  type HttpAgentConfig,
+  type HttpAuth,
+  type HttpHeader,
+  type HttpMethod,
+} from "@langwatch/agent-contract";
+import { useCallback, useMemo } from "react";
+import { z } from "zod";
+import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
 import {
   type AvailableSource,
   type FieldMapping,
-  type Variable,
   VariablesSection,
 } from "~/components/variables";
 import { showErrorToast } from "~/features/errors";
@@ -31,663 +27,258 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  HttpAuth,
-  HttpComponentConfig,
-  HttpHeader,
-  HttpMethod,
-} from "@langwatch/workflow-contract";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
+import { explainExecutionStateError } from "~/optimization_studio/utils/executionStateError";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
-import {
-  AuthConfigSection,
-  BodyTemplateEditor,
-  HeadersConfigSection,
-  HttpMethodSelector,
-  HttpTestPanel,
-  OutputPathInput,
-  useHttpTest,
-} from "./http";
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-const DEFAULT_URL = "https://api.example.com/agent/chat";
-const DEFAULT_METHOD: HttpMethod = "POST";
-const DEFAULT_BODY_TEMPLATE = `{
-  "thread_id": "{{threadId}}",
-  "messages": {{messages}}
-}`;
-const DEFAULT_OUTPUT_PATH = "$.choices[0].message.content";
-
-// Fixed variables that cannot be removed
-const FIXED_VARIABLES: Variable[] = [
-  { identifier: "threadId", type: "str" },
-  { identifier: "input", type: "str" },
-  { identifier: "messages", type: "chat_messages" },
-];
-
-const FIXED_VARIABLE_IDS = new Set(FIXED_VARIABLES.map((v) => v.identifier));
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Extract HTTP config from AgentComponentConfig
- */
-function getHttpConfig(config: AgentComponentConfig): HttpComponentConfig {
-  return config as HttpComponentConfig;
-}
-
-/**
- * Build DSL-compatible config for HTTP agent
- */
-function buildHttpConfig(
-  url: string,
-  method: HttpMethod,
-  bodyTemplate: string,
-  outputPath: string,
-  headers: HttpHeader[],
-  auth: HttpAuth | undefined,
-  scenarioMappings: Record<string, FieldMapping>,
-): HttpComponentConfig {
-  return {
-    name: "HTTP",
-    description: "HTTP API endpoint",
-    url,
-    method,
-    bodyTemplate,
-    outputPath,
-    headers: headers.length > 0 ? headers : undefined,
-    auth: auth?.type === "none" ? undefined : auth,
-    scenarioMappings:
-      Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
-  };
-}
-
-// ============================================================================
-// Props
-// ============================================================================
+const inputMappingsSchema = z.record(z.string(), agentInputBindingSchema);
+const availableSourceTypeSchema = z.enum([
+  "entry",
+  "end",
+  "signature",
+  "code",
+  "retriever",
+  "prompting_technique",
+  "custom",
+  "evaluator",
+  "http",
+  "agent",
+  "if_else",
+  "dataset",
+]);
+type AvailableNestedField = AvailableSource["fields"][number];
+const nestedFieldLoaderSchema = z.custom<() => AvailableNestedField[]>(
+  (value) => typeof value === "function",
+);
+const nestedFieldSchema: z.ZodType<AvailableNestedField> = z.lazy(() =>
+  z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    type: z.enum(FIELD_TYPES),
+    children: z.array(nestedFieldSchema).optional(),
+    getChildren: nestedFieldLoaderSchema.optional(),
+    isComplete: z.boolean().optional(),
+    isCompleteLabel: z.string().optional(),
+  }),
+);
+const availableSourcesSchema: z.ZodType<AvailableSource[]> = z.array(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: availableSourceTypeSchema,
+    fields: z.array(nestedFieldSchema),
+  }),
+);
+const saveCallbackSchema = z.custom<(agent: AgentWithFields) => void>(
+  (value) => typeof value === "function",
+);
+const EMPTY_AVAILABLE_SOURCES: AvailableSource[] = [];
 
 export type AgentHttpEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSave?: (agent: AgentWithFields) => void;
-  /** If provided, loads an existing agent for editing */
   agentId?: string;
-  /** Available sources for variable mapping (from Evaluations V3) */
   availableSources?: AvailableSource[];
-  /** Current input mappings (from Evaluations V3) */
   inputMappings?: Record<string, FieldMapping>;
-  /** Callback when input mappings change (for Evaluations V3) */
   onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
+function tryParse<T>(schema: z.ZodType<T>, value: unknown): T | undefined {
+  const parsed = schema.safeParse(value);
+  return parsed.success ? parsed.data : void 0;
+}
 
-/**
- * Drawer for creating/editing an HTTP-based agent.
- * Features a tabbed interface for I/O, Body, Auth, Headers, and Test.
- */
 export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const flowCallbacksForSave = getFlowCallbacks("agentHttpEditor");
+  const flowCallbacks = getFlowCallbacks("agentHttpEditor");
   const utils = api.useUtils();
+  const createAgent = api.agents.create.useMutation();
+  const updateAgent = api.agents.update.useMutation();
+  const executeHttp = api.httpProxy.execute.useMutation();
 
+  const agentId =
+    props.agentId ?? drawerParams.agentId ?? tryParse(z.string(), complexProps.agentId);
+  const availableSources =
+    props.availableSources ??
+    tryParse(availableSourcesSchema, complexProps.availableSources) ??
+    EMPTY_AVAILABLE_SOURCES;
+  const inputMappings =
+    props.inputMappings ?? tryParse(inputMappingsSchema, complexProps.inputMappings);
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ??
-    flowCallbacksForSave?.onSave ??
-    (complexProps.onSave as AgentHttpEditorDrawerProps["onSave"]);
-  const agentId =
-    props.agentId ?? drawerParams.agentId ?? (complexProps.agentId as string | undefined);
-  const isOpen = props.open !== false && props.open !== undefined;
-
-  // Props from drawer params or direct props (for Evaluations V3)
-  const availableSources =
-    props.availableSources ??
-    (complexProps.availableSources as AvailableSource[] | undefined);
-
-  const initialInputMappings =
-    props.inputMappings ??
-    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
-
-  const flowCallbacks = getFlowCallbacks("agentHttpEditor");
+    flowCallbacks?.onSave ??
+    tryParse(saveCallbackSchema, complexProps.onSave);
   const onInputMappingsChange =
     props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
-
-  // Local state for mappings (allows fast UI updates while persisting to store)
-  const [localMappings, setLocalMappings] = useState<Record<string, FieldMapping>>(
-    initialInputMappings ?? {},
-  );
-
-  // Sync local mappings when initial mappings change (e.g., when drawer reopens)
-  useEffect(() => {
-    if (initialInputMappings) {
-      setLocalMappings(initialInputMappings);
-    }
-  }, [initialInputMappings]);
-
-  // Handle mapping change - update local state and persist
-  const handleMappingChange = useCallback(
-    (identifier: string, mapping: FieldMapping | undefined) => {
-      setLocalMappings((prev) => {
-        const next = { ...prev };
-        if (mapping) {
-          next[identifier] = mapping;
-        } else {
-          delete next[identifier];
-        }
-        return next;
-      });
-      onInputMappingsChange?.(identifier, mapping);
-    },
-    [onInputMappingsChange],
-  );
-
-  // Check if we should show the variables tab (only when availableSources is provided)
-  const showVariablesTab = availableSources && availableSources.length > 0;
-
-  // Form state
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState(DEFAULT_URL);
-  const [method, setMethod] = useState<HttpMethod>(DEFAULT_METHOD);
-  const [bodyTemplate, setBodyTemplate] = useState(DEFAULT_BODY_TEMPLATE);
-  const [outputPath, setOutputPath] = useState(DEFAULT_OUTPUT_PATH);
-  const [headers, setHeaders] = useState<HttpHeader[]>([]);
-  const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  // Custom variables (in addition to fixed ones)
-  const [customVariables, setCustomVariables] = useState<Variable[]>([]);
-  // Scenario mappings (persisted on agent config, used by the HTTP adapter at runtime)
-  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
-    {},
-  );
-  // Default to variables tab when in evaluations context (has availableSources)
-  const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
-
-  // All variables = fixed + custom
-  const variables = useMemo(() => {
-    return [...FIXED_VARIABLES, ...customVariables];
-  }, [customVariables]);
-
-  // Handle variable changes (only affects custom variables)
-  const handleVariablesChange = useCallback((newVariables: Variable[]) => {
-    // Filter out fixed variables - only keep custom ones
-    const newCustomVariables = newVariables.filter(
-      (v) => !FIXED_VARIABLE_IDS.has(v.identifier),
-    );
-    setCustomVariables(newCustomVariables);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Validation: at least one variable should have a mapping
-  const hasAtLeastOneMapping = useMemo(() => {
-    return variables.some((v) => localMappings[v.identifier]);
-  }, [variables, localMappings]);
-
-  // For highlighting: show which variables are missing mappings (but only as info, not error)
-  // Since all are optional, we don't require all to be filled - just at least one
-  const missingMappingIds = useMemo(() => {
-    if (!showVariablesTab) {
-      return new Set<string>();
-    }
-    // If at least one mapping exists, don't highlight any as missing
-    if (hasAtLeastOneMapping) {
-      return new Set<string>();
-    }
-    // If no mappings, highlight all as needing attention
-    return new Set(variables.map((v) => v.identifier));
-  }, [showVariablesTab, variables, hasAtLeastOneMapping]);
-
-  // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!agentId && !!project?.id && isOpen },
+    { enabled: Boolean(agentId && project?.id && props.open !== false) },
   );
 
-  // Track whether form has been initialized for this drawer session
-  const formInitializedRef = useRef(false);
-  const lastAgentIdRef = useRef<string | undefined>(undefined);
+  const handleCreate = useCallback(
+    async (input: { projectId: string; name: string; config: HttpAgentConfig }) => {
+      const agent = await createAgent.mutateAsync({
+        projectId: input.projectId,
+        name: input.name,
+        type: "http",
+        config: input.config,
+      });
 
-  // Initialize form with agent data - only on first open or when agentId changes
-  useEffect(() => {
-    // Reset initialization flag when agentId changes
-    if (lastAgentIdRef.current !== agentId) {
-      formInitializedRef.current = false;
-      lastAgentIdRef.current = agentId;
-    }
-
-    // Only initialize once per drawer session
-    if (formInitializedRef.current) {
-      return;
-    }
-
-    if (agentQuery.data) {
-      const config = getHttpConfig(agentQuery.data.config);
-      setName(agentQuery.data.name ?? "");
-      setUrl(config.url || DEFAULT_URL);
-      setMethod(config.method ?? DEFAULT_METHOD);
-      // Use || to also catch empty strings
-      setBodyTemplate(config.bodyTemplate || DEFAULT_BODY_TEMPLATE);
-      setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
-      setHeaders(config.headers ?? []);
-      setAuth(config.auth ?? { type: "none" });
-      // Load persisted scenario mappings or compute best-match defaults from the
-      // fixed scenario inputs (input / messages / threadId).
-      const existingScenarioMappings = config.scenarioMappings ?? {};
-      setScenarioMappings(
-        Object.keys(existingScenarioMappings).length > 0
-          ? existingScenarioMappings
-          : computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
-      );
-      setHasUnsavedChanges(false);
-      formInitializedRef.current = true;
-    } else if (!agentId && isOpen) {
-      // Reset form for new agent only when drawer opens
-      setName("");
-      setUrl(DEFAULT_URL);
-      setMethod(DEFAULT_METHOD);
-      setBodyTemplate(DEFAULT_BODY_TEMPLATE);
-      setOutputPath(DEFAULT_OUTPUT_PATH);
-      setHeaders([]);
-      setAuth({ type: "none" });
-      setScenarioMappings(computeBestMatchMappings({ inputs: FIXED_VARIABLES }));
-      setHasUnsavedChanges(false);
-      formInitializedRef.current = true;
-    }
-  }, [agentQuery.data, agentId, isOpen]);
-
-  // Reset initialization flag when drawer closes
-  useEffect(() => {
-    if (!isOpen) {
-      formInitializedRef.current = false;
-    }
-  }, [isOpen]);
-
-  // Mutations
-  const createMutation = api.agents.create.useMutation({
-    onSuccess: (agent) => {
-      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
-      onSave?.(agent);
-      onClose();
+      void utils.agents.getAll.invalidate({ projectId: input.projectId });
+      return agent;
     },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
-  });
+    [createAgent, utils.agents.getAll],
+  );
 
-  const updateMutation = api.agents.update.useMutation({
-    onSuccess: (agent) => {
-      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+  const handleUpdate = useCallback(
+    async (input: {
+      id: string;
+      projectId: string;
+      name: string;
+      config: HttpAgentConfig;
+    }) => {
+      const agent = await updateAgent.mutateAsync(input);
+
+      void utils.agents.getAll.invalidate({ projectId: input.projectId });
       void utils.agents.getById.invalidate({
         id: agent.id,
-        projectId: project?.id ?? "",
+        projectId: input.projectId,
       });
-      onSave?.(agent);
-      onClose();
+      return agent;
     },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
-  });
-
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid =
-    (name?.trim().length ?? 0) > 0 &&
-    (url?.trim().length ?? 0) > 0 &&
-    isScenarioMappingValid({
-      mappings: scenarioMappings,
-    });
-
-  const handleSave = useCallback(() => {
-    if (!project?.id || !isValid) return;
-
-    const config = buildHttpConfig(
-      url,
-      method,
-      bodyTemplate,
-      outputPath,
-      headers,
-      auth,
-      scenarioMappings,
-    );
-
-    if (agentId) {
-      // Editing existing agent
-      updateMutation.mutate({
-        id: agentId,
-        projectId: project.id,
-        name: name.trim(),
-        config,
-      });
-    } else {
-      // Creating new agent
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        type: "http",
-        config,
-      });
-    }
-  }, [
-    project?.id,
-    agentId,
-    name,
-    url,
-    method,
-    bodyTemplate,
-    outputPath,
-    headers,
-    auth,
-    scenarioMappings,
-    isValid,
-    createMutation,
-    updateMutation,
-  ]);
-
-  const handleScenarioMappingChange = useCallback(
-    (identifier: string, mapping: FieldMapping | undefined) => {
-      setScenarioMappings((prev) => {
-        if (!mapping) {
-          const next = { ...prev };
-          delete next[identifier];
-          return next;
-        }
-        return { ...prev, [identifier]: mapping };
-      });
-      setHasUnsavedChanges(true);
-    },
-    [],
+    [updateAgent, utils.agents.getAll, utils.agents.getById],
   );
 
-  const markDirty = () => setHasUnsavedChanges(true);
-
-  const handleClose = () => {
-    if (hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
-        return;
+  const handleTest = useCallback(
+    async (input: {
+      url: string;
+      method: HttpMethod;
+      headers: HttpHeader[];
+      auth: HttpAuth | undefined;
+      outputPath: string;
+      bodyTemplate: string;
+      templateVariables: Record<string, unknown>;
+    }) => {
+      if (!project?.id) {
+        return { success: false, error: "No project selected" };
       }
-    }
-    onClose();
-  };
 
-  // HTTP test via shared hook
-  const { handleTest } = useHttpTest({
-    url,
-    method,
-    headers,
-    auth,
-    outputPath,
-    bodyTemplate,
-  });
+      try {
+        const result = await executeHttp.mutateAsync({
+          projectId: project.id,
+          url: input.url,
+          method: input.method,
+          headers: input.headers.map((header) => ({
+            key: header.key,
+            value: header.value,
+          })),
+          auth: input.auth,
+          bodyTemplate: input.bodyTemplate,
+          templateVariables: input.templateVariables,
+          outputPath: input.outputPath,
+        });
+
+        return {
+          success: result.success,
+          response: result.response,
+          extractedOutput: result.extractedOutput,
+          error: result.error,
+          errorCode: result.errorCode,
+          status: result.status,
+          statusText: result.statusText,
+          duration: result.duration,
+          responseHeaders: result.responseHeaders,
+          renderedBody: result.renderedBody,
+          warnings: result.warnings,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Test request failed",
+        };
+      }
+    },
+    [executeHttp, project?.id],
+  );
+
+  const defaultScenarioMappings = useMemo(() => {
+    const mappings = computeBestMatchMappings({
+      inputs: [
+        { identifier: "threadId" },
+        { identifier: "input" },
+        { identifier: "messages" },
+      ],
+    });
+    return tryParse(inputMappingsSchema, mappings) ?? {};
+  }, []);
+
+  const presentation = useMemo<AgentHttpEditorPresentation>(
+    () => ({
+      renderScenarioMappings: ({ inputs, mappings, onMappingChange }) => (
+        <ScenarioInputMappingSection
+          inputs={inputs}
+          mappings={mappings}
+          onMappingChange={onMappingChange}
+        />
+      ),
+      renderVariables: ({
+        variables,
+        mappings,
+        onChange,
+        onMappingChange,
+        missingMappingIds,
+        lockedVariableIds,
+      }) => (
+        <VariablesSection
+          title="Input Variables"
+          variables={variables}
+          onChange={onChange}
+          showMappings
+          availableSources={availableSources}
+          mappings={mappings}
+          onMappingChange={onMappingChange}
+          canAddRemove
+          readOnly={false}
+          lockedVariables={lockedVariableIds}
+          missingMappingIds={missingMappingIds}
+          showMissingMappingsError={false}
+          optionalHighlighting
+        />
+      ),
+      explainTestError: ({ errorCode, error }) =>
+        explainExecutionStateError({
+          state: { error_type: errorCode, error },
+          fallbackTitle: "The request failed",
+        }),
+      showSaveError: showErrorToast,
+    }),
+    [availableSources],
+  );
 
   return (
-    <>
-      <Drawer.Root
-        open={isOpen}
-        onOpenChange={({ open }) => !open && handleClose()}
-        size="lg"
-        closeOnInteractOutside={false}
-        modal={false}
-        preventScroll={false}
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.CloseTrigger />
-          <Drawer.Header>
-            <HStack gap={2}>
-              {canGoBack && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  padding={1}
-                  minWidth="auto"
-                  data-testid="back-button"
-                >
-                  <LuArrowLeft size={20} />
-                </Button>
-              )}
-              <Heading>{agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Heading>
-            </HStack>
-          </Drawer.Header>
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
-            padding={0}
-          >
-            {agentId && agentQuery.isLoading ? (
-              <HStack justify="center" paddingY={8}>
-                <Spinner size="md" />
-              </HStack>
-            ) : (
-              <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-                {/* Agent Name */}
-                <Box paddingX={6} paddingTop={4}>
-                  <Field.Root required>
-                    <Field.Label>Agent Name</Field.Label>
-                    <Input
-                      value={name}
-                      onChange={(e) => {
-                        setName(e.target.value);
-                        markDirty();
-                      }}
-                      placeholder="Enter agent name"
-                      data-testid="agent-name-input"
-                    />
-                  </Field.Root>
-                </Box>
-
-                {/* URL with Method Selector */}
-                <Box paddingX={6}>
-                  <HStack gap={2}>
-                    <HttpMethodSelector
-                      value={method}
-                      onChange={(m) => {
-                        setMethod(m);
-                        markDirty();
-                      }}
-                    />
-                    <Input
-                      value={url}
-                      onChange={(e) => {
-                        setUrl(e.target.value);
-                        markDirty();
-                      }}
-                      placeholder="https://api.example.com/agent/chat"
-                      flex={1}
-                      data-testid="url-input"
-                    />
-                  </HStack>
-                </Box>
-
-                {/* Tabbed Content */}
-                <Tabs.Root
-                  value={activeTab}
-                  onValueChange={(e) => setActiveTab(e.value)}
-                  flex={1}
-                  display="flex"
-                  flexDirection="column"
-                  overflow="hidden"
-                  colorPalette="blue"
-                >
-                  <Tabs.List paddingX={6} borderBottomWidth="1px" borderColor="border">
-                    <Tabs.Trigger value="body">Body</Tabs.Trigger>
-                    {showVariablesTab && (
-                      <Tabs.Trigger value="variables">Variables</Tabs.Trigger>
-                    )}
-                    <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
-                    <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
-                    <Tabs.Trigger value="test">Test</Tabs.Trigger>
-                  </Tabs.List>
-
-                  {/* Body Tab */}
-                  <Tabs.Content
-                    value="body"
-                    flex={1}
-                    overflowY="auto"
-                    paddingX={6}
-                    paddingY={4}
-                  >
-                    <VStack gap={6} align="stretch">
-                      <Field.Root>
-                        <Field.Label>Request Body Template</Field.Label>
-                        <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                          JSON body with mustache variables. Variables are replaced at
-                          runtime.
-                        </Text>
-                        <BodyTemplateEditor
-                          value={bodyTemplate}
-                          onChange={(v) => {
-                            setBodyTemplate(v);
-                            markDirty();
-                          }}
-                        />
-                      </Field.Root>
-                      <Field.Root>
-                        <Field.Label>Output Path (JSONPath)</Field.Label>
-                        <OutputPathInput
-                          value={outputPath}
-                          onChange={(v) => {
-                            setOutputPath(v);
-                            markDirty();
-                          }}
-                        />
-                      </Field.Root>
-                      {/* Scenario input mapping — HTTP adapter reads these at runtime */}
-                      <ScenarioInputMappingSection
-                        inputs={variables}
-                        mappings={scenarioMappings}
-                        onMappingChange={handleScenarioMappingChange}
-                      />
-                    </VStack>
-                  </Tabs.Content>
-
-                  {/* Variables Tab - only shown when availableSources is provided */}
-                  {showVariablesTab && (
-                    <Tabs.Content
-                      value="variables"
-                      flex={1}
-                      overflowY="auto"
-                      paddingX={6}
-                      paddingY={4}
-                    >
-                      <VStack gap={4} align="stretch">
-                        <Text fontSize="sm" color="fg.muted">
-                          Define variables to use in your body template (e.g.,{" "}
-                          <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
-                            {"{{input}}"}
-                          </Text>
-                          ) and map them to your evaluation dataset. At least one variable
-                          must be mapped.
-                        </Text>
-                        <VariablesSection
-                          title="Input Variables"
-                          variables={variables}
-                          onChange={handleVariablesChange}
-                          showMappings={true}
-                          availableSources={availableSources}
-                          mappings={localMappings}
-                          onMappingChange={handleMappingChange}
-                          canAddRemove={true}
-                          readOnly={false}
-                          lockedVariables={FIXED_VARIABLE_IDS}
-                          missingMappingIds={missingMappingIds}
-                          showMissingMappingsError={false}
-                          optionalHighlighting={true}
-                        />
-                        {!hasAtLeastOneMapping && (
-                          <Text
-                            data-testid="at-least-one-mapping-error"
-                            color="red.500"
-                            fontSize="sm"
-                          >
-                            At least one variable must be mapped
-                          </Text>
-                        )}
-                      </VStack>
-                    </Tabs.Content>
-                  )}
-
-                  {/* Auth Tab */}
-                  <Tabs.Content
-                    value="auth"
-                    flex={1}
-                    overflowY="auto"
-                    paddingX={6}
-                    paddingY={4}
-                  >
-                    <AuthConfigSection
-                      value={auth}
-                      onChange={(a) => {
-                        setAuth(a);
-                        markDirty();
-                      }}
-                    />
-                  </Tabs.Content>
-
-                  {/* Headers Tab */}
-                  <Tabs.Content
-                    value="headers"
-                    flex={1}
-                    overflowY="auto"
-                    paddingX={6}
-                    paddingY={4}
-                  >
-                    <HeadersConfigSection
-                      value={headers}
-                      onChange={(h) => {
-                        setHeaders(h);
-                        markDirty();
-                      }}
-                    />
-                  </Tabs.Content>
-
-                  {/* Test Tab */}
-                  <Tabs.Content
-                    value="test"
-                    flex={1}
-                    overflowY="auto"
-                    paddingX={6}
-                    paddingY={4}
-                  >
-                    <HttpTestPanel
-                      onTest={handleTest}
-                      url={url}
-                      method={method}
-                      headers={headers}
-                      outputPath={outputPath}
-                      bodyTemplate={bodyTemplate}
-                    />
-                  </Tabs.Content>
-                </Tabs.Root>
-              </VStack>
-            )}
-          </Drawer.Body>
-          <Drawer.Footer borderTopWidth="1px" borderColor="border">
-            <HStack gap={3}>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="blue"
-                onClick={handleSave}
-                disabled={!isValid || isSaving}
-                loading={isSaving}
-                data-testid="save-agent-button"
-              >
-                {agentId ? "Save Changes" : "Create Agent"}
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Root>
-    </>
+    <AgentHttpEditor
+      open={props.open}
+      agentId={agentId}
+      agent={agentQuery.data}
+      isLoadingAgent={agentQuery.isLoading}
+      isSaving={createAgent.isPending || updateAgent.isPending}
+      projectId={project?.id}
+      onClose={onClose}
+      onGoBack={canGoBack ? goBack : void 0}
+      onSave={onSave}
+      onCreate={handleCreate}
+      onUpdate={handleUpdate}
+      onTest={handleTest}
+      presentation={presentation}
+      defaultScenarioMappings={defaultScenarioMappings}
+      availableSources={availableSources}
+      inputMappings={inputMappings}
+      onInputMappingsChange={onInputMappingsChange}
+    />
   );
 }

@@ -110,6 +110,22 @@ Feature: Agents package boundary
     And it depends on Agents contract and the design system
     And it imports no Agents server, Prisma, Node runtime or app source
 
+  @web @http-agent
+  Scenario: HTTP editor preserves stored and default scenario mappings
+    Given an existing HTTP agent has persisted scenario mappings
+    When its editor opens
+    Then the persisted mappings are shown
+    When the persisted mapping set is empty
+    Then the app-supplied default mappings are shown instead
+
+  @web @http-agent
+  Scenario: HTTP request testing preserves the compatibility result
+    Given an HTTP agent editor has a configured endpoint and headers
+    When the user tests the request
+    Then the app executes it for the current project
+    And only header keys and values cross the transport boundary
+    And the editor receives the established response, output, error, status, duration, header, rendered body, and warning fields
+
   @architecture @registration
   Scenario: Each runtime installs only its Agents adapter
     Given no Agents installer has been called

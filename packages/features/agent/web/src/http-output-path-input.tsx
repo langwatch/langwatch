@@ -1,6 +1,6 @@
 import { Input, Text, VStack } from "@chakra-ui/react";
 
-export type OutputPathInputProps = {
+export type HttpOutputPathInputProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -14,7 +14,7 @@ export function OutputPathInput({
   value,
   onChange,
   disabled = false,
-}: OutputPathInputProps) {
+}: HttpOutputPathInputProps) {
   return (
     <VStack align="stretch" gap={1} width="full">
       <Input

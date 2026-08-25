@@ -36,9 +36,7 @@ export function AgentCodeEditorDrawerFromUrl(
   return <AgentCodeEditorDrawer {...props} open={open} />;
 }
 
-export function AgentHttpEditorDrawerFromUrl(
-  props: Omit<AgentHttpEditorDrawerProps, "open"> & { open?: boolean },
-) {
+export function AgentHttpEditorDrawerFromUrl(props: AgentHttpEditorDrawerProps) {
   const { drawerOpen } = useDrawer();
   const open = props.open ?? drawerOpen("agentHttpEditor");
   return <AgentHttpEditorDrawer {...props} open={open} />;
