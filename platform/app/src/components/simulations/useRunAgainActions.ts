@@ -35,9 +35,9 @@ export function useRunAgainActions({
   } = useScenarioTarget(scenarioId);
 
   const handleRunAgain = useCallback(
-    async (target: TargetValue, remember: boolean) => {
+    async (target: TargetValue, shouldRemember: boolean) => {
       if (!scenarioId || !target) return;
-      if (remember) persistTarget(target);
+      if (shouldRemember) persistTarget(target);
       try {
         await runScenario({ scenarioId, target });
       } catch (error) {

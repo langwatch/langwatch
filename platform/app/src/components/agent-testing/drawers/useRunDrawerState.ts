@@ -68,7 +68,13 @@ export function hasCriteria(scenarioState: {
 }
 
 /**
- * Reads the stored run once more the moment the run settles.
+ * How long to wait before each reread of a settled run. The list also sets
+ * how many rereads there are: once it runs out, the drawer stops asking.
+ */
+const SETTLED_REREAD_DELAYS_MS = [500, 1_000, 2_000, 4_000];
+
+/**
+ * Reads the stored run again after the run settles, until the results arrive.
  *
  * The event that carries the terminal status can beat the write of the
  * results, and a settled run stops polling, so without this the drawer keeps
@@ -93,13 +99,22 @@ function useRereadOnSettled({
     isTerminalStatus(scenarioState.status) &&
     !hasCriteria(scenarioState as Parameters<typeof hasCriteria>[0]);
 
+  const [rereadCount, setRereadCount] = useState(0);
+
+  useEffect(() => {
+    setRereadCount(0);
+  }, [scenarioRunId, open]);
+
   useEffect(() => {
     if (!open || !scenarioRunId || !isSettledWithoutResults) return;
+    const delay = SETTLED_REREAD_DELAYS_MS[rereadCount];
+    if (delay === undefined) return;
     const timer = setTimeout(() => {
       void utilsRef.current.scenarios.getRunState.invalidate({ scenarioRunId });
-    }, 500);
+      setRereadCount((count) => count + 1);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [open, scenarioRunId, isSettledWithoutResults]);
+  }, [open, scenarioRunId, isSettledWithoutResults, rereadCount]);
 }
 
 /**

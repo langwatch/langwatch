@@ -279,7 +279,7 @@ describe("starting a one-off run from the case table", () => {
     mockRouterState.asPath = "/test-project/agent-testing";
     useAgentTestingStore.setState({
       lastRunTarget: null,
-      pendingBatchRunId: null,
+      pendingRun: null,
     });
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow()],

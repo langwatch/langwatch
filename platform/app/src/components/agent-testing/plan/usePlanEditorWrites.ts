@@ -108,6 +108,8 @@ function onRefused({
 
 export type PlanEditorWritesInput = {
   projectId: string;
+  /** True when the dialog was opened on a stored plan. */
+  isEditing: boolean;
   /** The stored plan being edited, or nothing for a new one. */
   suite: SimulationSuite | null | undefined;
   /** The react-hook-form instance the fields are bound to. */
@@ -121,11 +123,13 @@ export type PlanEditorWritesInput = {
 /** Queues the mutation the plan needs: an update for a stored one, a create otherwise. */
 function useStorePlan({
   projectId,
+  isEditing,
   suite,
   createMutation,
   updateMutation,
 }: {
   projectId: string;
+  isEditing: boolean;
   suite: SimulationSuite | null | undefined;
   createMutation: { mutate: PlanMutate };
   updateMutation: { mutate: PlanMutateWithId };
@@ -133,6 +137,9 @@ function useStorePlan({
   return useCallback(
     (data: SuiteFormData, options?: PlanMutateOptions) => {
       if (!projectId) return;
+      // An edit whose plan never arrived would otherwise fall through to the
+      // create branch and store a second plan.
+      if (isEditing && !suite) return;
       const payload = buildMutationPayload(data, projectId);
       if (suite) {
         updateMutation.mutate({ ...payload, id: suite.id }, options);
@@ -140,12 +147,13 @@ function useStorePlan({
       }
       createMutation.mutate(payload, options);
     },
-    [projectId, suite, createMutation, updateMutation],
+    [projectId, isEditing, suite, createMutation, updateMutation],
   );
 }
 
 export function usePlanEditorWrites({
   projectId,
+  isEditing,
   suite,
   form,
   onSaved,
@@ -190,6 +198,7 @@ export function usePlanEditorWrites({
 
   const store = useStorePlan({
     projectId,
+    isEditing,
     suite,
     createMutation,
     updateMutation,

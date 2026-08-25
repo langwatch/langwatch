@@ -16,10 +16,13 @@ import type { TestCase, TestSuiteEntry } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
 
 /** The run dialog subject of a whole suite, with the cases it holds. */
-function runSubjectForSuite(
-  suite: TestSuiteEntry,
-  cases: TestCase[],
-): RunDialogSubject {
+function runSubjectForSuite({
+  suite,
+  cases,
+}: {
+  suite: TestSuiteEntry;
+  cases: TestCase[];
+}): RunDialogSubject {
   const persisted = suite.targets?.[0];
   return {
     kind: "suite",
@@ -47,13 +50,12 @@ export function useRunStartedHandler({
   setRunningCaseId?: (scenarioId: string | null) => void;
 }): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();
-  const setPendingBatchRunId = useAgentTestingStore(
-    (state) => state.setPendingBatchRunId,
-  );
+  const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   return useCallback(
     (info: RunStartedInfo) => {
-      setPendingBatchRunId(info.batchRunId);
+      const scenarioSetId = info.scenarioSetId ?? getOnPlatformSetId(projectId);
+      setPendingRun({ batchRunId: info.batchRunId, scenarioSetId });
       if (!info.scenarioId) {
         toaster.create({ title: "Run scheduled", type: "success" });
         return;
@@ -62,12 +64,12 @@ export function useRunStartedHandler({
       setRunningCaseId?.(info.scenarioId);
       openLiveRun({
         batchRunId: info.batchRunId,
-        scenarioSetId: info.scenarioSetId ?? getOnPlatformSetId(projectId),
+        scenarioSetId,
         scenarioId: info.scenarioId,
         targetId: info.targetId,
       });
     },
-    [setPendingBatchRunId, setRunningCaseId, openLiveRun, projectId],
+    [setPendingRun, setRunningCaseId, openLiveRun, projectId],
   );
 }
 
@@ -119,7 +121,7 @@ export function useCaseRunActions({
 
   const runSelectedSet = useCallback(() => {
     if (selection.kind === "suite" && selectedSuite) {
-      setRunSubject(runSubjectForSuite(selectedSuite, cases));
+      setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
       return;
     }
     setRunSubject({ kind: "all", initialTarget: lastRunTarget });
@@ -128,7 +130,7 @@ export function useCaseRunActions({
   const runSuiteById = useCallback(
     (suiteId: string) => {
       const suite = suites.find((entry) => entry.id === suiteId);
-      if (suite) setRunSubject(runSubjectForSuite(suite, cases));
+      if (suite) setRunSubject(runSubjectForSuite({ suite, cases }));
     },
     [suites, cases],
   );

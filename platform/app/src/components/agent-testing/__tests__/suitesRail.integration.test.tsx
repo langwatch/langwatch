@@ -125,19 +125,18 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
-  it("nests no button inside a rail row", () => {
+  it("keeps the row menu beside the selection control, not inside it", () => {
     renderRail({
       suites: [makeSuite({ id: "suite_1", name: "Refunds", slug: "refunds" })],
       externalSets: [],
     });
 
-    const row = screen.getByTestId("suite-rail-item-Refunds");
-    expect(row.tagName).not.toBe("BUTTON");
-    expect(row).toHaveAttribute("role", "button");
-    // The row menu lives inside the row, so the row itself must not be one.
-    expect(within(row).getByLabelText("Actions for Refunds").tagName).toBe(
-      "BUTTON",
-    );
+    const select = screen.getByTestId("suite-rail-item-Refunds");
+    expect(select.tagName).toBe("BUTTON");
+    const menu = screen.getByLabelText("Actions for Refunds");
+    expect(menu.tagName).toBe("BUTTON");
+    // A control inside a control takes the keypress meant for the inner one.
+    expect(select.contains(menu)).toBe(false);
   });
 
   /** @scenario "An external set carries the code icon and no counts" */

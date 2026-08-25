@@ -17,6 +17,7 @@
 import {
   Box,
   Button,
+  chakra,
   HStack,
   Skeleton,
   Text,
@@ -79,7 +80,6 @@ export type CasesTableProps = {
   onArchive: (testCase: TestCase) => void;
 };
 
-/** The card every Agent Testing table is drawn inside. */
 function TableCard({ children, ...rest }: React.ComponentProps<typeof Box>) {
   return (
     <Box
@@ -274,9 +274,20 @@ function CaseRow({
       data-testid={`case-row-${testCase.name}`}
     >
       <HStack gap={1.5} minWidth={0} flexWrap="wrap">
-        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-          {testCase.name}
-        </Text>
+        <chakra.button
+          type="button"
+          minWidth={0}
+          textAlign="left"
+          cursor="pointer"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRowClick(testCase);
+          }}
+        >
+          <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+            {testCase.name}
+          </Text>
+        </chakra.button>
         <TagList labels={testCase.labels} tone="pastel" />
       </HStack>
 
@@ -370,6 +381,48 @@ function LastResultCell({
   );
 }
 
+/** The submenu that files a case under one of the test suites, or under none. */
+function MoveToSuiteSubmenu({
+  testCase,
+  suites,
+  onMoveToSuite,
+}: {
+  testCase: TestCase;
+  suites: TestSuiteEntry[];
+  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
+}) {
+  const stop = (event: React.MouseEvent) => event.stopPropagation();
+
+  return (
+    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+      <Menu.TriggerItem value="move-to-suite">Move to suite</Menu.TriggerItem>
+      <Menu.Content>
+        {suites.map((suite) => (
+          <Menu.Item
+            key={suite.id}
+            value={`move-${suite.id}`}
+            onClick={(event) => {
+              stop(event);
+              onMoveToSuite(testCase, suite.id);
+            }}
+          >
+            {suite.name}
+          </Menu.Item>
+        ))}
+        <Menu.Item
+          value="move-unfiled"
+          onClick={(event) => {
+            stop(event);
+            onMoveToSuite(testCase, null);
+          }}
+        >
+          No test suite
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 function CaseRowActionsMenu({
   testCase,
   suites,
@@ -445,34 +498,11 @@ function CaseRowActionsMenu({
           </Menu.Item>
         )}
         {canManage && (
-          <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-            <Menu.TriggerItem value="move-to-suite">
-              Move to suite
-            </Menu.TriggerItem>
-            <Menu.Content>
-              {suites.map((suite) => (
-                <Menu.Item
-                  key={suite.id}
-                  value={`move-${suite.id}`}
-                  onClick={(event) => {
-                    stop(event);
-                    onMoveToSuite(testCase, suite.id);
-                  }}
-                >
-                  {suite.name}
-                </Menu.Item>
-              ))}
-              <Menu.Item
-                value="move-unfiled"
-                onClick={(event) => {
-                  stop(event);
-                  onMoveToSuite(testCase, null);
-                }}
-              >
-                No test suite
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
+          <MoveToSuiteSubmenu
+            testCase={testCase}
+            suites={suites}
+            onMoveToSuite={onMoveToSuite}
+          />
         )}
         <Menu.Item
           value="history"
@@ -526,8 +556,11 @@ export function ExternalCasesTable({
         }}
       >
         {cases.map((externalCase) => (
-          <Box
+          <chakra.button
             key={externalCase.scenarioId}
+            type="button"
+            width="full"
+            textAlign="left"
             display="grid"
             gridTemplateColumns={EXTERNAL_COLUMNS}
             columnGap={3}
@@ -551,7 +584,7 @@ export function ExternalCasesTable({
             >
               {format(externalCase.lastRunAt, "MMM d, HH:mm")}
             </Text>
-          </Box>
+          </chakra.button>
         ))}
       </Box>
     </TableCard>

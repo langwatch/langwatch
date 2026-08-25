@@ -75,20 +75,17 @@ export function useNewRunPlanFlow(
 export function useScenarioEditorRunFlow(projectId: string | undefined): void {
   const { setFlowCallbacks } = useDrawer();
   const { openLiveRun } = useOpenLiveRun();
-  const setPendingBatchRunId = useAgentTestingStore(
-    (state) => state.setPendingBatchRunId,
-  );
+  const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   useEffect(() => {
     if (!projectId) return;
+    const scenarioSetId = getOnPlatformSetId(projectId);
     setFlowCallbacks("scenarioEditor", {
       onRunStarted: ({ batchRunId }: { batchRunId: string }) => {
-        setPendingBatchRunId(batchRunId);
-        void openLiveRun({
-          batchRunId,
-          scenarioSetId: getOnPlatformSetId(projectId),
-        });
+        setPendingRun({ batchRunId, scenarioSetId });
+        void openLiveRun({ batchRunId, scenarioSetId });
       },
     });
-  }, [projectId, setFlowCallbacks, setPendingBatchRunId, openLiveRun]);
+    return () => setFlowCallbacks("scenarioEditor", {});
+  }, [projectId, setFlowCallbacks, setPendingRun, openLiveRun]);
 }

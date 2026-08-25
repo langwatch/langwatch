@@ -190,7 +190,7 @@ describe("<RunDialog/>", () => {
     mockHasProviders.value = true;
     useAgentTestingStore.setState({
       lastRunTarget: null,
-      pendingBatchRunId: null,
+      pendingRun: null,
     });
     mockAgentsGetAll.mockReturnValue({
       data: [ONLINE_AGENT, OFFLINE_AGENT],
@@ -242,24 +242,24 @@ describe("<RunDialog/>", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "The agents are shown as blocks with an online mark" */
-  it("shows the agents as blocks, the connected one with a green online mark", () => {
+  /** @scenario "The agents are shown as blocks with a local tunnel mark" */
+  it("shows the agents as blocks, the tunnelled one with a local tunnel mark", () => {
     renderDialog(suiteSubject());
 
-    const online = screen.getByTestId("run-dialog-agent-agent_1");
-    const offline = screen.getByTestId("run-dialog-agent-agent_2");
-    expect(within(online).getByText("prod-agent")).toBeInTheDocument();
-    expect(within(offline).getByText("staging-agent")).toBeInTheDocument();
+    const tunnelled = screen.getByTestId("run-dialog-agent-agent_1");
+    const plain = screen.getByTestId("run-dialog-agent-agent_2");
+    expect(within(tunnelled).getByText("prod-agent")).toBeInTheDocument();
+    expect(within(plain).getByText("staging-agent")).toBeInTheDocument();
     expect(
-      within(online).getByTestId("agent-online-agent_1"),
-    ).toHaveTextContent("online");
+      within(tunnelled).getByTestId("agent-dev-tunnel-agent_1"),
+    ).toHaveTextContent("Local tunnel");
     expect(
-      within(offline).queryByTestId("agent-online-agent_2"),
+      within(plain).queryByTestId("agent-dev-tunnel-agent_2"),
     ).not.toBeInTheDocument();
     // The block holds the name and the mark, nothing else: no file name, no
     // environment name.
-    expect(online).toHaveTextContent(/^prod-agentonline$/);
-    expect(offline).toHaveTextContent(/^staging-agent$/);
+    expect(tunnelled).toHaveTextContent(/^prod-agentLocal tunnel$/);
+    expect(plain).toHaveTextContent(/^staging-agent$/);
   });
 
   /** @scenario "A project with no target shows a Setup agent box" */
@@ -488,7 +488,6 @@ describe("<RunDialog/>", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     const run = screen.getByTestId("run-dialog-run");
-    // The subject holds two cases, and the control says so.
     expect(run).toHaveTextContent("Run 2 cases");
     expect(run).not.toHaveAttribute("aria-haspopup");
   });
@@ -619,7 +618,7 @@ describe("run entries on the Test cases tab", () => {
     mockHasProviders.value = true;
     useAgentTestingStore.setState({
       lastRunTarget: null,
-      pendingBatchRunId: null,
+      pendingRun: null,
     });
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
     mockPromptsGetAll.mockReturnValue({ data: [] });
@@ -687,6 +686,8 @@ describe("run entries on the Test cases tab", () => {
     // No navigation: the placeholder is what announces the run. The runs rail
     // renders it from this same store value (see the run plan detail tests).
     expect(mockRouterPush).not.toHaveBeenCalled();
-    expect(useAgentTestingStore.getState().pendingBatchRunId).toBe("batch_new");
+    expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
+      "batch_new",
+    );
   });
 });

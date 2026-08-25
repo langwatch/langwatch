@@ -12,10 +12,8 @@ import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { RemoveBlockButton } from "./RemoveBlockButton";
 import type { RunDialogForm } from "./useRunDialogForm";
 
-/** What the one parameter line reads when it is empty. */
 export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";
 
-/** What the (i) beside the parameters line explains. */
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same case as a free or a pro customer, in another locale, or on another model.";
 

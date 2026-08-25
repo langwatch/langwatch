@@ -51,6 +51,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      getAll: { useQuery: vi.fn(() => ({ data: [], isLoading: false })) },
+      run: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
       getSuiteRunFreshness: { useQuery: mockFreshnessQuery },
       getScenarioSetBatchRunCount: { useQuery: mockGetBatchRunCount },
@@ -68,9 +72,25 @@ vi.mock("~/utils/api", () => ({
       },
     },
     agents: { getAll: { useQuery: vi.fn(() => ({ data: [] })) } },
-    suites: { getById: { useQuery: mockGetSuiteById } },
+    suites: {
+      getById: { useQuery: mockGetSuiteById },
+      run: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
+      runAll: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
+      update: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
+    },
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
+    },
+    modelProvider: {
+      getAllForProjectForFrontend: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false })),
+      },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
   },
@@ -207,7 +227,7 @@ describe("<RunPlanDetail/>", () => {
   beforeEach(() => {
     useAgentTestingStore.setState({
       viewMode: "table",
-      pendingBatchRunId: null,
+      pendingRun: null,
       cancellingJobId: null,
       caseEditor: { open: false, scenarioId: null, folderId: null },
     });
@@ -462,11 +482,15 @@ describe("<RunPlanDetail/>", () => {
   });
 
   /** @scenario "A test suite is run from the header of its run plan" */
-  it("offers Run and Edit in the header of a test suite plan", () => {
+  it("opens the run dialog on the suite from the header Run control", async () => {
+    const user = userEvent.setup();
     renderDetail();
 
-    expect(screen.getByTestId("run-plan-button")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("run-plan-button"));
+
+    const dialog = await screen.findByTestId("run-dialog");
+    expect(dialog).toHaveTextContent("Run · Checkout");
   });
 
   /** @scenario "A set that runs from code has no Run and no Edit" */
@@ -805,9 +829,25 @@ describe("<RunPlanDetail/>", () => {
   });
 
   it("holds a place for a run that was just started", () => {
-    useAgentTestingStore.setState({ pendingBatchRunId: "batch_new" });
+    useAgentTestingStore.setState({
+      pendingRun: { batchRunId: "batch_new", scenarioSetId: SUITE_SET_ID },
+    });
     renderDetail();
 
     expect(screen.getByTestId("runs-sidebar-pending")).toBeInTheDocument();
+  });
+
+  it("holds no place for a run that another plan started", () => {
+    useAgentTestingStore.setState({
+      pendingRun: {
+        batchRunId: "batch_new",
+        scenarioSetId: getSuiteSetId("suite_other"),
+      },
+    });
+    renderDetail();
+
+    expect(
+      screen.queryByTestId("runs-sidebar-pending"),
+    ).not.toBeInTheDocument();
   });
 });

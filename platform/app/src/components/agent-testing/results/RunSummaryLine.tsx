@@ -46,7 +46,6 @@ export function RunSummaryLine({
         </Text>
       ) : null}
       <Box flex={1} />
-      {/* The evaluator pills of a run will read to the left of the pass pill. */}
       <HStack gap={1.5} flexWrap="wrap">
         {summary ? <RunMetricsSummary summary={summary} /> : null}
       </HStack>

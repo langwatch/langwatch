@@ -50,9 +50,9 @@ export type RailItemProps = {
 };
 
 /**
- * One row of the rail. The row itself is not a `button` element: it carries
- * the row menu, and a button inside a button is not valid markup. It answers
- * to a click, to Enter and to Space, the way a button does.
+ * One row of the rail. The row selection is its own `button` element and the
+ * row menu is a sibling of it, so a keypress on the menu trigger opens the
+ * menu instead of selecting the suite.
  */
 export function RailItem({
   label,
@@ -65,39 +65,40 @@ export function RailItem({
   return (
     <HStack
       className="group"
-      role="button"
-      tabIndex={0}
-      aria-current={selected ? "true" : undefined}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        // The row is not a button element, so Space would scroll the rail.
-        event.preventDefault();
-        onClick();
-      }}
       gap={2}
       width="full"
       paddingX="10px"
       paddingY="6px"
       borderRadius="lg"
-      textAlign="left"
-      cursor="pointer"
       fontSize="12.5px"
       fontWeight={selected ? "medium" : "normal"}
       color={selected ? "fg" : FG_MUTED}
       background={selected ? "bg.muted" : "transparent"}
       _hover={{ background: "bg.muted/60" }}
-      data-testid={`suite-rail-item-${label}`}
     >
-      {icon}
-      {!collapsed && (
-        <>
+      <chakra.button
+        type="button"
+        onClick={onClick}
+        aria-current={selected ? "true" : undefined}
+        data-testid={`suite-rail-item-${label}`}
+        display="flex"
+        alignItems="center"
+        gap={2}
+        flex={1}
+        minWidth={0}
+        textAlign="left"
+        cursor="pointer"
+        color="inherit"
+        font="inherit"
+      >
+        {icon}
+        {!collapsed && (
           <Text truncate flex={1} minWidth={0}>
             {label}
           </Text>
-          {actions}
-        </>
-      )}
+        )}
+      </chakra.button>
+      {!collapsed && actions}
     </HStack>
   );
 }

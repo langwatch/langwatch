@@ -28,16 +28,27 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 /** Records the options the hook passed, so a test can play the server back. */
 const mockUpdateOptions = vi.hoisted(() => ({
-  current: null as { onError?: (error: unknown) => void } | null,
+  current: null as {
+    onSuccess?: (data: unknown) => void;
+    onError?: (error: unknown) => void;
+  } | null,
 }));
 
 const mutationOf = vi.hoisted(
   () =>
     (
       mutate: (...args: unknown[]) => void,
-      capture?: { current: { onError?: (error: unknown) => void } | null },
+      capture?: {
+        current: {
+          onSuccess?: (data: unknown) => void;
+          onError?: (error: unknown) => void;
+        } | null;
+      },
     ) =>
-    (options?: { onError?: (error: unknown) => void }) => {
+    (options?: {
+      onSuccess?: (data: unknown) => void;
+      onError?: (error: unknown) => void;
+    }) => {
       if (capture) capture.current = options ?? null;
       return { mutate, isPending: false, mutateAsync: vi.fn() };
     },
@@ -214,6 +225,11 @@ describe("the run plan dialog", () => {
         name: "Checkout",
         scenarioIds: ["scen_1"],
       });
+
+      act(() =>
+        mockUpdateOptions.current?.onSuccess?.(storedSuite({ id: "suite_1" })),
+      );
+      expect(mockCloseDrawer).toHaveBeenCalled();
     });
 
     /** @scenario "A plan the server refuses keeps the dialog open" */
@@ -228,6 +244,11 @@ describe("the run plan dialog", () => {
 
       const name = screen.getByLabelText("Name");
       await waitFor(() => expect(name).toHaveAttribute("aria-invalid", "true"));
+      expect(
+        await screen.findByText(
+          "That name is already taken. Pick a different name for this run plan.",
+        ),
+      ).toBeInTheDocument();
       expect(mockCloseDrawer).not.toHaveBeenCalled();
       expect(screen.getByTestId("plan-modal")).toBeInTheDocument();
     });

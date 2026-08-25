@@ -44,7 +44,7 @@ describe("<AgentTestingHeader/>", () => {
       expect(comesBefore(title, tabs)).toBe(true);
     });
 
-    /** @scenario "The header holds the title and the tabs on one line" */
+    /** @scenario "Each tab name carries how many rows it holds" */
     it("counts the cases and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 

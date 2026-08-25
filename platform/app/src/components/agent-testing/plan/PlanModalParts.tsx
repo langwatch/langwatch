@@ -8,7 +8,7 @@
 import { Box, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
-import { FormServerError } from "~/features/errors";
+import { describeError, FormServerError } from "~/features/errors";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import { PlanExecutionTab } from "./PlanExecutionTab";
@@ -73,6 +73,14 @@ export function PlanModalBody({
 }) {
   if (editor.isLoading) return <PlanModalSkeleton />;
 
+  if (editor.loadError) {
+    return (
+      <Text fontSize="12.5px" color="fg.error" data-testid="plan-modal-error">
+        {describeError({ error: editor.loadError })}
+      </Text>
+    );
+  }
+
   return (
     <VStack align="stretch" gap={4}>
       <FormServerError form={editor.suiteForm.form} />
@@ -114,6 +122,7 @@ export function PlanModalFooter({ editor }: { editor: PlanEditorState }) {
       </chakra.button>
       <SmallButton
         loading={editor.isSaving}
+        disabled={!!editor.loadError}
         onClick={editor.saveAndRun}
         data-testid="plan-modal-save-and-run"
       >
@@ -126,6 +135,7 @@ export function PlanModalFooter({ editor }: { editor: PlanEditorState }) {
         background={undefined}
         borderColor="transparent"
         loading={editor.isSaving}
+        disabled={!!editor.loadError}
         onClick={editor.save}
         data-testid="plan-modal-save"
       >

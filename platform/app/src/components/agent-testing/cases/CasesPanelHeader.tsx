@@ -6,7 +6,14 @@
  */
 
 import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { ChevronRight, Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  Folder,
+  FolderCode,
+  Pencil,
+  Play,
+  Plus,
+} from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { FG_FAINT } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
@@ -44,7 +51,7 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
         {props.title}
       </Text>
       <Text fontSize="11.5px" color={FG_FAINT}>
-        {props.caseCount} cases
+        {props.caseCount} {props.caseCount === 1 ? "case" : "cases"}
       </Text>
       {props.isExternal && (
         <Badge
@@ -85,11 +92,7 @@ function CasesPanelActions({
   onEditSuite,
 }: Pick<
   CasesPanelHeaderProps,
-  | "selection"
-  | "isRunningSet"
-  | "onRunSet"
-  | "onNewTestCase"
-  | "onEditSuite"
+  "selection" | "isRunningSet" | "onRunSet" | "onNewTestCase" | "onEditSuite"
 >) {
   const isSuite = selection.kind === "suite";
 

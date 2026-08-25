@@ -37,9 +37,11 @@ export type RunPlanDetailProps = {
 
 export function RunPlanDetail(props: RunPlanDetailProps) {
   const { plan } = props;
-  const pendingBatchRunId = useAgentTestingStore(
-    (state) => state.pendingBatchRunId,
-  );
+  const pendingRun = useAgentTestingStore((state) => state.pendingRun);
+  const pendingBatchRunId =
+    pendingRun?.scenarioSetId === plan.scenarioSetId
+      ? pendingRun.batchRunId
+      : null;
 
   const batches = useRunPlanBatches({
     plan,

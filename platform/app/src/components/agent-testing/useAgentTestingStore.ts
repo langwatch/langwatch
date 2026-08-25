@@ -50,6 +50,15 @@ export type CaseEditorTarget = {
   folderId: string | null;
 };
 
+/**
+ * A run that was just started and has no rows yet. The set it belongs to
+ * travels with it, so only the run plan that started it shows the entry.
+ */
+export type PendingRun = {
+  batchRunId: string;
+  scenarioSetId: string;
+};
+
 const CLOSED_CASE_EDITOR: CaseEditorTarget = {
   open: false,
   scenarioId: null,
@@ -62,8 +71,7 @@ export interface AgentTestingState {
   expandedFolderIds: Set<string>;
   /** The target the last run used, so the run dialog opens on it again. */
   lastRunTarget: TargetValue;
-  /** A run that was just started and has no rows yet. */
-  pendingBatchRunId: string | null;
+  pendingRun: PendingRun | null;
   /** The run whose cancel is in flight, so its button can say so. */
   cancellingJobId: string | null;
   caseEditor: CaseEditorTarget;
@@ -74,7 +82,7 @@ export interface AgentTestingState {
   setFolderExpanded: (folderId: string, expanded: boolean) => void;
   toggleFolder: (folderId: string) => void;
   setLastRunTarget: (target: TargetValue) => void;
-  setPendingBatchRunId: (batchRunId: string | null) => void;
+  setPendingRun: (run: PendingRun | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
   openCaseEditor: (target: Partial<Omit<CaseEditorTarget, "open">>) => void;
   closeCaseEditor: () => void;
@@ -131,7 +139,7 @@ export function createAgentTestingStore() {
     railCollapsed: readStoredRailCollapsed(),
     expandedFolderIds: new Set<string>(),
     lastRunTarget: null,
-    pendingBatchRunId: null,
+    pendingRun: null,
     cancellingJobId: null,
     caseEditor: CLOSED_CASE_EDITOR,
 
@@ -168,8 +176,7 @@ export function createAgentTestingStore() {
 
     setLastRunTarget: (target) => set({ lastRunTarget: target }),
 
-    setPendingBatchRunId: (batchRunId) =>
-      set({ pendingBatchRunId: batchRunId }),
+    setPendingRun: (run) => set({ pendingRun: run }),
 
     setCancellingJobId: (jobId) => set({ cancellingJobId: jobId }),
 

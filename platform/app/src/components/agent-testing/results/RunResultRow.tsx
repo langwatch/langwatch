@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import {
   MessageSquare,
   MoreVertical,
@@ -193,12 +193,22 @@ export function RunResultRow({
       </Box>
 
       <HStack gap={1.5} minWidth={0} flexWrap="wrap" paddingTop="1px">
-        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-          {displayName}
-        </Text>
+        <chakra.button
+          type="button"
+          minWidth={0}
+          textAlign="left"
+          cursor="pointer"
+          onClick={(event) => {
+            event.stopPropagation();
+            onScenarioRunClick(scenarioRun);
+          }}
+        >
+          <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+            {displayName}
+          </Text>
+        </chakra.button>
       </HStack>
 
-      {/* The evaluator scores of a result will read here. */}
       <Box />
 
       <Box paddingTop="1px" textAlign="right">

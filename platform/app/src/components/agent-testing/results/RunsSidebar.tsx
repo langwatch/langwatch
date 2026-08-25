@@ -16,7 +16,6 @@ import { RunsSidebarEntry } from "./RunsSidebarEntry";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches } from "./useRunPlanBatches";
 
-/** How wide the runs rail is. */
 export const RUNS_SIDEBAR_WIDTH = 230;
 
 export type RunsSidebarProps = {
@@ -26,14 +25,13 @@ export type RunsSidebarProps = {
     "batchRuns" | "totalBatchCount" | "hasMore" | "loadMore" | "isLoading"
   >;
   selectedBatchRunId: string | null;
-  /** A run that was just started and has no rows yet. */
+  /** A run of this plan that was just started and has no rows yet. */
   pendingBatchRunId: string | null;
   onSelectRun: (batchRunId: string) => void;
   onBack: () => void;
   periodControls: PeriodControls;
 };
 
-/** The run that was just started, before any of its rows arrive. */
 function PendingEntry() {
   return (
     <RunsSidebarEntry
@@ -49,7 +47,6 @@ function PendingEntry() {
   );
 }
 
-/** The runs themselves, and what reads in their place when there are none. */
 function RunsList({
   plan,
   runs,

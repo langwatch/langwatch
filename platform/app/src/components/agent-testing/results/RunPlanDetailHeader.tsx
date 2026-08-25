@@ -112,7 +112,7 @@ export function RunPlanDetailHeader({
           </Button>
         ) : null}
 
-        {onRunPlan ? (
+        {onRunPlan && suiteId ? (
           <SmallButton
             variant="solid"
             colorPalette="blue"

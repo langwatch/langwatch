@@ -26,11 +26,11 @@ Feature: The run dialog
     And the customize chips are shown but add no fields yet
 
   @integration
-  Scenario: The agents are shown as blocks with an online mark
-    Given the project has two connected agents
+  Scenario: The agents are shown as blocks with a local tunnel mark
+    Given the project has two agents, one of them with a local tunnel
     When the run dialog is opened
     Then each agent is shown as a block with its name
-    And a connected agent carries a green online mark
+    And the agent with a local tunnel carries a local tunnel mark
     And no file name and no environment name are shown
 
   @integration

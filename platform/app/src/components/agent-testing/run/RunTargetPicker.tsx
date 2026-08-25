@@ -66,7 +66,7 @@ function AgentBlock({
   onSelect: (target: NonNullable<TargetValue>) => void;
 }) {
   const AgentIcon = AGENT_ICONS[agent.type];
-  const isOnline = agentHasDevTunnel(agent);
+  const hasDevTunnel = agentHasDevTunnel(agent);
 
   return (
     <Box
@@ -99,25 +99,24 @@ function AgentBlock({
       <Text fontSize="12.5px" fontWeight="medium" truncate marginTop={3}>
         {agent.name}
       </Text>
-      {/* Only a dev tunnel says whether an agent is reachable right now, so
-          an agent without one carries no state it cannot vouch for. The row
-          keeps its height either way, so the cards line up. */}
+      {/* The row keeps its height with or without the line, so the cards
+          line up. */}
       <HStack
         gap={1.5}
         marginTop={1}
         minHeight="16px"
-        data-testid={isOnline ? `agent-online-${agent.id}` : undefined}
+        data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
       >
-        {isOnline && (
+        {hasDevTunnel && (
           <>
             <Box
               boxSize="8px"
               borderRadius="full"
               flexShrink={0}
-              background="green.500"
+              background="orange.500"
             />
             <Text fontSize="11px" color={FG_MUTED} truncate>
-              online
+              Local tunnel
             </Text>
           </>
         )}

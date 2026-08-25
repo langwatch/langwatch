@@ -36,11 +36,14 @@ function usePlanEditorChoices({
 }) {
   const enabled = !!projectId && isOpen;
 
-  const { data: suite, isLoading: isSuiteLoading } =
-    api.suites.getById.useQuery(
-      { projectId, id: suiteId ?? "" },
-      { enabled: enabled && !!suiteId },
-    );
+  const {
+    data: suite,
+    isLoading: isSuiteLoading,
+    error: suiteError,
+  } = api.suites.getById.useQuery(
+    { projectId, id: suiteId ?? "" },
+    { enabled: enabled && !!suiteId },
+  );
   const { data: scenarios } = api.scenarios.getAll.useQuery(
     { projectId },
     { enabled },
@@ -58,7 +61,15 @@ function usePlanEditorChoices({
     { enabled },
   );
 
-  return { suite, isSuiteLoading, scenarios, agents, prompts, folders };
+  return {
+    suite,
+    isSuiteLoading,
+    suiteError,
+    scenarios,
+    agents,
+    prompts,
+    folders,
+  };
 }
 
 export function usePlanEditor() {
@@ -90,8 +101,13 @@ export function usePlanEditor() {
       projectId: project?.id,
     });
 
+  // A plan that cannot be read must not be saved: without it every save would
+  // take the create branch and write a second plan.
+  const loadError = isEditing && choices.suiteError ? choices.suiteError : null;
+
   const writes = usePlanEditorWrites({
     projectId,
+    isEditing,
     suite: choices.suite,
     form: suiteForm.form,
     onSaved: callbacks?.onSaved,
@@ -104,6 +120,8 @@ export function usePlanEditor() {
     close: closeDrawer,
     /** True while a stored plan is still being read. */
     isLoading: isEditing && choices.isSuiteLoading,
+    /** Set when the plan being edited could not be read. */
+    loadError,
     isEditing,
     /**
      * True for a plan whose scope is fixed: a test suite runs the cases filed

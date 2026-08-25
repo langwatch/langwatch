@@ -107,7 +107,11 @@ export function useTestCasesTab(): TestCasesTabModel {
     selectedSuite: view.selectedSuite,
   });
 
-  const suiteMutations = useSuiteMutations({ projectId, selectSuite });
+  const suiteMutations = useSuiteMutations({
+    projectId,
+    selectedSuiteId: view.selectedSuite?.id ?? null,
+    selectSuite,
+  });
   const caseMutations = useCaseMutations(projectId);
   const open = useCaseOpenActions(data.lastResults);
 

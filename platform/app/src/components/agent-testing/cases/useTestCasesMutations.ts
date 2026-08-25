@@ -39,9 +39,12 @@ export type SuiteMutations = {
 
 export function useSuiteMutations({
   projectId,
+  selectedSuiteId,
   selectSuite,
 }: {
   projectId: string;
+  /** The suite the rail is on, so archiving another one leaves it alone. */
+  selectedSuiteId: string | null;
   selectSuite: (selection: AgentTestingSelection) => void;
 }): SuiteMutations {
   const invalidate = useCasesInvalidate(projectId);
@@ -66,9 +69,9 @@ export function useSuiteMutations({
   });
 
   const archive = api.suites.folders.archive.useMutation({
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       invalidate();
-      selectSuite({ kind: "all" });
+      if (variables.folderId === selectedSuiteId) selectSuite({ kind: "all" });
     },
     onError: toastOnError("Couldn't archive the test suite"),
   });

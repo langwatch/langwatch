@@ -62,6 +62,13 @@ Feature: The Agent Testing page
     And the header spans the full width of the page
 
   @integration
+  Scenario: Each tab name carries how many rows it holds
+    Given the Agent Testing page is open
+    When the header is read
+    Then "Test cases" carries the number of test cases
+    And "Results" carries the number of run plans
+
+  @integration
   Scenario: The header carries no action on either tab
     Given the Agent Testing page is open on the Test cases tab
     Then the header offers no action

@@ -9,11 +9,11 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
+import { toaster } from "~/components/ui/toaster";
+import type { Scenario } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
-import { toaster } from "~/components/ui/toaster";
-import type { Scenario } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { RunDialog } from "../run/RunDialog";
 import type { RunDialogSubject } from "../run/run-dialog-types";
@@ -22,6 +22,62 @@ import { CaseModal } from "./CaseModal";
 import type { TestSuiteEntry } from "./test-cases";
 import { useCaseEditor } from "./useCaseEditor";
 import { useRunStartedHandler } from "./useCaseRunActions";
+
+/**
+ * The suites the editor can file a case under. The rail reads the same list,
+ * so this is the cached copy rather than a second read.
+ */
+function useEditorSuites(projectId: string): TestSuiteEntry[] {
+  const { data: folders } = api.suites.folders.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+
+  return useMemo<TestSuiteEntry[]>(
+    () =>
+      (folders ?? []).map((folder) => ({
+        id: folder.id,
+        name: folder.name,
+        slug: folder.slug,
+        caseCount: 0,
+      })),
+    [folders],
+  );
+}
+
+/** What a saved case does: say so, close, and run when Save and Run asked. */
+function useOnCaseSaved({
+  projectId,
+  isEditingStoredCase,
+  closeCaseEditor,
+  setRunSubject,
+}: {
+  projectId: string;
+  isEditingStoredCase: boolean;
+  closeCaseEditor: () => void;
+  setRunSubject: (subject: RunDialogSubject) => void;
+}) {
+  return useCallback(
+    (
+      saved: Scenario,
+      { shouldRunAfterSave }: { shouldRunAfterSave: boolean },
+    ) => {
+      toaster.create({
+        title: isEditingStoredCase ? "Test case updated" : "Test case created",
+        type: "success",
+      });
+      closeCaseEditor();
+      if (!shouldRunAfterSave) return;
+      setRunSubject({
+        kind: "case",
+        scenarioId: saved.id,
+        name: saved.name,
+        initialTarget: readScenarioTarget({ projectId, scenarioId: saved.id }),
+      });
+    },
+    [isEditingStoredCase, closeCaseEditor, projectId, setRunSubject],
+  );
+}
 
 export function AgentTestingCaseEditor() {
   const { project } = useOrganizationTeamProject();
@@ -33,42 +89,14 @@ export function AgentTestingCaseEditor() {
   );
   const onRunStarted = useRunStartedHandler({ projectId });
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
+  const suites = useEditorSuites(projectId);
 
-  // The rail reads the same list, so this is the cached copy rather than a
-  // second read.
-  const { data: folders } = api.suites.folders.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
-
-  const suites = useMemo<TestSuiteEntry[]>(
-    () =>
-      (folders ?? []).map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        slug: folder.slug,
-        caseCount: 0,
-      })),
-    [folders],
-  );
-
-  const onSaved = useCallback(
-    (saved: Scenario, { runAfter }: { runAfter: boolean }) => {
-      toaster.create({
-        title: caseEditor.scenarioId ? "Test case updated" : "Test case created",
-        type: "success",
-      });
-      closeCaseEditor();
-      if (!runAfter) return;
-      setRunSubject({
-        kind: "case",
-        scenarioId: saved.id,
-        name: saved.name,
-        initialTarget: readScenarioTarget({ projectId, scenarioId: saved.id }),
-      });
-    },
-    [caseEditor.scenarioId, closeCaseEditor, projectId],
-  );
+  const onSaved = useOnCaseSaved({
+    projectId,
+    isEditingStoredCase: !!caseEditor.scenarioId,
+    closeCaseEditor,
+    setRunSubject,
+  });
 
   const editor = useCaseEditor({
     open: caseEditor.open,

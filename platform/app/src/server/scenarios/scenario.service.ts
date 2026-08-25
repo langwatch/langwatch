@@ -93,15 +93,21 @@ function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
  * Recomputes the member list of every folder a write touched, once per folder.
  * Nulls and repeats are dropped, so a move between two folders reconciles both
  * and a move within one reconciles it once.
+ *
+ * The ids are sorted first. `reconcileFolderMembership` takes a row lock, so
+ * two moves between the same pair of folders in opposite directions would
+ * deadlock if each locked in the order its caller supplied.
  */
 async function reconcileFolders(params: {
   projectId: string;
   folderIds: (string | null | undefined)[];
   tx: FolderMembershipClient;
 }): Promise<void> {
-  const touchedFolderIds = new Set(
-    params.folderIds.filter((folderId): folderId is string => !!folderId),
-  );
+  const touchedFolderIds = [
+    ...new Set(
+      params.folderIds.filter((folderId): folderId is string => !!folderId),
+    ),
+  ].sort();
   for (const folderId of touchedFolderIds) {
     await reconcileFolderMembership({
       projectId: params.projectId,
@@ -154,7 +160,7 @@ export class ScenarioService {
         // One transaction holds the row, its v1 version and the folder
         // membership, so a create that fails part way leaves nothing behind.
         const result = await this.prisma.$transaction(async (tx) => {
-          if (folderId) {
+          if (folderId !== null) {
             await assertAssignableFolder({
               projectId: input.projectId,
               folderId,
@@ -342,7 +348,7 @@ export class ScenarioService {
         currentVersion: existing.version,
       });
     }
-    if (data.folderId) {
+    if (data.folderId !== undefined && data.folderId !== null) {
       await assertAssignableFolder({ projectId, folderId: data.folderId, tx });
     }
 

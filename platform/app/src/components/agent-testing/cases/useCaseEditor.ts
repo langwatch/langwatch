@@ -9,8 +9,15 @@
  * @see specs/scenarios/scenario-versioning.feature
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { showErrorToast, readHandledError } from "~/features/errors";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { readHandledError, showErrorToast } from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
 import {
   parseScenarioParameterDefinitions,
@@ -90,8 +97,205 @@ export type CaseEditorState = {
   reloadStale: () => void;
   /** Says what a save would refuse, or nothing when the draft is complete. */
   problem: string | null;
-  save: (options: { runAfter: boolean }) => void;
+  save: (options: { shouldRunAfterSave: boolean }) => void;
 };
+
+/**
+ * The draft the dialog holds. It is seeded once per case the dialog opens on,
+ * so a background refetch cannot overwrite what somebody is typing, and the
+ * version it was seeded from travels with it so a save cannot refer to a
+ * newer one.
+ */
+function useCaseDraft({
+  open,
+  scenarioId,
+  folderId,
+  scenario,
+}: {
+  open: boolean;
+  scenarioId: string | null;
+  folderId: string | null;
+  scenario: Scenario | undefined;
+}) {
+  const [draft, setDraftState] = useState<CaseDraft>(EMPTY_DRAFT);
+  const [version, setVersion] = useState<number | null>(null);
+
+  const seed = open ? (scenarioId ?? "new") : null;
+  const seededFrom = useMemo(
+    () => (scenarioId && scenario?.id === scenarioId ? scenario : null),
+    [scenarioId, scenario],
+  );
+
+  const seedFrom = useCallback((stored: Scenario) => {
+    setDraftState(draftFromScenario(stored));
+    setVersion(stored.version);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!scenarioId) {
+      setDraftState({ ...EMPTY_DRAFT, folderId });
+      setVersion(null);
+      return;
+    }
+    if (seededFrom) seedFrom(seededFrom);
+    // The draft follows the case the dialog opened on, not every answer of a
+    // refetch, so `seed` is what re-seeds it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, seededFrom?.id, folderId]);
+
+  const setDraft = useCallback(
+    (update: Partial<CaseDraft>) =>
+      setDraftState((current) => ({ ...current, ...update })),
+    [],
+  );
+
+  return { draft, setDraft, version, seedFrom };
+}
+
+/** The two writes the dialog makes, and the one refusal it can name. */
+function useCaseWrites({
+  projectId,
+  onSaved,
+  runAfterSave,
+}: {
+  projectId: string;
+  onSaved: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
+  runAfterSave: MutableRefObject<boolean>;
+}) {
+  const utils = api.useUtils();
+  const [staleVersion, setStaleVersion] = useState<number | null>(null);
+
+  const invalidate = useCallback(() => {
+    void utils.scenarios.getAll.invalidate({ projectId });
+    void utils.suites.folders.getAll.invalidate({ projectId });
+  }, [utils, projectId]);
+
+  const createMutation = api.scenarios.create.useMutation({
+    onSuccess: (saved) => {
+      invalidate();
+      onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
+  });
+
+  const updateMutation = api.scenarios.update.useMutation({
+    onSuccess: (saved) => {
+      invalidate();
+      utils.scenarios.getById.setData({ projectId, id: saved.id }, saved);
+      void utils.scenarios.getById.invalidate({ projectId, id: saved.id });
+      onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
+    },
+    onError: (error) => {
+      const handled = readHandledError(error);
+      if (handled?.code === "scenario_stale_version") {
+        const current = handled.meta.currentVersion;
+        setStaleVersion(typeof current === "number" ? current : 0);
+        return;
+      }
+      showErrorToast({ error, fallbackTitle: "Couldn't save the test case" });
+    },
+  });
+
+  return { createMutation, updateMutation, staleVersion, setStaleVersion };
+}
+
+type SavePayload = ReturnType<typeof savePayload>;
+
+/** What one save sends, out of the draft and the stored parameter types. */
+function savePayload({
+  projectId,
+  draft,
+  existingParameters,
+}: {
+  projectId: string;
+  draft: CaseDraft;
+  existingParameters: ScenarioParameterDefinition[];
+}) {
+  return {
+    projectId,
+    name: draft.title.trim(),
+    situation: draft.situation.trim(),
+    criteria: rubricsOf(draft),
+    labels: draft.labels,
+    parameters: toParameterDefinitions({
+      line: draft.parameters,
+      existing: existingParameters,
+    }),
+    folderId: draft.folderId,
+    simulatorModel: draft.simulatorModel,
+    judgeModel: draft.judgeModel,
+    maxTurns: draft.maxTurns,
+    minTurns: draft.minTurns,
+  };
+}
+
+/** Says what a save would refuse, or nothing when the draft is complete. */
+function useCaseProblem(draft: CaseDraft): string | null {
+  return useMemo(() => {
+    if (!draft.title.trim()) return "A test case needs a title.";
+    if (rubricsOf(draft).length === 0)
+      return "A test case needs at least one rubric.";
+    return null;
+  }, [draft]);
+}
+
+/** Sends the draft: an update when it came from a stored case, else a create. */
+function useCaseSave({
+  problem,
+  projectId,
+  draft,
+  existingParameters,
+  scenarioId,
+  version,
+  runAfterSave,
+  createMutation,
+  updateMutation,
+}: {
+  problem: string | null;
+  projectId: string;
+  draft: CaseDraft;
+  existingParameters: ScenarioParameterDefinition[];
+  scenarioId: string | null;
+  version: number | null;
+  runAfterSave: MutableRefObject<boolean>;
+  createMutation: { mutate: (input: SavePayload) => void };
+  updateMutation: {
+    mutate: (
+      input: SavePayload & { id: string; expectedVersion: number },
+    ) => void;
+  };
+}) {
+  return useCallback(
+    ({ shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
+      if (problem) return;
+      runAfterSave.current = shouldRunAfterSave;
+      const payload = savePayload({ projectId, draft, existingParameters });
+
+      if (scenarioId && version !== null) {
+        updateMutation.mutate({
+          ...payload,
+          id: scenarioId,
+          expectedVersion: version,
+        });
+        return;
+      }
+      createMutation.mutate(payload);
+    },
+    [
+      problem,
+      projectId,
+      draft,
+      existingParameters,
+      scenarioId,
+      version,
+      runAfterSave,
+      updateMutation,
+      createMutation,
+    ],
+  );
+}
 
 export function useCaseEditor({
   open,
@@ -106,11 +310,8 @@ export function useCaseEditor({
   scenarioId: string | null;
   /** The suite a new case starts in. */
   folderId: string | null;
-  onSaved: (saved: Scenario, options: { runAfter: boolean }) => void;
+  onSaved: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
 }): CaseEditorState {
-  const utils = api.useUtils();
-  const [draft, setDraftState] = useState<CaseDraft>(EMPTY_DRAFT);
-  const [staleVersion, setStaleVersion] = useState<number | null>(null);
   // Which button started the save. The answer of the mutation is read by a
   // callback built on an earlier render, so this cannot be state.
   const runAfterSave = useRef(false);
@@ -124,137 +325,53 @@ export function useCaseEditor({
     { enabled: open && !!projectId && !!scenarioId },
   );
 
-  const isLoading = open && !!scenarioId && (isScenarioLoading || !scenario);
+  const { draft, setDraft, version, seedFrom } = useCaseDraft({
+    open,
+    scenarioId,
+    folderId,
+    scenario,
+  });
 
-  // The draft is seeded once per case the dialog opens on. A background
-  // refetch must not overwrite what somebody is typing.
-  const seed = open ? (scenarioId ?? "new") : null;
-  const seededFrom = useMemo(
-    () => (scenarioId && scenario?.id === scenarioId ? scenario : null),
-    [scenarioId, scenario],
-  );
+  const { createMutation, updateMutation, staleVersion, setStaleVersion } =
+    useCaseWrites({ projectId, onSaved, runAfterSave });
 
   useEffect(() => {
-    if (!open) return;
-    setStaleVersion(null);
-    if (!scenarioId) {
-      setDraftState({ ...EMPTY_DRAFT, folderId });
-      return;
-    }
-    if (seededFrom) setDraftState(draftFromScenario(seededFrom));
-    // The draft follows the case the dialog opened on, not every answer of a
-    // refetch, so `seed` is what re-seeds it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed, seededFrom?.id, folderId]);
-
-  const setDraft = useCallback(
-    (update: Partial<CaseDraft>) =>
-      setDraftState((current) => ({ ...current, ...update })),
-    [],
-  );
-
-  const invalidate = useCallback(() => {
-    void utils.scenarios.getAll.invalidate({ projectId });
-    void utils.suites.folders.getAll.invalidate({ projectId });
-  }, [utils, projectId]);
-
-  const createMutation = api.scenarios.create.useMutation({
-    onSuccess: (saved) => {
-      invalidate();
-      onSaved(saved, { runAfter: runAfterSave.current });
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
-  });
-
-  const updateMutation = api.scenarios.update.useMutation({
-    onSuccess: (saved) => {
-      invalidate();
-      utils.scenarios.getById.setData({ projectId, id: saved.id }, saved);
-      void utils.scenarios.getById.invalidate({ projectId, id: saved.id });
-      onSaved(saved, { runAfter: runAfterSave.current });
-    },
-    onError: (error) => {
-      const handled = readHandledError(error);
-      if (handled?.code === "scenario_stale_version") {
-        const current = handled.meta.currentVersion;
-        setStaleVersion(typeof current === "number" ? current : 0);
-        return;
-      }
-      showErrorToast({ error, fallbackTitle: "Couldn't save the test case" });
-    },
-  });
+    if (open) setStaleVersion(null);
+  }, [open, scenarioId, setStaleVersion]);
 
   const existingParameters: ScenarioParameterDefinition[] = useMemo(
     () => parseScenarioParameterDefinitions(scenario?.parameters),
     [scenario?.parameters],
   );
 
-  const problem = useMemo(() => {
-    if (!draft.title.trim()) return "A test case needs a title.";
-    if (rubricsOf(draft).length === 0)
-      return "A test case needs at least one rubric.";
-    return null;
-  }, [draft]);
+  const problem = useCaseProblem(draft);
 
-  const save = useCallback(
-    ({ runAfter }: { runAfter: boolean }) => {
-      if (problem) return;
-      runAfterSave.current = runAfter;
-
-      const payload = {
-        projectId,
-        name: draft.title.trim(),
-        situation: draft.situation.trim(),
-        criteria: rubricsOf(draft),
-        labels: draft.labels,
-        parameters: toParameterDefinitions({
-          line: draft.parameters,
-          existing: existingParameters,
-        }),
-        folderId: draft.folderId,
-        simulatorModel: draft.simulatorModel,
-        judgeModel: draft.judgeModel,
-        maxTurns: draft.maxTurns,
-        minTurns: draft.minTurns,
-      };
-
-      if (scenarioId && scenario) {
-        updateMutation.mutate({
-          ...payload,
-          id: scenarioId,
-          expectedVersion: scenario.version,
-        });
-        return;
-      }
-      createMutation.mutate(payload);
-    },
-    [
-      problem,
-      projectId,
-      draft,
-      existingParameters,
-      scenarioId,
-      scenario,
-      updateMutation,
-      createMutation,
-    ],
-  );
+  const save = useCaseSave({
+    problem,
+    projectId,
+    draft,
+    existingParameters,
+    scenarioId,
+    version,
+    runAfterSave,
+    createMutation,
+    updateMutation,
+  });
 
   const reloadStale = useCallback(() => {
     void (async () => {
       const reread = await refetchScenario();
-      if (reread.data) setDraftState(draftFromScenario(reread.data));
+      if (reread.data) seedFrom(reread.data);
       setStaleVersion(null);
     })();
-  }, [refetchScenario]);
+  }, [refetchScenario, seedFrom, setStaleVersion]);
 
   return {
     draft,
     setDraft,
-    isLoading,
+    isLoading: open && !!scenarioId && (isScenarioLoading || !scenario),
     isSaving: createMutation.isPending || updateMutation.isPending,
-    version: scenario?.version ?? null,
+    version,
     staleVersion,
     reloadStale,
     problem,

@@ -88,10 +88,13 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
   );
 }
 
-function useSuiteEntries(
-  folders: FolderRows | undefined,
-  cases: TestCase[],
-): TestSuiteEntry[] {
+function useSuiteEntries({
+  folders,
+  cases,
+}: {
+  folders: FolderRows | undefined;
+  cases: TestCase[];
+}): TestSuiteEntry[] {
   return useMemo<TestSuiteEntry[]>(() => {
     const countByFolder = new Map<string, number>();
     for (const testCase of cases) {
@@ -153,7 +156,7 @@ export function useTestCasesData({
 }): TestCasesData {
   const queries = useTestCasesQueries(period);
   const cases = useCaseEntries(queries.scenarios);
-  const suites = useSuiteEntries(queries.folders, cases);
+  const suites = useSuiteEntries({ folders: queries.folders, cases });
   const externalSets = useExternalSetEntries(queries.externalSetSummaries);
   const lastResults = useLastResultsByCase(queries.lastResultRows);
   const suiteIdsWithRuns = useSuiteIdsWithRuns(queries.suiteSummaries);
