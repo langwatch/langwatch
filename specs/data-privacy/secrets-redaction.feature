@@ -400,3 +400,56 @@ Feature: Redacting secrets from traces
     Given a log attribute holding the receiver-written API key id
     When the log record is redacted
     Then the key id is still readable
+
+  # The shape rule reads the prefix up to the FIRST separator, and the record
+  # id list held `scenario` while the product mints `scenariorun_…`. The rule
+  # saw `scenariorun`, matched nothing on the list, and blanked every
+  # simulation run id at ingestion; `prompt_…`, `scenarioset_…`, `check_…`,
+  # `dataset_…` and `trigger_…` went the same way, and `scenariobatch_…`
+  # survived only by being one character over the prefix cap. A customer report
+  # showed the cost of it: with the run id gone, a trace could not be attached
+  # to its run, and the pipeline attributed the cost to a run that did not
+  # exist. Redaction is irreversible at ingestion, so the ids are not
+  # recoverable for the spans already stored.
+  #
+  # The prefixes the app mints are listed one by one now, and the test walks
+  # the app's own resource registry, so a resource added later cannot be
+  # forgotten here.
+
+  @unit
+  Scenario: Every id prefix the product mints survives redaction
+    Given an id for every resource the application mints ids for
+    When each id is redacted
+    Then every id is left exactly as written
+
+  # Second line for the same failure. A value rule reads a shape, and a minted
+  # id and a minted key have the same shape, so a rule tuned for keys will take
+  # ids again. For the small set of attribute names the ingestion pipeline
+  # READS - the run id it attaches a trace by, the prompt id, the conversation,
+  # user and customer it groups by, the gateway and ingestion provenance - the
+  # value is an address rather than content, so the secrets pass is skipped for
+  # them by name. The personal-data pass still runs on them, and every other
+  # attribute keeps both passes.
+
+  @unit
+  Scenario: A reserved identifier attribute keeps its value
+    Given a span attribute the pipeline reads to link a trace, holding an id
+    When the attribute is redacted with secrets redaction on
+    Then the stored attribute still holds the id
+
+  @unit
+  Scenario: A name that only resembles a reserved one is still redacted
+    Given an attribute whose name adds a prefix or a suffix to a reserved name
+    When the attribute is redacted
+    Then the value is treated as ordinary content
+
+  @unit
+  Scenario: A reserved identifier attribute still runs the personal data pass
+    Given a reserved attribute whose value is an email address
+    When the attribute is redacted
+    Then the email address is replaced
+
+  @integration
+  Scenario: A simulation trace keeps the run id that links it to its run
+    When a trace is ingested with a span attribute "scenario.run_id"
+    Then the stored span still carries the run id

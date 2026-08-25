@@ -329,6 +329,21 @@ const IDENTIFIER_PREFIXES = new Set([
  * of these prefixes. `toolu_` is here for the same reason, having previously
  * survived only by being two characters under the length floor, which is not a
  * margin anyone should rely on.
+ *
+ * The prefix a rule sees ends at the FIRST separator, which is what a
+ * near-match cannot cover. The list held `scenario`, and the product mints
+ * `scenariorun_…`; the rule read `scenariorun`, found nothing, and blanked
+ * every simulation run id at ingestion, which cost the platform the link
+ * between a trace and its run. So the app's own prefixes are listed whole and
+ * one by one, in the second block below, mirroring `KSUID_RESOURCES` in
+ * `platform/app/src/utils/constants.ts` plus the ids minted from a template
+ * literal. A test in the app walks that registry and fails when a new resource
+ * is missing here.
+ *
+ * Key material never goes in that block. LangWatch mints its credentials with
+ * a dash (`sk-lw-`, `ik-lw-`, `pat-lw-`, `vk-lw-`), and the shape rule accepts
+ * a dash as the separator too, so a prefix listed for its underscore form
+ * exempts the dash form with it.
  */
 const RECORD_ID_PREFIXES = new Set([
   "project",
@@ -366,6 +381,71 @@ const RECORD_ID_PREFIXES = new Set([
   "acct",
   "cus",
   "sub",
+  // Records this product mints. KSUID resources first, in the order they are
+  // declared in the app registry.
+  "batchresult",
+  "cost",
+  "event",
+  "experiment",
+  "exprunresult",
+  "mdcfg",
+  "mdcs",
+  "mpscope",
+  "organization",
+  "scenariobatch",
+  "scenariorun",
+  "trigger",
+  "logrecord",
+  "tracesummary",
+  "trackedevent",
+  "promptthread",
+  "dsrecord",
+  "group",
+  "rolebinding",
+  "apikeyrole",
+  "bugreport",
+  "langymsg",
+  "topicrun",
+  "topicrunhist",
+  "topicmodel",
+  "pminstance",
+  "pminbox",
+  "pmoutbox",
+  "webhookendpoint",
+  "export",
+  "traceedit",
+  // KSUID resources minted by the identity and authorization packages.
+  "idf",
+  "idcmd",
+  "verif",
+  "grant",
+  // KSUID resources minted by the Go services.
+  "gtwyreq",
+  "gtwytrace",
+  "aicomptrace",
+  "budgetdebit",
+  "authcache",
+  // Records minted from a template literal rather than through the registry.
+  "prompt",
+  "agent",
+  "suite",
+  "workflow",
+  "evaluator",
+  "customeval",
+  "record",
+  "dataset",
+  "doc",
+  "ptag",
+  "vtag",
+  "llmcost",
+  "langyturn",
+  "mcp",
+  "svc",
+  // Prefixes the app no longer mints and still reads off stored rows.
+  "check",
+  "evaluation",
+  "scen",
+  "mp",
 ]);
 
 /**

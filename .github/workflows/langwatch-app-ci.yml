@@ -389,6 +389,20 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/clickhouse-client run test:unit
 
+      # @langwatch/redaction is the canonical secret and PII scrubber the
+      # ingestion pipeline runs on every attribute, and the CLI ships a
+      # byte-for-byte copy of it. Same reason again, and the sharpest one: its
+      # suite was the only thing asserting which values a rule must NOT take,
+      # and while it ran nowhere a rule change reached production that blanked
+      # the product's own record ids.
+      - name: Run @langwatch/redaction unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run test:unit
+
+      - name: Typecheck @langwatch/redaction
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run typecheck
+
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.

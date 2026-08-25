@@ -7,6 +7,7 @@ import {
   needsStrictAnalysis,
   redactAttributeNative,
   redactStringNative,
+  SECRETS_EXEMPT_RESERVED_ATTRIBUTES,
 } from "../applyContentRedaction";
 
 function policy({
@@ -29,6 +30,10 @@ function policy({
 
 const SECRET = "key sk-ant-" + "A".repeat(40) + " end";
 const EMAIL = "mail test@example.com end";
+
+// A real scenario run id: the value the shape rule ate, and the shape every
+// reserved identifier attribute carries.
+const RUN_ID = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";
 
 describe("redactStringNative", () => {
   describe("given secrets enabled and essential PII", () => {
@@ -145,6 +150,55 @@ describe("redactAttributeNative", () => {
         policy: policy({}),
       });
       expect(text).toBe("[SECRET]");
+    });
+  });
+
+  describe("given a reserved attribute the ingestion pipeline reads", () => {
+    // The secrets value rules go on shape, and a minted id has the shape of a
+    // minted key. One of them took `scenario.run_id` and the platform lost the
+    // link between a trace and its run, so the names the pipeline itself reads
+    // skip the secrets pass.
+    /** @scenario "A reserved identifier attribute keeps its value" */
+    it("keeps every reserved identifier exactly as sent", () => {
+      const eaten = [...SECRETS_EXEMPT_RESERVED_ATTRIBUTES]
+        .map((key) => ({
+          key,
+          text: redactAttributeNative({
+            key,
+            value: RUN_ID,
+            policy: policy({}),
+          }).text,
+        }))
+        .filter(({ text }) => text !== RUN_ID);
+      expect(eaten).toEqual([]);
+    });
+
+    // The exemption is an exact-name match. A suffixed or nested variant is a
+    // name any client can invent, so it keeps the secrets pass. Shown here
+    // with a value the pass does redact, since a run id survives under every
+    // name now that the shape rules know the prefix.
+    /** @scenario "A name that only resembles a reserved one is still redacted" */
+    it.each([
+      "scenario.run_id.extra",
+      "custom.scenario.run_id",
+      "scenario.run_idx",
+    ])("treats %s as ordinary content", (key) => {
+      const { text } = redactAttributeNative({
+        key,
+        value: "sk-ant-" + "A".repeat(40),
+        policy: policy({}),
+      });
+      expect(text).toBe("[SECRET]");
+    });
+
+    /** @scenario "A reserved identifier attribute still runs the personal data pass" */
+    it("still replaces an email address under a reserved name", () => {
+      const { text } = redactAttributeNative({
+        key: "langwatch.user_id",
+        value: "test@example.com",
+        policy: policy({}),
+      });
+      expect(text).toBe("[EMAIL_ADDRESS]");
     });
   });
 

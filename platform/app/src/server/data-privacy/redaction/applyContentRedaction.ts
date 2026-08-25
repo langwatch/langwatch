@@ -54,6 +54,10 @@ export function nativePiiEntitiesForPolicy(
  * `isAttributeValue` marks the text as one attribute value, which lets the PII
  * pass hold identifier-shaped values back from the recognizers that have only a
  * shape to go on. Free text (bodies, status messages) leaves it off.
+ *
+ * `skipSecrets` turns the secrets pass off for this one string while the policy
+ * stays on, for the reserved attributes in
+ * {@link SECRETS_EXEMPT_RESERVED_ATTRIBUTES}. It never touches the PII pass.
  */
 export function redactStringNative({
   text,
@@ -61,17 +65,19 @@ export function redactStringNative({
   compiledSecretPatterns,
   compiledPiiExceptions,
   isAttributeValue = false,
+  skipSecrets = false,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
   isAttributeValue?: boolean;
+  skipSecrets?: boolean;
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
 
-  if (policy.secrets.enabled) {
+  if (policy.secrets.enabled && !skipSecrets) {
     const secrets = redactSecretsInText({
       text: result,
       customPatterns: compiledSecretPatterns,
@@ -128,6 +134,68 @@ const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Attribute names the SECRETS pass does not run on at all, name rule and value
+ * rules both.
+ *
+ * These are the names the ingestion pipeline itself reads. It uses them to
+ * attach a span to its simulation run, its evaluation run, its prompt, its
+ * conversation and the customer it belongs to, and every one of those links is
+ * made by comparing the value to the same value on another record. So the value
+ * is not free text the customer happens to have sent us, it is an address, and
+ * writing `[SECRET]` over it does not hide a credential from anyone. It breaks
+ * the link, permanently: redaction runs at ingestion and the original is never
+ * stored. Every value in this set is also shown back to the customer as an id,
+ * so there is no reader for whom it is content.
+ *
+ * The set exists because a value-shape rule cannot tell a minted id from a
+ * minted key, and one that guessed wrong took `scenario.run_id` with it. The
+ * shape rules are listed record prefixes now, which is the first line; this is
+ * the second, and it holds whatever the shape rules decide next.
+ *
+ * Three limits keep it narrow. It is an exact-name match, so a nested or
+ * suffixed variant carries none of it. It covers the secrets pass ONLY, so a
+ * personal identifier under one of these names is still replaced by the PII
+ * pass at every level that runs it. And a name goes in only when the pipeline
+ * reads it: an attribute the product merely stores is content and keeps both
+ * passes.
+ */
+export const SECRETS_EXEMPT_RESERVED_ATTRIBUTES: ReadonlySet<string> = new Set([
+  // Simulation runs. The trace pipeline reads this to send the trace's cost to
+  // the run that spent it.
+  "scenario.run_id",
+  // Evaluation and experiment runs, read the same way.
+  "evaluation.run_id",
+  // Prompts. The trace fold collects these into the trace's prompt list, which
+  // is what shows a prompt its own traces.
+  "langwatch.prompt.id",
+  "langwatch.prompt.handle",
+  "langwatch.prompt.selected.id",
+  "langwatch.prompt.version.id",
+  "langwatch.prompt.version.number",
+  // Conversation, user and customer: the three dimensions traces are grouped
+  // and filtered by, each with the spellings the canonicalisers accept.
+  "gen_ai.conversation.id",
+  "langwatch.thread.id",
+  "langwatch.thread_id",
+  "langwatch.langgraph.thread_id",
+  "metadata.thread_id",
+  "langwatch.user.id",
+  "langwatch.user_id",
+  "metadata.user_id",
+  "langwatch.customer.id",
+  "langwatch.customer_id",
+  "metadata.customer_id",
+  // Gateway and ingestion provenance: which virtual key, which request and
+  // which ingestion source produced the span. All are row ids written by our
+  // own services, and the gateway's key material uses a different prefix.
+  "langwatch.virtual_key_id",
+  "langwatch.gateway_request_id",
+  "langwatch.model_provider_id",
+  "langwatch.ingestion_source.id",
+  "langwatch.ingestion_source.organization_id",
+]);
+
+/**
  * Redact one attribute (key + value). When secrets redaction is on and the
  * attribute NAME is obviously sensitive (authorization, api_key, cookie, ...),
  * the whole value is replaced regardless of its shape — the Sentry-style
@@ -135,6 +203,9 @@ const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
  * the value runs through the normal native passes (secrets value-scan +
  * essential PII), marked as an attribute value so the PII pass can hold an
  * identifier-shaped value back from the recognizers that go on shape alone.
+ *
+ * {@link SECRETS_EXEMPT_RESERVED_ATTRIBUTES} skips the secrets pass entirely
+ * and keeps the PII pass.
  */
 export function redactAttributeNative({
   key,
@@ -149,8 +220,10 @@ export function redactAttributeNative({
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
+  const secretsExempt = SECRETS_EXEMPT_RESERVED_ATTRIBUTES.has(key);
   if (
     policy.secrets.enabled &&
+    !secretsExempt &&
     value.length > 0 &&
     !NAME_RULE_EXEMPT_ATTRIBUTES.has(key) &&
     isSensitiveAttributeKey(key)
@@ -160,6 +233,7 @@ export function redactAttributeNative({
   return redactStringNative({
     text: value,
     policy,
+    skipSecrets: secretsExempt,
     compiledSecretPatterns,
     compiledPiiExceptions,
     isAttributeValue: true,
