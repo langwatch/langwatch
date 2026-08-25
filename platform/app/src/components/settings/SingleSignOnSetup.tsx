@@ -148,6 +148,11 @@ function ConnectedJourney({
   connection: NonNullable<SelfServeSetupView["connection"]>;
 }) {
   const { availability, claims, record, serviceProvider, goLive } = view;
+  // The caller already refused an unavailable organization, but destructuring
+  // here starts from the whole union again — so `proof`, which only the
+  // available branch carries, was being read off a type that may not have it.
+  const provesWithLicense =
+    availability.available && availability.proof === "license-token";
   const progress = setupProgressFor({
     domainProved: goLive?.domainProved ?? false,
     testSignInDone: goLive?.testSignIn.done ?? false,
@@ -190,7 +195,7 @@ function ConnectedJourney({
             canManage={canManage}
             organizationId={organizationId}
             connectionId={connection.connectionId}
-            provesWithLicense={availability.proof === "license-token"}
+            provesWithLicense={provesWithLicense}
           />
         </SetupStep>
 

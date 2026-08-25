@@ -1,5 +1,8 @@
 import { Alert } from "@chakra-ui/react";
-import type { SsoSelfServeAvailability } from "@langwatch/identity-server";
+// The availability union is the pure package's, not the server's — asking
+// `identity-server` for it typed the refusal as `any`, which is how a
+// registry lookup keyed by a union of three codes stopped being checked.
+import type { SsoSelfServeAvailability } from "@langwatch/identity";
 import { explainAnyError } from "~/features/errors/logic/presentation";
 import { toaster } from "../../ui/toaster";
 

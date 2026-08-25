@@ -207,9 +207,10 @@ function nameserverBackedResolver(): TxtRecordResolver {
     timeout: LOOKUP_TIMEOUT_MS,
     tries: LOOKUP_TRIES,
   });
-  const servers = (env.SSO_DOMAIN_PROOF_DNS_SERVERS ?? "")
+  const configured: string = env.SSO_DOMAIN_PROOF_DNS_SERVERS ?? "";
+  const servers = configured
     .split(/[\s,]+/)
-    .filter((entry) => entry !== "");
+    .filter((entry: string) => entry !== "");
   if (servers.length === 0) return resolver;
 
   try {
