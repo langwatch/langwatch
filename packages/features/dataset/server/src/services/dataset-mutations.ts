@@ -27,7 +27,6 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { tryToMapPreviousColumnsToNewColumns } from "./dataset-column-mapping";
 import { DatasetContentRepository as DatasetRepository } from "../repositories/prisma/dataset-content.repository";
 import {
   type ChunkedDatasetMeta,
@@ -49,9 +48,39 @@ import {
   convertRowsToColumnTypes,
   type DatasetColumns,
   type DatasetRecordEntry,
+  type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
 
 const logger = createLogger("langwatch:datasets:mutations");
+
+const tryToMapPreviousColumnsToNewColumns = (
+  records: DatasetRecordInput[],
+  previousColumns: DatasetColumns,
+  newColumns: DatasetColumns,
+): DatasetRecordInput[] => {
+  const mapping: Record<string, string | undefined> = {};
+  for (const previous of previousColumns) {
+    const exact = newColumns.find((column) => column.name === previous.name);
+    if (exact) mapping[previous.name] = exact.name;
+  }
+  const previousUnmapped = previousColumns.filter(
+    (column) => !(column.name in mapping),
+  );
+  const newUnmapped = newColumns.filter(
+    (column) => !Object.values(mapping).includes(column.name),
+  );
+  previousUnmapped.forEach((previous, index) => {
+    const next = newUnmapped[index];
+    if (next) mapping[previous.name] = next.name;
+  });
+  return records.map((record) => {
+    const mapped: DatasetRecordInput = record.id ? { id: record.id } : {};
+    for (const [key, value] of Object.entries(record)) {
+      if (key !== "id" && mapping[key]) mapped[mapping[key]!] = value;
+    }
+    return mapped;
+  });
+};
 
 /**
  * Storage mutation state shared by the portable Dataset aggregate and the
