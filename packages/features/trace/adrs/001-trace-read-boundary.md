@@ -17,26 +17,21 @@ is composed by the server adapter and never crosses the package export
 boundary. Cost redaction is applied after persistence reads and before DTO
 validation.
 
-This slice deliberately does not move headers, span details, full/blob reads,
-list/search, projections, eventing, edit overlays, evaluations, transcript
-enrichment, resource metadata, logs, signals, or other trace viewer paths.
-Those paths have additional cross-feature dependencies and will move only when
-their complete response parity is characterized.
+This slice does not move headers, full/detail reads, list/search, projections,
+eventing, overlays, evaluations, enrichment, resources, logs, or signals.
+Those paths move only with their complete response parity characterized.
 
 ## Compatibility gate
 
-The adapter is not yet wired to an existing REST or tRPC route. The current
-drawer response is assembled by several legacy loaders and includes additional
-resource, evaluation, annotation, redaction, and enrichment fields. A route
-may migrate only after a characterization fixture proves the complete existing
-payload, including null-versus-omitted fields, cursor and timestamp semantics,
-tenant isolation, event/link data, and full/blob resolution.
+The adapter is not wired to a REST or tRPC route. The current drawer combines
+resource, evaluation, annotation, redaction, enrichment, event/link and blob
+data. Migrate only after a fixture proves the complete payload, including
+null-versus-omitted fields, cursor/timestamp semantics, tenant isolation and
+full/blob fallback.
 
-The package deliberately selects every input to the live cost mapper, but does
-not yet own the canonical `computeSpanCost` dependency graph. Its live fallback
-includes custom rates, an SDK total, static model prices, cache TTL, audio, and
-guardrail pricing; returning the raw stored cost alone would change valid
-responses. That exact calculator must move as one canonical dependency (not a
-second implementation) before this service can be wired. Until then the old
-route remains authoritative and this package is an internal composition
-candidate, not a transport replacement.
+The repository keeps the calculator inputs private and the service delegates
+missing positive stored cost to the full Model Provider service. That service
+owns the one canonical custom, SDK, static, cache, audio and guardrail pricing
+cascade. The remaining transport gate is therefore full-detail parity, not a
+second cost implementation. Until that payload is complete, the old route
+remains authoritative.

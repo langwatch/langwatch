@@ -23,7 +23,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import { SpanStorageClickHouseRepository } from "../repositories/span-storage.clickhouse.repository";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
 const now = Date.now();
@@ -265,8 +265,8 @@ describe("RAG contexts read path (integration)", () => {
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
       });
 
-      const repo = new SpanStorageClickHouseRepository(ch);
-      const spans = await repo.getSpansByTraceId(tenantId, traceId);
+      const repo = new SpanStorageClickHouseRepository(async () => ch);
+      const spans = await repo.getSpansByTraceId({ tenantId, traceId });
 
       const ragSpan = findRagSpan(spans);
       expect(ragSpan.contexts).toEqual(ragChunks);
