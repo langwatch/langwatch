@@ -92,8 +92,10 @@
  */
 @media (color-gamut: p3) {
 	:root {
-		--chakra-colors-auth-action: color(display-p3 0.706 0.325 0.055);
-		--chakra-colors-auth-action-hover: color(display-p3 0.62 0.247 0.02);
+		/* The action pill is ink-on-paper now (and paper-on-ink in dark) —
+		   neutral in both spaces, so it takes no p3 upgrade and must not be
+		   restated here: an orange left behind would put the slab back on
+		   every wide-gamut display. */
 		--chakra-colors-auth-ink: color(display-p3 0.62 0.247 0.02);
 		--chakra-colors-auth-detail: color(display-p3 0.91 0.427 0.114);
 		--chakra-colors-auth-tint: color(display-p3 0.98 0.925 0.882);
@@ -107,8 +109,6 @@
 	}
 
 	.dark {
-		--chakra-colors-auth-action: color(display-p3 0.91 0.427 0.114 / 0.92);
-		--chakra-colors-auth-action-hover: color(display-p3 0.98 0.549 0.259);
 		--chakra-colors-auth-ink: color(display-p3 0.98 0.549 0.259);
 		--chakra-colors-auth-detail: color(display-p3 0.98 0.549 0.259 / 0.75);
 		--chakra-colors-auth-tint: color(display-p3 0.91 0.427 0.114 / 0.18);

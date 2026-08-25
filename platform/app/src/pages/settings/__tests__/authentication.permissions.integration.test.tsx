@@ -161,7 +161,9 @@ describe("the single sign-on settings surface", () => {
       expect(screen.getByText("okta")).toBeTruthy();
       expect(screen.getByText("acme.com")).toBeTruthy();
       expect(screen.getByText("Not proved yet")).toBeTruthy();
-      expect(screen.getByText("APPROVED")).toBeTruthy();
+      // In the words the status chip speaks, never the aggregate's own
+      // vocabulary: a reader is told "Domain approved", not "APPROVED".
+      expect(screen.getByText("Domain approved")).toBeTruthy();
 
       // And nothing they cannot use is rendered AT ALL — not disabled, not
       // present. Every control named here is one this reader would be

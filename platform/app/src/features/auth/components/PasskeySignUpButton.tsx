@@ -94,10 +94,16 @@ function readRefusal(error: { status: number } & object): Refusal {
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
   // Saying "something went wrong" about a cancelled prompt would be telling
   // somebody off for deciding, and the password fields are still on screen.
-  if (code === "ERROR_CEREMONY_ABORTED" || error.status === 0) {
+  // Only the explicit abort is that decision, though: a client-side failure
+  // also arrives with no status, and treating every status-less error as a
+  // cancel left a FAILED ceremony saying nothing at all.
+  if (code === "ERROR_CEREMONY_ABORTED") {
     return { kind: "silent" };
   }
-  return { kind: "report", error: passkeyFailure(error.status) };
+  return {
+    kind: "report",
+    error: passkeyFailure(error.status === 0 ? void 0 : error.status),
+  };
 }
 
 /**

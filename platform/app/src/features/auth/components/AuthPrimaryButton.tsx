@@ -82,8 +82,10 @@ export const AUTH_PRIMARY_STYLE = {
   // heavier weight would be a different component wearing the colour.
   fontSize: "14px",
   fontWeight: 600,
-  // The card's one radius language: the same cut as the box above it.
-  borderRadius: SHAPE.control,
+  // The site's pill, not the card's box: `.btn-primary` on the marketing
+  // pages is rounded-full, and the primary is the one control on this card
+  // that speaks the site's own button language rather than the form's.
+  borderRadius: "9999px",
   backgroundColor: "auth.action",
   color: "auth.onAction",
   // Every state is a change of COLOUR. One step along the brand ramp on hover

@@ -47,18 +47,12 @@ export function AuthField({
           <label htmlFor={id}>{label}</label>
         </VisuallyHidden>
       ) : (
-        /* Centred when the label stands alone, because everything else on this
-           card is: the title, the button's word, the divider, the method rail
-           and the footer all sit on the centre line, and a lone label pinned
-           left was the one thing that did not. It goes back to a two-ended row
-           the moment there is something to put at the far end — a centred
-           label with a link hanging off the right of it is not centred, it is
-           two things fighting. */
-        <HStack
-          width="full"
-          justify={labelEnd ? "space-between" : "center"}
-          marginBottom="7px"
-        >
+        /* Always the left edge. Centring a label that stood alone made two
+           stacked fields disagree — Password pinned left by its hint,
+           Confirm password floating in the middle — and a form whose labels
+           wander is worse than a lone label off the centre line. The label
+           marks where reading a field STARTS, and that is the edge. */
+        <HStack width="full" justify="space-between" marginBottom="7px">
           {/* The site's small technical voice: mono, spaced, quiet — the same
               register the "or" divider speaks in. */}
           <Text

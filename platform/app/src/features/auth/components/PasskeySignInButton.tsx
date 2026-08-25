@@ -158,9 +158,20 @@ export function PasskeySignInButton({
       if (current.abandoned) return;
       // A cancelled prompt is not a failure worth shouting about: the person
       // closed it, and the other methods are still on the screen behind this.
+      // But ONLY the explicit abort is a cancel. A client-side failure — the
+      // authenticator erroring, a relying-party mismatch — also comes back
+      // with no status, and silencing it left somebody whose passkey FAILED
+      // staring at a screen that said nothing at all.
       if (result?.error) {
-        if (result.error.status !== 0) {
-          onError(passkeyFailure(result.error.status));
+        const cancelled =
+          "code" in result.error &&
+          result.error.code === "ERROR_CEREMONY_ABORTED";
+        if (!cancelled) {
+          onError(
+            passkeyFailure(
+              result.error.status === 0 ? void 0 : result.error.status,
+            ),
+          );
         }
         // Told either way, quiet refusal included: the screen's job now is to
         // offer the next-best method, and that is as true of a prompt somebody

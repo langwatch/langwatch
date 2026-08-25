@@ -236,12 +236,22 @@ export function FederatedMethodButton({
 export function LastUsedBadge() {
   return (
     <Badge
+      // The site's own pill: a hairline ring on the ground colour, small
+      // caps, muted ink. It floats over the button's top edge, so the solid
+      // ground is load-bearing — it is what masks the border it crosses —
+      // and the quiet register is the point: this is a memory of the
+      // browser's, not a recommendation of ours.
       borderRadius="full"
-      paddingX="9px"
-      fontSize="10px"
+      paddingX="8px"
+      paddingY="1px"
+      fontSize="9px"
       fontWeight={500}
-      backgroundColor={"auth.tint"}
-      color={"auth.ink"}
+      letterSpacing="0.14em"
+      textTransform="uppercase"
+      backgroundColor="auth.ground"
+      borderWidth="1px"
+      borderColor="auth.hairline"
+      color="fg.muted"
       data-testid="last-used-method"
     >
       Last used

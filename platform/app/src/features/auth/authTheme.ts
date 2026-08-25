@@ -68,31 +68,22 @@ export const authThemeConfig = defineConfig({
            *  the site's dark band — never the app's panel grey. */
           ground: mode("#ffffff", ink[950]),
           /**
-           * The primary action, on BOTH grounds. It was an ink pill on paper
-           * and orange on ink, which meant the two themes disagreed about
-           * what the most important thing on the screen looks like.
+           * The primary action, in the site's own button language: an ink
+           * pill on paper, inverted to a paper pill on ink — the marketing
+           * site's `.btn-primary`, per surface. The orange slab it replaces
+           * made the one most important control on the screen the loudest
+           * thing the brand owns, and black-on-orange never cleared the
+           * contrast it pretended to; the brand colour stays where the site
+           * keeps it, in the details, the focus ring and the accents.
            *
-           * SOLID on both, and cut from opposite ends of the ramp. The dark
-           * value used to be the mid orange at an alpha, which is two
-           * mistakes wearing one colour: the alpha let the card's blue glass
-           * up through the pill and pulled it toward brown, and the mid cut
-           * is the one this file already says a dark ground cannot use — it
-           * is why `detail` steps up a stop. The lifted cut is the same
-           * decision, made for the button.
-           *
-           * The direction is the one every other state here takes: darker on
-           * paper, brighter on ink, because those are the same direction seen
-           * from opposite grounds.
+           * The hover is one step toward the ground — lighter ink on paper,
+           * dimmer paper on ink — because "recedes" and "lifts" are the same
+           * direction seen from opposite grounds.
            */
-          action: mode(brand[600], brand[400]),
-          actionHover: mode(brand[700], brand[300]),
-          /**
-           * Text that sits on the action colour, and the other half of the
-           * fix above. White on the orange it now takes is around 2.4:1,
-           * which is not a contrast ratio so much as a rumour of one; ink on
-           * it clears 9:1. So the label follows the ground the pill is cut
-           * for rather than being white by habit.
-           */
+          action: mode(ink[900], "#f5f4f1"),
+          actionHover: mode("#2c2c31", "#e2e0da"),
+          /** Text that sits on the action colour: the opposite ground's ink,
+           *  which is what an inverted pill is. */
           onAction: mode("#ffffff", ink[950]),
           /** Text on a tinted surface: readable where the tint alone is not. */
           ink: mode(brand[700], brand[400]),

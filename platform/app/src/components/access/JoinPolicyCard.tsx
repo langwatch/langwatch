@@ -161,8 +161,10 @@ export function JoinPolicyCard({
                       <RadioGroup.ItemIndicator />
                       <RadioGroup.ItemText>
                         <VStack align="start" gap={0}>
-                          <Text>{option.label}</Text>
-                          <Text color="fg.muted" fontSize="sm">
+                          <Text fontSize="sm" fontWeight="medium">
+                            {option.label}
+                          </Text>
+                          <Text color="fg.muted" fontSize="xs">
                             {option.help}
                           </Text>
                         </VStack>
