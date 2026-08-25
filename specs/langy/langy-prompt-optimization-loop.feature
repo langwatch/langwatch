@@ -162,12 +162,10 @@ Feature: Langy runs the prompt improvement loop on the workbench
     Then it does not say the open page is showing a change the page is not showing
     And a place it names as where a change happened is where the change happened
 
-  # The other half of the same idea, and the agent does not do it: it reads the
-  # `executedVia` its own dispatch answers with, and never phrases anything from
-  # it. Read the durable record of a full live loop and there is not one mention
-  # of the page, the browser or a reload. Held here until the skill earns it; the
-  # judged half above is the part the live suite enforces today.
-  @unimplemented
+  # The other half of the same idea. The two are graded apart so a run that
+  # simply says nothing fails only this one, while a run that speaks and is
+  # wrong fails the stricter invariant above.
+  @e2e
   Scenario: Langy says where each change happened
     When a change ran in the page the user is watching
     Then Langy phrases it as something the user can watch happen

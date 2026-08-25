@@ -28,8 +28,14 @@ Calls one action and blocks until it is done. Use `--payload-file` for any paylo
 
 The result carries `executedVia`:
 
-- `"browser"`: the user's open page applied it. They saw it. Say "watch the table" style things.
-- `"backend"`: no page answered, the platform applied it to the saved state. Say "reload when you are back" style things.
+- `"browser"`: the user's open page applied it. They saw it happen.
+- `"backend"`: no page answered, the platform applied it to the saved state. The page has not caught up.
+
+**Say where the change happened.** When you report work you did, name the place, because those are two different places for the reader. `"browser"` means it is on the page in front of them, so point at it: "the new column is on your table now". `"backend"` means it is on the saved workbench and their page is behind, so tell them that: "I made it on the saved workbench, so reload the page to see it". This is not decoration. A reader watching a page they think is current, which is not, will read stale numbers and believe them.
+
+Say it once for a run of work, not once per call. A loop that made six changes reports where the six landed, not six sentences.
+
+Only claim the page shows something when `executedVia` said `"browser"` for that action. If you did not read `executedVia`, say nothing about the page at all. Guessing wrong here is worse than staying quiet, because the reader trusts what you tell them about their own screen.
 
 `executedVia` names the path that ran the action, not the outcome. The write landed only when the answer's `result` names what it touched, such as the new target id, the model, or the row count. When `result` names nothing, read the state again before you build on it.
 
