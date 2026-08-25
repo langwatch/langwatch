@@ -8,12 +8,17 @@
 import { ScenarioRunExportDialog } from "~/components/suites/ScenarioRunExportDialog";
 import { useExportScenarioRuns } from "~/components/suites/useExportScenarioRuns";
 import { useCan } from "~/hooks/useCan";
+import { useNow } from "~/hooks/useNow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunDialog } from "../run/RunDialog";
 import { ContentColumn } from "../shared/ContentColumn";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailProps } from "./RunPlanDetail";
-import { RunPlanDetailHeader } from "./RunPlanDetailHeader";
+import {
+  RunPlanDetailHeader,
+  type RunPlanDetailRun,
+} from "./RunPlanDetailHeader";
 import { RunPlanRunResults } from "./RunPlanRunResults";
 import { RUNS_SIDEBAR_WIDTH } from "./RunsSidebar";
 import type { RunPlan } from "./run-plans";
@@ -39,6 +44,7 @@ export function RunPlanResultsColumn({
 }: RunPlanResultsColumnProps) {
   const { project } = useOrganizationTeamProject();
   const { can } = useCan();
+  const now = useNow();
   const canManage = can("scenarios:manage");
   const { viewMode, handleViewModeChange } = useRunPlanViewMode();
   const runDialog = useRunPlanRunDialog({ plan, canManage });
@@ -61,11 +67,21 @@ export function RunPlanResultsColumn({
     exportRuns.isExporting ||
     batches.batchRuns.length === 0;
 
+  const run: RunPlanDetailRun | null = selection.selectedBatch
+    ? {
+        title: selection.title ?? "",
+        timeAgo: formatTimeAgoCompact(selection.selectedBatch.timestamp, now),
+        note: selection.note,
+        summary: selection.summary,
+      }
+    : null;
+
   return (
     <>
       <ContentColumn railWidth={RUNS_SIDEBAR_WIDTH}>
         <RunPlanDetailHeader
           plan={plan}
+          run={run}
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
           onStopAll={

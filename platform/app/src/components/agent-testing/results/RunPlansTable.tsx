@@ -26,7 +26,7 @@ import type {
   RelativePresetKey,
 } from "~/components/PeriodSelector";
 import { ContentColumn } from "../shared/ContentColumn";
-import { FG_FAINT, TABLE_HEADER_BG } from "../shared/design";
+import { FG_MUTED, TABLE_HEADER_BG } from "../shared/design";
 import { AgentTestingPeriodPicker, periodDays } from "../shared/PeriodPicker";
 import { SmallButton } from "../shared/SmallButton";
 import { PLAN_COLUMNS, PlanRow } from "./RunPlanRow";
@@ -65,7 +65,7 @@ export function RunPlansTable({
         <Text fontSize="14px" fontWeight="semibold" color="fg">
           Test Runs
         </Text>
-        <Text fontSize="11.5px" color={FG_FAINT}>
+        <Text fontSize="11.5px" color={FG_MUTED}>
           {plans.length === 1 ? "1 run plan" : `${plans.length} run plans`}
         </Text>
         <Box flex={1} />
@@ -121,14 +121,13 @@ export function RunPlansTable({
             fontWeight="semibold"
             textTransform="uppercase"
             letterSpacing="0.025em"
-            color={FG_FAINT}
+            color={FG_MUTED}
           >
             <Text as="span">Run plan</Text>
             <Text as="span">Cases</Text>
             <Text as="span" gridColumn="span 2">
               Last run
             </Text>
-            <Text as="span" />
             <Text as="span" />
           </Box>
 

@@ -19,7 +19,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, History, Play } from "lucide-react";
+import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useState } from "react";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
@@ -27,8 +27,9 @@ import { Dialog } from "~/components/ui/dialog";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
+import { CaseVersionHistoryPopover } from "./CaseVersionHistoryPopover";
 import type { TestSuiteEntry } from "./test-cases";
 import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 
@@ -40,12 +41,16 @@ const PARAMETERS_HELP =
 /** The heading: what the dialog is for, and the way back to the versions. */
 export function CaseModalHeader({
   isEditing,
+  scenarioId,
   version,
-  onOpenHistory,
+  openHistoryOnOpen,
 }: {
   isEditing: boolean;
+  /** The case being edited, or nothing for a new one. */
+  scenarioId: string | null;
   version: number | null;
-  onOpenHistory: () => void;
+  /** True when the dialog was opened from a History entry. */
+  openHistoryOnOpen?: boolean;
 }) {
   return (
     <Dialog.Header
@@ -61,21 +66,12 @@ export function CaseModalHeader({
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
-      {isEditing && version !== null && (
-        <Button
-          position="absolute"
-          top={3}
-          right={11}
-          size="xs"
-          variant="ghost"
-          fontSize="12px"
-          color={FG_MUTED}
-          title="Every version of this test case"
-          onClick={onOpenHistory}
-          data-testid="case-modal-history"
-        >
-          <History size={12} />v{version} · History
-        </Button>
+      {isEditing && scenarioId && version !== null && (
+        <CaseVersionHistoryPopover
+          scenarioId={scenarioId}
+          version={version}
+          initialOpen={openHistoryOnOpen}
+        />
       )}
       <Dialog.CloseTrigger />
     </Dialog.Header>
@@ -166,7 +162,7 @@ function SituationAndRubrics({
           value={draft.rubrics}
           onChange={(event) => setDraft({ rubrics: event.target.value })}
         />
-        <Text marginTop={1} fontSize="11px" color={FG_FAINT}>
+        <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
           The judge scores each line as pass or fail on the finished
           conversation.
         </Text>
@@ -376,7 +372,7 @@ function AdvancedSection({
               />
             </Box>
           </Grid>
-          <Text fontSize="11px" color={FG_FAINT}>
+          <Text fontSize="11px" color={FG_MUTED}>
             Max turns caps the conversation. Min turns keeps the judge from
             ending the test early.
           </Text>

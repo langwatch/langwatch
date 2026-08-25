@@ -15,7 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
-import { FG_FAINT } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { CasesPanelProps } from "./CasesPanel";
 
@@ -44,13 +44,13 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
   return (
     <HStack gap={2} minHeight="32px" flexWrap="wrap">
       {props.isExternal && (
-        <Icon as={FolderCode} boxSize="15px" color={FG_FAINT} />
+        <Icon as={FolderCode} boxSize="15px" color={FG_MUTED} />
       )}
-      {isSuite && <Icon as={Folder} boxSize="15px" color={FG_FAINT} />}
+      {isSuite && <Icon as={Folder} boxSize="15px" color={FG_MUTED} />}
       <Text fontSize="14px" fontWeight="semibold" color="fg">
         {props.title}
       </Text>
-      <Text fontSize="11.5px" color={FG_FAINT}>
+      <Text fontSize="11.5px" color={FG_MUTED}>
         {props.caseCount} {props.caseCount === 1 ? "case" : "cases"}
       </Text>
       {props.isExternal && (

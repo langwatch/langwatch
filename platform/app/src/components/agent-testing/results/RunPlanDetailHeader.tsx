@@ -1,6 +1,9 @@
 /**
- * The top line of an open run plan: its name and what it covers on the left,
- * and on the same line everything a person can do with it.
+ * The top line of an open run plan: which run is on screen on the left, and
+ * everything a person can do with the plan on the right, all on one row.
+ *
+ * The name of the plan is not here: it reads as the page title while the plan
+ * is open, so this line can stay on the run itself.
  *
  * A set that runs from code and the one-off bucket are not plans anyone wrote,
  * so neither carries an Edit or a Run. Export lives in the overflow menu, so
@@ -10,19 +13,32 @@
  * goes back to.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/suites/run-notes.feature
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Download, MoreVertical, Pencil, Play, Square } from "lucide-react";
+import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
+import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import { Menu } from "~/components/ui/menu";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";
-import { planScopeNote, type RunPlan } from "./run-plans";
+import type { RunPlan } from "./run-plans";
 import { ViewModeToggle } from "./ViewModeToggle";
+
+/** Which run is on screen, as the line reads it. */
+export type RunPlanDetailRun = {
+  title: string;
+  timeAgo: string;
+  note: string | null;
+  summary: RunGroupSummary | null;
+};
 
 export type RunPlanDetailHeaderProps = {
   plan: RunPlan;
+  /** Absent while the plan has no run to show yet. */
+  run: RunPlanDetailRun | null;
   viewMode: AgentTestingViewMode;
   onViewModeChange: (viewMode: AgentTestingViewMode) => void;
   /** Offered only while the selected run still has cases to stop. */
@@ -35,8 +51,36 @@ export type RunPlanDetailHeaderProps = {
   onRunPlan?: () => void;
 };
 
+/** Which run is on screen: its number, its age and the note it carries. */
+function RunSummary({ run }: { run: RunPlanDetailRun }) {
+  return (
+    <>
+      <Text fontSize="12.5px" fontWeight="semibold">
+        {run.title}
+      </Text>
+      <Text fontSize="11.5px" color={FG_MUTED}>
+        {run.timeAgo}
+      </Text>
+      {run.note ? (
+        <Text
+          fontSize="11.5px"
+          color={FG_MUTED}
+          fontStyle="italic"
+          truncate
+          minWidth={0}
+          title={run.note}
+          data-testid="run-summary-note"
+        >
+          &ldquo;{run.note}&rdquo;
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
 export function RunPlanDetailHeader({
   plan,
+  run,
   viewMode,
   onViewModeChange,
   onStopAll,
@@ -49,19 +93,27 @@ export function RunPlanDetailHeader({
   const suiteId = plan.kind === "suite" ? plan.suiteId : null;
 
   return (
-    <HStack gap={2} flexWrap="wrap" minHeight="32px">
-      <Text fontSize="14px" fontWeight="semibold" color="fg">
-        {plan.name}
-      </Text>
-      <Text fontSize="11.5px" color={FG_FAINT}>
-        {planScopeNote(plan.kind)}
-      </Text>
+    <HStack
+      gap={2.5}
+      flexWrap="wrap"
+      minHeight="32px"
+      data-testid="run-summary-line"
+    >
+      {run ? <RunSummary run={run} /> : null}
+
       <Box flex={1} />
+
       <HStack gap={1.5}>
+        {run?.summary ? (
+          <RunMetricsSummary summary={run.summary} size="md" />
+        ) : null}
+
         <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
 
         {onStopAll ? (
           <SmallButton
+            height="32px"
+            minHeight="32px"
             onClick={onStopAll}
             disabled={isStoppingAll}
             data-testid="stop-all-button"
@@ -75,8 +127,8 @@ export function RunPlanDetailHeader({
             <Button
               size="xs"
               variant="ghost"
-              minWidth="26px"
-              height="26px"
+              minWidth="28px"
+              height="28px"
               paddingX={0}
               color={FG_MUTED}
               aria-label={`More actions for ${plan.name}`}
@@ -100,7 +152,7 @@ export function RunPlanDetailHeader({
           <Button
             size="xs"
             variant="ghost"
-            height="28px"
+            height="32px"
             paddingX="10px"
             fontSize="12px"
             fontWeight="medium"
@@ -116,6 +168,8 @@ export function RunPlanDetailHeader({
           <SmallButton
             variant="solid"
             colorPalette="blue"
+            height="32px"
+            minHeight="32px"
             background={undefined}
             borderColor="transparent"
             onClick={onRunPlan}

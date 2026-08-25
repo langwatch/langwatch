@@ -8,12 +8,15 @@ Feature: The run dialog
     "Customize your run" section that offers chips. A chip adds one field to
     the form, and each added field can be removed again.
 
-    The chips are "Add a note to your run", "Override parameters" and "Run
-    against a prompt". Choosing the prompt chip replaces the agent area with a
-    prompt picker; removing it brings the agent area back.
+    The chips are "Add a note to your run", "Override parameters" and, last,
+    "Run against a prompt". Choosing the prompt chip replaces the agent area
+    with a prompt picker; removing it brings the agent area back. The chips are
+    drawn flat, with a dashed border and no shadow.
 
-    The target used last time is already selected, so a repeat run needs one
-    click.
+    The run options of a test suite are written onto the suite itself, so the
+    next run dialog of that suite opens on them for everybody on the team: the
+    target, the parameter overrides, and a prompt in place of an agent. The
+    note is the one field that never comes back.
 
   # --- The agent section ---
 
@@ -24,6 +27,14 @@ Feature: The run dialog
     Then the section reads "Agent to be tested"
     And the target used last time is selected
     And the customize chips are shown but add no fields yet
+
+  @integration
+  Scenario: The agent section offers a way to the agent setup page
+    Given the run dialog is open on the agent section
+    When the label line is read
+    Then it offers "Configure" on the right
+    And choosing it opens the agents page in another tab
+    And the run dialog stays open
 
   @integration
   Scenario: The agents are shown as blocks with a local tunnel mark
@@ -82,6 +93,12 @@ Feature: The run dialog
     And the run waits until the secret holds a value
 
   @integration
+  Scenario: The prompt chip is the last chip of the row
+    Given the run dialog is open with a prompt published
+    When the customize chips are read
+    Then "Run against a prompt" is the last chip
+
+  @integration
   Scenario: The prompt chip replaces the agent area
     Given the run dialog is open with an agent selected
     When "Run against a prompt" is chosen
@@ -112,6 +129,41 @@ Feature: The run dialog
     When a target is chosen and the run is confirmed
     And the run dialog for that suite is opened again
     Then that target is already selected
+
+  @integration
+  Scenario: A suite remembers the parameter overrides of its last run
+    Given a test suite run with parameter overrides
+    When the run dialog for that suite is opened again
+    Then the parameter block is already open
+    And it holds the values the last run used
+
+  @integration
+  Scenario: A suite remembers that it was run against a prompt
+    Given a test suite run against a published prompt
+    When the run dialog for that suite is opened again
+    Then the dialog opens on the prompt picker
+    And that prompt is already selected
+
+  @integration
+  Scenario: The run options are remembered for the whole team
+    Given a test suite run with a target and parameter overrides by one person
+    When another person opens the run dialog for that suite
+    Then the same target and the same overrides are already selected
+
+  @integration
+  Scenario: The note of a run is never remembered
+    Given a test suite run with the note "checking the stricter rubric"
+    When the run dialog for that suite is opened again
+    Then no note field is shown
+    And "Add a note to your run" is offered again
+
+  @integration
+  Scenario: A secret parameter value is never remembered
+    Given a test suite whose cases declare a secret parameter
+    And a run of that suite with the secret filled in
+    When the run dialog for that suite is opened again
+    Then the masked field is empty
+    And the run waits until the secret holds a value again
 
   @integration
   Scenario: The dialog closes and the person stays where they were

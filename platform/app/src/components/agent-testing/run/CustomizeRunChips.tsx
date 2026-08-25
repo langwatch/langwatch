@@ -44,6 +44,7 @@ export function CustomizeRunChips({ chips }: { chips: CustomizeRunChip[] }) {
             borderWidth="1px"
             borderStyle="dashed"
             borderColor="border.emphasized"
+            boxShadow="none"
             fontSize="12px"
             fontWeight="medium"
             color={FG_MUTED}

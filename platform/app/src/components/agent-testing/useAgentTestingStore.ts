@@ -48,6 +48,8 @@ export type CaseEditorTarget = {
   scenarioId: string | null;
   /** The suite a new case starts in. */
   folderId: string | null;
+  /** True when the case was opened to read its versions. */
+  showHistory: boolean;
 };
 
 /**
@@ -59,10 +61,22 @@ export type PendingRun = {
   scenarioSetId: string;
 };
 
+/**
+ * The run plan the Results tab is open on, as the page title reads it. The
+ * page header is above the tab that resolves the plan, so the tab hands the
+ * title up rather than the header reading the plans a second time.
+ */
+export type OpenPlanTitle = {
+  name: string;
+  /** What the plan is: "Test suite", "from code", and so on. */
+  note: string;
+};
+
 const CLOSED_CASE_EDITOR: CaseEditorTarget = {
   open: false,
   scenarioId: null,
   folderId: null,
+  showHistory: false,
 };
 
 export interface AgentTestingState {
@@ -75,6 +89,8 @@ export interface AgentTestingState {
   /** The run whose cancel is in flight, so its button can say so. */
   cancellingJobId: string | null;
   caseEditor: CaseEditorTarget;
+  /** The run plan the page is open on, or nothing on the list itself. */
+  openPlanTitle: OpenPlanTitle | null;
 
   setViewMode: (value: AgentTestingViewMode) => void;
   setRailCollapsed: (isCollapsed: boolean) => void;
@@ -84,6 +100,7 @@ export interface AgentTestingState {
   setLastRunTarget: (target: TargetValue) => void;
   setPendingRun: (run: PendingRun | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
+  setOpenPlanTitle: (title: OpenPlanTitle | null) => void;
   openCaseEditor: (target: Partial<Omit<CaseEditorTarget, "open">>) => void;
   closeCaseEditor: () => void;
 
@@ -142,6 +159,7 @@ export function createAgentTestingStore() {
     pendingRun: null,
     cancellingJobId: null,
     caseEditor: CLOSED_CASE_EDITOR,
+    openPlanTitle: null,
 
     setViewMode: (value) => set({ viewMode: value }),
 
@@ -180,8 +198,14 @@ export function createAgentTestingStore() {
 
     setCancellingJobId: (jobId) => set({ cancellingJobId: jobId }),
 
-    openCaseEditor: ({ scenarioId = null, folderId = null }) =>
-      set({ caseEditor: { open: true, scenarioId, folderId } }),
+    setOpenPlanTitle: (title) => set({ openPlanTitle: title }),
+
+    openCaseEditor: ({
+      scenarioId = null,
+      folderId = null,
+      showHistory = false,
+    }) =>
+      set({ caseEditor: { open: true, scenarioId, folderId, showHistory } }),
 
     closeCaseEditor: () => set({ caseEditor: CLOSED_CASE_EDITOR }),
 

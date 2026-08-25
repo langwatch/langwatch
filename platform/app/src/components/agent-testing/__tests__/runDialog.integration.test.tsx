@@ -48,7 +48,10 @@ vi.mock("~/utils/api", () => ({
         getAll: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
-      suites: { folders: { getAll: { invalidate: vi.fn() } } },
+      suites: {
+        folders: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getAll: { useQuery: mockScenariosGetAll },
@@ -178,6 +181,25 @@ function renderDialog(subject: RunDialogSubject) {
   return { onClose, onRunStarted };
 }
 
+/** A test case that declares the parameters a run may override. */
+function casesDeclaring(parameters: unknown) {
+  return {
+    data: [
+      {
+        id: "case_1",
+        name: "Double charge",
+        labels: [],
+        folderId: "suite_refunds",
+        parameters,
+        createdAt: new Date("2026-07-06T12:00:00.000Z"),
+        lastUpdatedById: null,
+        version: 1,
+      },
+    ],
+    isLoading: false,
+  };
+}
+
 /** A refusal the way tRPC carries a handled error to the client. */
 function handledRejection(code: string, meta: Record<string, unknown> = {}) {
   return { data: { error: { code, httpStatus: 422, meta } } };
@@ -240,6 +262,18 @@ describe("<RunDialog/>", () => {
     expect(
       screen.queryByTestId("run-dialog-parameters"),
     ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The agent section offers a way to the agent setup page" */
+  it("offers Configure, which opens the agents page in another tab", () => {
+    renderDialog(suiteSubject());
+
+    const configure = screen.getByTestId("run-dialog-configure-agents");
+    expect(configure).toHaveTextContent("Configure");
+    expect(configure).toHaveAttribute("href", "/test-project/agents");
+    expect(configure).toHaveAttribute("target", "_blank");
+    // The dialog is still the thing on screen.
+    expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
   });
 
   /** @scenario "The agents are shown as blocks with a local tunnel mark" */
@@ -431,6 +465,26 @@ describe("<RunDialog/>", () => {
     });
   });
 
+  /** @scenario "The prompt chip is the last chip of the row" */
+  it("offers the prompt chip last in the row", () => {
+    mockPromptsGetAll.mockReturnValue({
+      data: [{ id: "prompt_1", handle: "refund-prompt", version: 3 }],
+    });
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5-mini" }]),
+    );
+    renderDialog(suiteSubject());
+
+    const chips = within(screen.getByTestId("customize-run-chips"))
+      .getAllByRole("button")
+      .map((chip) => chip.getAttribute("data-testid"));
+    expect(chips).toEqual([
+      "customize-chip-note",
+      "customize-chip-params",
+      "customize-chip-prompt",
+    ]);
+  });
+
   /** @scenario "The prompt chip replaces the agent area" */
   it("replaces the agent area with the prompt picker, folders included", async () => {
     const user = userEvent.setup();
@@ -508,6 +562,132 @@ describe("<RunDialog/>", () => {
       targets: [{ type: "http", referenceId: "agent_1" }],
     });
     expect(onRunStarted).toHaveBeenCalled();
+  });
+
+  /** @scenario "A suite remembers the parameter overrides of its last run" */
+  it("opens the parameter block on the overrides the suite remembers", () => {
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "model", defaultValue: "gpt-5-mini" },
+        { name: "locale", defaultValue: "de" },
+      ]),
+    );
+    renderDialog(
+      suiteSubject({
+        initialTarget: { type: "http", id: "agent_1" },
+        persistedTarget: {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { model: "gpt-5", locale: "nl" },
+        },
+      }),
+    );
+
+    expect(screen.getByTestId("run-dialog-parameters")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
+      "model=gpt-5, locale=nl",
+    );
+    expect(
+      screen.queryByTestId("customize-chip-params"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A suite remembers that it was run against a prompt" */
+  it("opens on the prompt picker when the suite was last run against a prompt", () => {
+    mockPromptsGetAll.mockReturnValue({
+      data: [{ id: "prompt_1", handle: "refund-prompt", version: 3 }],
+    });
+    renderDialog(
+      suiteSubject({
+        initialTarget: { type: "prompt", id: "prompt_1" },
+        persistedTarget: { type: "prompt", referenceId: "prompt_1" },
+      }),
+    );
+
+    expect(screen.getByText("Prompt to be tested")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-prompt-prompt_1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  /** @scenario "The run options are remembered for the whole team" */
+  it("writes the target and the overrides onto the suite, where everyone reads them", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5-mini" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("customize-chip-params"));
+    const line = screen.getByTestId("run-dialog-parameter-line");
+    await user.clear(line);
+    await user.type(line, "model=gpt-5");
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesUpdate).toHaveBeenCalledWith({
+      projectId: "proj_1",
+      id: "suite_refunds",
+      targets: [
+        {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { model: "gpt-5" },
+        },
+      ],
+    });
+  });
+
+  /** @scenario "The note of a run is never remembered" */
+  it("never brings a note back, whatever the suite remembers", () => {
+    renderDialog(
+      suiteSubject({
+        initialTarget: { type: "http", id: "agent_1" },
+        persistedTarget: { type: "http", referenceId: "agent_1" },
+      }),
+    );
+
+    expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
+    expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
+  });
+
+  /** @scenario "A secret parameter value is never remembered" */
+  it("keeps the secret out of what the suite remembers", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "model", defaultValue: "gpt-5-mini" },
+        { name: "api_key", secret: true },
+      ]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.type(
+      screen.getByTestId("suite-run-parameter-api_key"),
+      "sk-live-1",
+    );
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    // The run carries the secret; the suite is only told the line.
+    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+      parameters: { api_key: "sk-live-1" },
+    });
+    expect(mockSuitesUpdate).toHaveBeenCalledWith({
+      projectId: "proj_1",
+      id: "suite_refunds",
+      targets: [
+        {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { model: "gpt-5-mini" },
+        },
+      ],
+    });
   });
 
   /** @scenario "The dialog closes and the person stays where they were" */

@@ -1,6 +1,7 @@
 /**
  * The results of the selected run: a table by default, or the classic wall of
- * live conversation cards.
+ * live conversation cards. Which run this is reads in the header line above,
+ * so the results start straight away.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
@@ -8,9 +9,7 @@
 import type { BatchRun } from "~/components/suites/run-history-transforms";
 import { ScenarioRunContent } from "~/components/suites/ScenarioRunContent";
 import { useCan } from "~/hooks/useCan";
-import { useNow } from "~/hooks/useNow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { PeriodControls } from "./period-controls";
 import {
   NoRunInPeriod,
@@ -18,7 +17,6 @@ import {
   RunsLoadingSkeleton,
 } from "./RunPlanResultsStates";
 import { RunResultsTable } from "./RunResultsTable";
-import { RunSummaryLine } from "./RunSummaryLine";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
 import type { useRunPlanCancel } from "./useRunPlanCancel";
@@ -51,23 +49,16 @@ function SelectedRunResults({
   onRerunCase,
 }: SelectedRunResultsProps) {
   const { can } = useCan();
-  const now = useNow();
   const rows = useRunRowHandlers({ scenarioSetId: plan.scenarioSetId });
   const onCancelRun = cancel.canStop ? cancel.handleCancelRun : undefined;
 
   return (
     <>
-      <RunSummaryLine
-        title={selection.title ?? ""}
-        timeAgo={formatTimeAgoCompact(batch.timestamp, now)}
-        note={selection.note}
-        summary={selection.summary}
-      />
-
       {viewMode === "grid" ? (
         <ScenarioRunContent
           scenarioRuns={batch.scenarioRuns}
           viewMode="grid"
+          gridPadding={0}
           resolveTargetName={rows.resolveTargetName}
           onScenarioRunClick={rows.handleScenarioRunClick}
           iterationMap={selection.iterationMap}

@@ -11,7 +11,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import type { Scenario } from "~/generated/prisma/client";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
 import { api } from "~/utils/api";
@@ -82,7 +81,6 @@ function useOnCaseSaved({
 export function AgentTestingCaseEditor() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const { openDrawer } = useDrawer();
   const caseEditor = useAgentTestingStore((state) => state.caseEditor);
   const closeCaseEditor = useAgentTestingStore(
     (state) => state.closeCaseEditor,
@@ -114,12 +112,7 @@ export function AgentTestingCaseEditor() {
         suites={suites}
         editor={editor}
         onClose={closeCaseEditor}
-        onOpenHistory={() => {
-          if (!caseEditor.scenarioId) return;
-          openDrawer("scenarioVersionHistory", {
-            urlParams: { scenarioId: caseEditor.scenarioId },
-          });
-        }}
+        openHistoryOnOpen={caseEditor.showHistory}
       />
 
       <RunDialog

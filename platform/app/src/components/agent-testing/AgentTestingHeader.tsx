@@ -2,16 +2,20 @@
  * The one header line of the Agent Testing page: the page title on the left
  * and the tabs in the middle.
  *
+ * With a run plan open the title is the name of that plan, with what the plan
+ * is beside it. Leaving the plan hands the title back to the page.
+ *
  * Neither tab carries an action here. Every write entry sits in the section
  * header above the table it writes into: New test case beside the set it files
  * into, New run plan beside the Test Runs list it adds to.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
-import { Box, Grid, GridItem, Tabs } from "@chakra-ui/react";
+import { Box, Grid, GridItem, HStack, Tabs, Text } from "@chakra-ui/react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { FG_FAINT } from "./shared/design";
+import { FG_MUTED } from "./shared/design";
 import type { AgentTestingTab } from "./useAgentTestingRouting";
+import type { OpenPlanTitle } from "./useAgentTestingStore";
 
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;
@@ -20,6 +24,8 @@ export type AgentTestingHeaderProps = {
   casesCount?: number;
   /** How many run plans the project holds, beside the Results tab. */
   plansCount?: number;
+  /** The run plan the page is open on, when it is open on one. */
+  openPlan?: OpenPlanTitle | null;
 };
 
 /** The small count that sits beside a tab name. */
@@ -33,7 +39,7 @@ function TabCount({ value }: { value?: number }) {
       background="bg.muted"
       paddingX={1.5}
       fontSize="10.5px"
-      color={FG_FAINT}
+      color={FG_MUTED}
     >
       {value}
     </Box>
@@ -45,6 +51,7 @@ export function AgentTestingHeader({
   onTabChange,
   casesCount,
   plansCount,
+  openPlan,
 }: AgentTestingHeaderProps) {
   return (
     <PageLayout.Header height="auto" paddingX={5} alignItems="flex-end" gap={4}>
@@ -57,10 +64,24 @@ export function AgentTestingHeader({
         alignItems="flex-end"
         gap={4}
       >
-        <GridItem paddingY={2}>
+        <GridItem paddingY={2} minWidth={0}>
           {/* The title keeps the standard page heading size: every page title
               in the product is the same size, by design-system rule. */}
-          <PageLayout.Heading>Agent Testing</PageLayout.Heading>
+          <HStack gap={2} minWidth={0} alignItems="baseline">
+            <PageLayout.Heading>
+              {openPlan?.name ?? "Agent Testing"}
+            </PageLayout.Heading>
+            {openPlan ? (
+              <Text
+                fontSize="11.5px"
+                color={FG_MUTED}
+                truncate
+                data-testid="agent-testing-title-note"
+              >
+                {openPlan.note}
+              </Text>
+            ) : null}
+          </HStack>
         </GridItem>
 
         <GridItem>

@@ -30,7 +30,7 @@ import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
-import { FG_FAINT, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
+import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
@@ -119,7 +119,7 @@ function TableHeaderRow({
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
-      color={FG_FAINT}
+      color={FG_MUTED}
     >
       {children}
     </Box>
@@ -578,7 +578,7 @@ export function ExternalCasesTable({
             <Box />
             <Text
               fontSize="11px"
-              color={FG_FAINT}
+              color={FG_MUTED}
               whiteSpace="nowrap"
               textAlign="right"
             >

@@ -56,7 +56,10 @@ vi.mock("~/utils/api", () => ({
         listVersions: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
-      suites: { folders: { getAll: { invalidate: vi.fn() } } },
+      suites: {
+        folders: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getRunState: { useQuery: mockGetRunState },
@@ -343,6 +346,7 @@ describe("the wide run detail drawer", () => {
       open: true,
       scenarioId: "case_1",
       folderId: null,
+      showHistory: false,
     });
   });
 
@@ -423,6 +427,90 @@ describe("the wide run detail drawer", () => {
     }
   });
 
+  // --- The results panel ---
+
+  /** @scenario "The results read as one flat list of the criteria" */
+  it("reads the criteria as one list in the order the case declares them", () => {
+    mockGetScenario.mockReturnValue({
+      data: {
+        id: "case_1",
+        name: "Angry refund request",
+        version: 6,
+        archivedAt: null,
+        criteria: [
+          "stays polite",
+          "names the refund window",
+          "offers the refund",
+        ],
+      },
+      isLoading: false,
+    });
+    setRunState(
+      makeRunState({
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: ["stays polite", "offers the refund"],
+          unmetCriteria: ["names the refund window"],
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("stays polite")).toBeLessThan(
+      text.indexOf("names the refund window"),
+    );
+    expect(text.indexOf("names the refund window")).toBeLessThan(
+      text.indexOf("offers the refund"),
+    );
+    // Met and unmet are one list, not two headed sections.
+    expect(within(panel).queryByText(/Met Criteria/i)).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByText(/Unmet Criteria/i),
+    ).not.toBeInTheDocument();
+    expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);
+    expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
+  });
+
+  /** @scenario "The results panel is headed Results and repeats no chip" */
+  it("heads the panel Results and repeats nothing from the chip strip", () => {
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    expect(within(panel).getByText("Results")).toBeInTheDocument();
+    expect(panel).not.toHaveTextContent(/LLM judge/i);
+    expect(panel).not.toHaveTextContent(/success rate/i);
+    expect(panel).not.toHaveTextContent("6.3s");
+    // The terminal log box is gone.
+    expect(screen.queryByText("test-results.log")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "What the judge said about the run as a whole reads last" */
+  it("reads the overall reasoning as a muted paragraph under the criteria", () => {
+    setRunState(
+      makeRunState({
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: ["stays polite"],
+          unmetCriteria: [],
+          reasoning: "The agent stayed calm and answered the refund question.",
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const reasoning = within(panel).getByTestId("run-verdict-reasoning");
+    expect(reasoning).toHaveTextContent(
+      "The agent stayed calm and answered the refund question.",
+    );
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("stays polite")).toBeLessThan(
+      text.indexOf("The agent stayed calm"),
+    );
+  });
+
   // --- The version the run used ---
 
   /** @scenario "The run detail drawer shows the version the run used" */
@@ -434,16 +522,22 @@ describe("the wide run detail drawer", () => {
     expect(screen.queryByTestId("case-version-6")).not.toBeInTheDocument();
   });
 
-  /** @scenario "The version in the drawer opens the history of that case" */
-  it("opens the case history on the recorded version from the chip", async () => {
+  /** @scenario "The run drawer offers no History control" */
+  /** @scenario "The version in the drawer is a fact of the run, not a control" */
+  it("reads the version as a plain chip and offers no History control", async () => {
     const user = userEvent.setup();
     renderWide();
 
+    expect(screen.queryByTestId("run-drawer-history")).not.toBeInTheDocument();
+
     await user.click(screen.getByTestId("run-drawer-version"));
 
-    expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioVersionHistory", {
-      urlParams: { scenarioId: "case_1", markVersion: "3" },
-    });
+    // The history belongs to the case, so the chip is a fact of the run and
+    // opens nothing.
+    expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+      "scenarioVersionHistory",
+      expect.anything(),
+    );
   });
 
   /** @scenario "A run made before versions were recorded shows no version" */
@@ -461,21 +555,6 @@ describe("the wide run detail drawer", () => {
     // Nothing else changes: the run still reads as it always did.
     expect(screen.getByText("I want my money back")).toBeInTheDocument();
     expect(screen.getAllByText("6.3s").length).toBeGreaterThan(0);
-  });
-
-  /** @scenario "The History control is not shown for a case in an external set" */
-  it("offers no History control when the case exists only as external runs", () => {
-    mockGetScenario.mockReturnValue({ data: null, isLoading: false });
-    setRunState(
-      makeRunState({
-        metadata: {
-          langwatch: { targetReferenceId: "agent_1", targetType: "http" },
-        },
-      }),
-    );
-    renderWide();
-
-    expect(screen.queryByTestId("run-drawer-history")).not.toBeInTheDocument();
   });
 });
 

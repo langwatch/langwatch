@@ -18,6 +18,7 @@ const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockGetById = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
 const emptyQuery = vi.hoisted(() => () => ({
@@ -49,12 +50,20 @@ vi.mock("~/utils/api", () => ({
         getById: { invalidate: vi.fn(), setData: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
-      suites: { folders: { getAll: { invalidate: vi.fn() } } },
+      suites: {
+        folders: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getAll: { useQuery: emptyQuery },
       getById: { useQuery: mockGetById },
       getLastResultSummaries: { useQuery: emptyQuery },
+      listVersions: { useQuery: mockListVersions },
+      getVersion: { useQuery: emptyQuery },
+      restoreVersion: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       create: { useMutation: onSuccessOf(mockCreate) },
       update: { useMutation: onSuccessOf(mockUpdate) },
     },
@@ -221,11 +230,27 @@ describe("the test case dialog", () => {
 
   describe("when a stored case is edited", () => {
     /** @scenario "Editing a case names its version and opens the history" */
-    it("names the version in the header and opens the history from it", async () => {
+    /** @scenario "History opens a popover listing the versions newest first" */
+    it("names the version in the header and opens the history beside it", async () => {
       const user = userEvent.setup();
       mockGetById.mockReturnValue({
         data: storedCase(),
         isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockListVersions.mockReturnValue({
+        data: {
+          versions: [
+            {
+              version: 4,
+              createdAt: new Date().toISOString(),
+              changedFields: ["name"],
+              author: { name: "Lena Fischer" },
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
         refetch: vi.fn(),
       });
       render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
@@ -237,9 +262,13 @@ describe("the test case dialog", () => {
 
       await user.click(history);
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioVersionHistory", {
-        urlParams: { scenarioId: "case_1" },
-      });
+      // The history reads in place, and the case dialog stays open under it.
+      expect(
+        await screen.findByTestId("scenario-version-history"),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("version-row-4")).toBeInTheDocument();
+      expect(screen.getByTestId("case-modal")).toBeInTheDocument();
+      expect(mockOpenDrawer).not.toHaveBeenCalled();
     });
   });
 });

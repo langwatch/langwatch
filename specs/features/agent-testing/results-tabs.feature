@@ -7,9 +7,10 @@ Feature: The Results tab
     The Results tab opens on a list titled "Test Runs". Each row is a run plan:
     a test suite, a custom run plan, or One-off runs, which is always last.
 
-    Choosing a row opens that plan. A sidebar on the left lists its runs,
-    newest first, each with its number, its note, how long ago it started and
-    its pass rate. The selected run has a grey background.
+    Choosing a row opens that plan. The page title then reads the name of the
+    plan. A sidebar on the left lists its runs, newest first, each with its
+    number, its note, how long ago it started and its pass rate. The selected
+    run has a grey background.
 
     The results of the selected run fill the rest of the page. They read as a
     table by default, and a toggle switches to the classic grid of live cards.
@@ -31,6 +32,14 @@ Feature: The Results tab
     Then it offers "New run plan" beside the period picker
     And the button reads as a small outlined action, like "New test case"
     And choosing it opens the run plan editor
+
+  @integration
+  Scenario: A run plan row opens on a click and carries no chevron
+    Given the Results tab is open on the list of run plans
+    When a row is read
+    Then it ends on its row menu
+    And no chevron sits after the menu
+    And clicking anywhere else on the row opens the plan
 
   @integration
   Scenario: A run plan row shows its last result
@@ -138,12 +147,34 @@ Feature: The Results tab
     And the other runs stay in the sidebar
 
   @integration
-  Scenario: The header of the results names the run plan and holds the actions
+  Scenario: The page title names the open run plan
+    Given a run plan named "Checkout" is open
+    When the page header is read
+    Then the title reads "Checkout"
+    And what the plan is reads small and muted beside it
+    And the tabs stay in the middle of the header
+
+  @integration
+  Scenario: Leaving the run plan gives the page title back
+    Given a run plan is open
+    When the list of run plans is opened again
+    Then the title reads "Agent Testing"
+
+  @integration
+  Scenario: The results header holds the run and the actions on one line
     Given a run plan is open
     When the top of the results is read
-    Then the name of the run plan reads there
-    And the actions of the plan read on the same line
+    Then the number of the selected run, how long ago it ran and its note read on the left
+    And the pass summary, the view toggle and the actions of the plan read on the right
+    And they are all on the same line
     And the back control stays in the sidebar
+
+  @integration
+  Scenario: The cards of the grid line up with the line above them
+    Given the results of a run are shown as the grid of cards
+    When the top of the grid is read
+    Then the first card starts at the left edge of the summary line above it
+    And the grid takes no padding of its own
 
   # --- Live runs ---
 

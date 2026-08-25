@@ -26,8 +26,8 @@ export type CaseModalProps = {
   suites: TestSuiteEntry[];
   editor: CaseEditorState;
   onClose: () => void;
-  /** Opens the version history of the case being edited. */
-  onOpenHistory: () => void;
+  /** True when the dialog was opened from a History entry. */
+  openHistoryOnOpen?: boolean;
 };
 
 export function CaseModal({
@@ -36,7 +36,7 @@ export function CaseModal({
   suites,
   editor,
   onClose,
-  onOpenHistory,
+  openHistoryOnOpen,
 }: CaseModalProps) {
   return (
     <Dialog.Root
@@ -47,8 +47,9 @@ export function CaseModal({
       <Dialog.Content bg="bg.panel" maxWidth="640px" data-testid="case-modal">
         <CaseModalHeader
           isEditing={!!scenarioId}
+          scenarioId={scenarioId}
           version={editor.version}
-          onOpenHistory={onOpenHistory}
+          openHistoryOnOpen={openHistoryOnOpen}
         />
 
         <Dialog.Body paddingX={5} paddingY={4}>

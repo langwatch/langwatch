@@ -10,16 +10,17 @@
  */
 
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PLAN_EDITOR_DRAWER } from "../plan/usePlanEditor";
 import { useNewRunPlanFlow } from "../useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 import { RunPlanDetail } from "./RunPlanDetail";
 import { RunPlansTable } from "./RunPlansTable";
-import { resolveRunPlan } from "./run-plans";
+import { planScopeNote, type RunPlan, resolveRunPlan } from "./run-plans";
 import { useRunPlans } from "./useRunPlans";
 import { useWidenWindowForPlan } from "./useWidenWindowForPlan";
 
@@ -27,6 +28,27 @@ export type ResultsTabProps = {
   /** While the live stream is up the fallback polling stands down. */
   isSseConnected: boolean;
 };
+
+/**
+ * Names the open run plan as the page title, and hands the title back when
+ * the plan is left.
+ */
+function usePlanAsPageTitle(plan: RunPlan | null) {
+  const setOpenPlanTitle = useAgentTestingStore(
+    (state) => state.setOpenPlanTitle,
+  );
+  const name = plan?.name ?? null;
+  const note = plan ? planScopeNote(plan.kind) : null;
+
+  useEffect(() => {
+    if (name === null || note === null) {
+      setOpenPlanTitle(null);
+      return;
+    }
+    setOpenPlanTitle({ name, note });
+    return () => setOpenPlanTitle(null);
+  }, [name, note, setOpenPlanTitle]);
+}
 
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const { project } = useOrganizationTeamProject();
@@ -40,6 +62,8 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const selectedPlan = planSlug
     ? resolveRunPlan({ plans, planSlug, projectId: project?.id ?? "" })
     : null;
+
+  usePlanAsPageTitle(selectedPlan);
 
   useWidenWindowForPlan({
     planSlug,

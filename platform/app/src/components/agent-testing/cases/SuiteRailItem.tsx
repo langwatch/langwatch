@@ -7,7 +7,7 @@
  */
 
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 export type RailSectionHeadingProps = {
   label: string;
@@ -32,7 +32,7 @@ export function RailSectionHeading({
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
-      color={FG_FAINT}
+      color={FG_MUTED}
     >
       {label}
     </Text>
@@ -127,7 +127,7 @@ export function RailAddButton({
       textAlign="left"
       cursor="pointer"
       fontSize="12px"
-      color={FG_FAINT}
+      color={FG_MUTED}
       _hover={{ background: "bg.muted/60", color: FG_MUTED }}
     >
       {icon}

@@ -6,7 +6,7 @@
 
 import { chakra } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import { FG_FAINT } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 export function RemoveBlockButton({
   label,
@@ -23,7 +23,7 @@ export function RemoveBlockButton({
       display="flex"
       alignItems="center"
       cursor="pointer"
-      color={FG_FAINT}
+      color={FG_MUTED}
       _hover={{ color: "red.fg" }}
       title="Remove"
       aria-label={label}

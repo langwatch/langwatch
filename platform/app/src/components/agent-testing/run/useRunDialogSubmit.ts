@@ -4,6 +4,7 @@ import { readHandledError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { writeScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
+import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { toLineRunParameters } from "./parameter-line";
@@ -13,10 +14,40 @@ import { useBatchRun } from "./useRunDialogBatch";
 /** The overrides a queued run carries, when the dialog collected any. */
 type RunParameters = ReturnType<typeof toLineRunParameters>;
 
-/** The targets a suite run is written against. */
-function toSuiteTargets(target: TargetValue) {
+/**
+ * The targets a suite run is written against: what was chosen, the overrides
+ * it was chosen with, and the bindings the suite already held for it.
+ *
+ * The bindings only survive while the same prompt stays selected, because
+ * they bind a scenario to that prompt's inputs and mean nothing for another
+ * one.
+ */
+function toSuiteTargets({
+  target,
+  runParameters,
+  persistedTarget,
+}: {
+  target: TargetValue;
+  runParameters: RunParameters;
+  persistedTarget?: SuiteTarget | null;
+}): SuiteTarget[] | undefined {
   if (!target) return undefined;
-  return [{ type: target.type, referenceId: target.id }];
+
+  const keepsMappings =
+    target.type === "prompt" &&
+    persistedTarget?.type === "prompt" &&
+    persistedTarget.referenceId === target.id;
+
+  return [
+    {
+      type: target.type,
+      referenceId: target.id,
+      ...(keepsMappings && persistedTarget.scenarioMappings
+        ? { scenarioMappings: persistedTarget.scenarioMappings }
+        : {}),
+      ...(runParameters ? { runParameters } : {}),
+    },
+  ];
 }
 
 export type SuiteTargets = ReturnType<typeof toSuiteTargets>;
@@ -32,6 +63,8 @@ export type RunDialogSubmitInput = {
   target: TargetValue;
   note: string;
   runParameters: RunParameters;
+  /** The overrides the suite may remember: everything but the secrets. */
+  storableRunParameters: RunParameters;
   onRunStarted: (info: RunStartedInfo) => void;
   onCaseRunSettled?: (scenarioId: string) => void;
   onClose: () => void;
@@ -103,9 +136,13 @@ function usePersistTargetChoice({
         id: subject.suiteId,
         targets: suiteTargets,
       });
-      // The rail's folder list carries the persisted targets; the next open
-      // of this dialog preselects from it.
+      // The rail's folder list and the plan header both carry the persisted
+      // targets; the next open of this dialog preselects from them.
       void utils.suites.folders.getAll.invalidate({ projectId });
+      void utils.suites.getById.invalidate({
+        projectId,
+        id: subject.suiteId,
+      });
     }
     // Run all persists its targets through the run itself: the managed suite
     // may not exist before the first run.
@@ -148,7 +185,12 @@ function useSaveTargetChoice({
 export function useRunDialogSubmit(input: RunDialogSubmitInput) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const suiteTargets = toSuiteTargets(input.target);
+  const suiteTargets = toSuiteTargets({
+    target: input.target,
+    runParameters: input.storableRunParameters,
+    persistedTarget:
+      input.subject?.kind === "suite" ? input.subject.persistedTarget : null,
+  });
   const noteInput = toNoteInput(input.note);
   const hasAnyTarget = useHasAnyTarget(input.subject);
   const surfaceError = useSurfaceRunError(input.setInlineError);

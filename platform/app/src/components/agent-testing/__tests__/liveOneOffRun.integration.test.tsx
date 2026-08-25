@@ -62,7 +62,10 @@ vi.mock("~/utils/api", () => ({
         getRunState: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
-      suites: { folders: { getAll: { invalidate: vi.fn() } } },
+      suites: {
+        folders: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getAll: { useQuery: mockScenariosGetAll },

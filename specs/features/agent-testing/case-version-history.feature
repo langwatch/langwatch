@@ -4,12 +4,13 @@ Feature: Test case history in the interface
   So that I can tell what I changed and go back if I need to
 
   Background: where history is shown.
-    The case editor shows the current version as a small chip beside the case
-    name. A ghost History control with a history icon sits to the left of
-    Rerun in the run detail drawer and in the editor footer area.
+    The case editor header carries one control that reads "v4 · History". It is
+    the only way into the history of a case: history belongs to the case, not
+    to any single run of it.
 
-    Choosing History opens a drawer that lists the versions, newest first. Each
-    entry shows its number, who saved it, when, and which fields changed.
+    Choosing it opens a popover under the control that lists the versions,
+    newest first. Each entry shows its number, who saved it, when, and which
+    fields changed. The case editor stays open under the popover.
 
     The domain rules are in specs/scenarios/scenario-versioning.feature and
     specs/scenarios/scenario-version-restore.feature.
@@ -35,25 +36,26 @@ Feature: Test case history in the interface
     Then it reads version 3, the version that ran
     And it does not read version 6
 
-  # --- The History drawer ---
+  # --- The History popover ---
 
   @integration
-  Scenario: History opens a drawer listing the versions newest first
-    Given a test case with three versions
+  Scenario: History opens a popover listing the versions newest first
+    Given a test case with three versions open in the editor
     When History is chosen
-    Then a drawer lists version 3, version 2 and version 1 in that order
+    Then a popover lists version 3, version 2 and version 1 in that order
+    And the case editor stays open under it
 
   @integration
   Scenario: A history entry names the author, the date and the changed fields
     Given a version saved by "Lena Fischer" that changed the name and the criteria
-    When the history drawer is read
+    When the history popover is read
     Then that entry names "Lena Fischer"
     And it shows the date of the save
     And it lists the name and the criteria as changed
 
   @integration
   Scenario: Choosing a version shows what it held
-    Given the history drawer with three versions
+    Given the history popover with three versions
     When version 2 is chosen
     Then the content of version 2 is shown, read-only
     And the current version is still marked in the list
@@ -66,31 +68,39 @@ Feature: Test case history in the interface
     And it carries the date the case was created
 
   @integration
-  Scenario: The History control is not shown for a case in an external set
-    Given a case that only exists as runs from an external set
-    When its run is opened
-    Then no History control is offered
+  Scenario: History opens from the row menu of a test case
+    Given a test case with three versions in the table
+    When History is chosen on its row menu
+    Then the editor of that case opens
+    And its history popover is already open
+
+  @integration
+  Scenario: The run drawer offers no History control
+    Given a finished run open in the drawer
+    When its header is read
+    Then the version the run used reads as a plain chip
+    And no History control is offered
 
   # --- Restore ---
 
   @integration
-  Scenario: Restore writes a new version and closes the drawer on the new one
-    Given the history drawer with a test case at version 5
+  Scenario: Restore writes a new version and lists the new one on top
+    Given the history popover with a test case at version 5
     When version 2 is restored
-    Then the drawer lists a new version 6 at the top
+    Then the popover lists a new version 6 at the top
     And the editor reads the content of version 2
     And version 5 is still listed
 
   @integration
   Scenario: The version a restore wrote says that it is a restore
     Given a version written by restoring version 1
-    When the history drawer is read
+    When the history popover is read
     Then that entry reads "Restored from v1"
     And it does not read as an ordinary field change
 
   @integration
   Scenario: Restore asks for confirmation before it writes
-    Given the history drawer with an older version chosen
+    Given the history popover with an older version chosen
     When Restore is chosen
     Then a confirmation names the version being restored
     And leaving the confirmation writes nothing
@@ -98,7 +108,7 @@ Feature: Test case history in the interface
   @integration
   Scenario: A viewer sees history but no Restore control
     Given a person with read-only access to the project
-    When they open the history drawer
+    When they open the history popover
     Then the versions are listed
     And no Restore control is offered
 
@@ -113,8 +123,8 @@ Feature: Test case history in the interface
     And it does not read "unknown error"
 
   @integration
-  Scenario: A history drawer that cannot load says so and offers to retry
+  Scenario: A history that cannot load says so and offers to retry
     Given the history of a test case cannot be read
     When History is chosen
-    Then the drawer says the history could not be loaded
+    Then the popover says the history could not be loaded
     And it offers to try again

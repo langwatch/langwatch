@@ -17,7 +17,7 @@ import { differenceInCalendarDays } from "date-fns";
 import { Calendar, ChevronDown } from "lucide-react";
 import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
-import { FG_FAINT, FG_MUTED } from "./design";
+import { FG_MUTED } from "./design";
 
 /** The windows the list offers, shortest first. */
 const WINDOWS: { key: RelativePresetKey; days: number; label: string }[] = [
@@ -151,7 +151,7 @@ function PeriodMenuContent({
         paddingX={3}
         paddingY={1.5}
       >
-        <Text fontSize="10.5px" color={FG_FAINT}>
+        <Text fontSize="10.5px" color={FG_MUTED}>
           {COLD_STORAGE_NOTE}
         </Text>
       </HStack>

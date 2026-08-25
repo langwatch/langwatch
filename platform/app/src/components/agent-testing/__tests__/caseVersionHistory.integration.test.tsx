@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Test case history in the interface: the version chip in the editor, the
- * History drawer with its versions and restore, and the stale-save offer.
+ * version list with its restore, and the stale-save offer.
  *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-versioning.feature
@@ -398,7 +398,7 @@ describe("the History drawer", () => {
   const renderHistory = () =>
     render(<ScenarioVersionHistoryDrawer open />, { wrapper: Wrapper });
 
-  /** @scenario "History opens a drawer listing the versions newest first" */
+  /** @scenario "History opens a popover listing the versions newest first" */
   it("lists the versions newest first", () => {
     renderHistory();
 
@@ -497,7 +497,7 @@ describe("the History drawer", () => {
 
   // --- Restore ---
 
-  /** @scenario "Restore writes a new version and closes the drawer on the new one" */
+  /** @scenario "Restore writes a new version and lists the new one on top" */
   it("restores an old version as a new one and keeps every version listed", async () => {
     const user = userEvent.setup();
     mocks.mockListVersions.mockReturnValue({
@@ -577,7 +577,7 @@ describe("the History drawer", () => {
 
   // --- Failure paths ---
 
-  /** @scenario "A history drawer that cannot load says so and offers to retry" */
+  /** @scenario "A history that cannot load says so and offers to retry" */
   it("says the history could not be loaded and offers to try again", async () => {
     const user = userEvent.setup();
     mocks.mockListVersions.mockReturnValue({

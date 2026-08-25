@@ -3,6 +3,9 @@
  * parameters, beside each other when the window gives enough room and stacked
  * under each other when it does not.
  *
+ * The results read as a plain list of the criteria the judge scored. They are
+ * always open: they are the answer the drawer was opened for.
+ *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
@@ -15,21 +18,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CopyButton } from "~/components/CopyButton";
 import { RunDetailSection } from "~/components/simulations/RunDetailSection";
 import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
 import {
-  formatResultsForCopy,
   ParameterRow,
   SECRET_VALUE_MASK,
 } from "~/components/simulations/ScenarioRunDetailDrawer";
-import { SimulationConsole } from "~/components/simulations/simulation-console/SimulationConsole";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
+import { orderVerdicts, RunVerdictPanel } from "./RunVerdictPanel";
 import { hasCriteria, type RunDetail } from "./useRunDrawerState";
-
-/** What the console title bar reads in Agent Testing. */
-export const AGENT_TESTING_CONSOLE_FILE_NAME = "test-results.log";
 
 function ConversationSection({ detail }: { detail: RunDetail }) {
   const { scenarioState, project } = detail;
@@ -90,40 +88,6 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
 }
 
 /** The verdict of the judge, once it has one. */
-function ResultsConsole({ detail }: { detail: RunDetail }) {
-  const { scenarioState } = detail;
-  if (!scenarioState) return null;
-
-  return (
-    <Box
-      borderRadius="xl"
-      overflow="hidden"
-      borderWidth="1px"
-      borderColor="border.muted"
-      boxShadow="sm"
-    >
-      <SimulationConsole
-        fileName={AGENT_TESTING_CONSOLE_FILE_NAME}
-        results={scenarioState.results}
-        scenarioName={scenarioState.name ?? undefined}
-        status={scenarioState.status}
-        durationInMs={scenarioState.durationInMs}
-        titleBarActions={
-          scenarioState.results ? (
-            <CopyButton
-              value={formatResultsForCopy(scenarioState.results)}
-              label="Results"
-              size="2xs"
-              color="gray.500"
-              _hover={{ color: "gray.200", bg: "gray.800" }}
-            />
-          ) : undefined
-        }
-      />
-    </Box>
-  );
-}
-
 function ResultsSection({
   detail,
   isFirst,
@@ -135,17 +99,17 @@ function ResultsSection({
   if (!scenarioState) return null;
 
   // A run that has not settled has no verdict, whatever its stored results
-  // hold. Drawing the console then reads "0/0", which says the judge failed
-  // every criterion rather than that it has not spoken yet.
+  // hold. Drawing the criteria then reads "0 of 0 met", which says the judge
+  // failed every criterion rather than that it has not spoken yet.
   const isJudgePending =
     !isTerminalStatus(scenarioState.status) && !hasCriteria(scenarioState);
 
   return (
-    <RunDetailSection
-      value="results"
-      title="Results"
-      count={detail.criteria?.total}
-      isFirst={isFirst}
+    <Box
+      paddingX={4}
+      paddingY={3}
+      borderTopWidth={isFirst ? "0" : "1px"}
+      borderColor="border.muted"
     >
       {isJudgePending ? (
         <VStack
@@ -159,9 +123,17 @@ function ResultsSection({
           <Text fontSize="sm">The judge has not run yet.</Text>
         </VStack>
       ) : (
-        <ResultsConsole detail={detail} />
+        <RunVerdictPanel
+          verdicts={orderVerdicts({
+            metCriteria: scenarioState.results?.metCriteria ?? [],
+            unmetCriteria: scenarioState.results?.unmetCriteria ?? [],
+            declaredCriteria: detail.scenarioData?.criteria ?? [],
+          })}
+          reasoning={scenarioState.results?.reasoning}
+          error={scenarioState.results?.error}
+        />
       )}
-    </RunDetailSection>
+    </Box>
   );
 }
 
@@ -208,8 +180,8 @@ function SideBySideContent({ detail }: { detail: RunDetail }) {
         </Accordion.Root>
       </Box>
       <Box style={{ overflowY: "auto" }} data-testid="wide-drawer-results">
-        <Accordion.Root multiple defaultValue={["results", "parameters"]}>
-          <ResultsSection detail={detail} isFirst />
+        <ResultsSection detail={detail} isFirst />
+        <Accordion.Root multiple defaultValue={["parameters"]}>
           <ParametersSection detail={detail} />
         </Accordion.Root>
       </Box>
@@ -228,13 +200,15 @@ function StackedContent({ detail }: { detail: RunDetail }) {
     >
       <Accordion.Root
         multiple
-        defaultValue={["conversation", "no-response", "results", "parameters"]}
+        defaultValue={["conversation", "no-response", "parameters"]}
       >
         <ConversationSection detail={detail} />
-        <ResultsSection
-          detail={detail}
-          isFirst={!detail.hasConversation && !detail.shouldShowNoResponse}
-        />
+      </Accordion.Root>
+      <ResultsSection
+        detail={detail}
+        isFirst={!detail.hasConversation && !detail.shouldShowNoResponse}
+      />
+      <Accordion.Root multiple defaultValue={["parameters"]}>
         <ParametersSection detail={detail} />
       </Accordion.Root>
     </Box>

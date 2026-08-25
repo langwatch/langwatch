@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 import { FieldMappingSchema } from "../scenarios/field-mapping";
+import { runParameterValuesSchema } from "../scenarios/parameters";
 
 /**
  * The kinds of SimulationSuite.
@@ -36,6 +37,14 @@ const suiteTargetFields = z.object({
    * the pairing. Optional, so suites saved before this field still parse.
    */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * The parameter overrides the last run of this suite used, so the next run
+   * dialog opens on the same values for everyone on the team.
+   *
+   * Secret parameters are never kept here: their values are typed once per
+   * run and travel with the run alone.
+   */
+  runParameters: runParameterValuesSchema.optional(),
 });
 
 /**

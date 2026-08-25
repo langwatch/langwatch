@@ -9,26 +9,21 @@
  */
 
 import { Badge, Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
-import {
-  ChevronRight,
-  Folder,
-  FolderCode,
-  MoreVertical,
-  Zap,
-} from "lucide-react";
+import { Folder, FolderCode, MoreVertical, Zap } from "lucide-react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { FG_FAINT, FG_MUTED, ROW_HOVER_BG } from "../shared/design";
+import { FG_MUTED, ROW_HOVER_BG } from "../shared/design";
 import { planScopeNote, type RunPlan, toRunGroupSummary } from "./run-plans";
 
 /**
  * The columns of the list. The prototype carries a count of runs in the
- * window between the result and the chevron; the plan queries only read the
- * last run, so that place holds the row menu instead.
+ * window after the result; the plan queries only read the last run, so that
+ * place holds the row menu instead. The whole row opens the plan, so it ends
+ * on the menu rather than on a chevron.
  */
-export const PLAN_COLUMNS = "minmax(0,1fr) 60px 58px minmax(0,560px) 32px 20px";
+export const PLAN_COLUMNS = "minmax(0,1fr) 60px 58px minmax(0,560px) 32px";
 
 function PlanIcon({ kind }: { kind: RunPlan["kind"] }) {
   const color = "var(--chakra-colors-fg-muted)";
@@ -65,7 +60,7 @@ function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {
 function LastResultCell({ plan, days }: { plan: RunPlan; days: number }) {
   if (!plan.lastRun || plan.lastRun.lastRunTimestamp === null) {
     return (
-      <Text fontSize="11px" color={FG_FAINT}>
+      <Text fontSize="11px" color={FG_MUTED}>
         nothing in {days} days
       </Text>
     );
@@ -174,7 +169,7 @@ export function PlanRow({
             </chakra.button>
             <PlanBadge kind={plan.kind} />
           </HStack>
-          <Text fontSize="10.5px" color={FG_FAINT} truncate>
+          <Text fontSize="10.5px" color={FG_MUTED} truncate>
             {planScopeNote(plan.kind)}
           </Text>
         </Box>
@@ -184,7 +179,7 @@ export function PlanRow({
         {plan.caseCount ?? "-"}
       </Text>
 
-      <Text fontSize="10.5px" color={FG_FAINT} whiteSpace="nowrap">
+      <Text fontSize="10.5px" color={FG_MUTED} whiteSpace="nowrap">
         {plan.lastRun?.lastRunTimestamp
           ? formatTimeAgoCompact(plan.lastRun.lastRunTimestamp, now)
           : ""}
@@ -201,8 +196,6 @@ export function PlanRow({
           onEditPlan={onEditPlan}
         />
       </HStack>
-
-      <ChevronRight size={13} color="var(--chakra-colors-fg-muted)" />
     </Box>
   );
 }

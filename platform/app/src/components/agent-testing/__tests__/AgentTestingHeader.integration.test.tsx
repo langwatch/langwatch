@@ -100,6 +100,52 @@ describe("<AgentTestingHeader/>", () => {
     });
   });
 
+  describe("given a run plan is open", () => {
+    /** @scenario "The title reads the run plan while one is open" */
+    /** @scenario "The page title names the open run plan" */
+    it("reads the name of the plan, with what the plan is beside it", () => {
+      renderHeader({
+        tab: "results",
+        openPlan: { name: "Checkout", note: "Test suite" },
+      });
+
+      const title = screen.getByRole("heading", { name: "Checkout" });
+      expect(title).toBeInTheDocument();
+      expect(screen.getByTestId("agent-testing-title-note")).toHaveTextContent(
+        "Test suite",
+      );
+      expect(comesBefore(title, screen.getByRole("tablist"))).toBe(true);
+      expect(
+        screen.queryByRole("heading", { name: "Agent Testing" }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Leaving the run plan gives the page title back" */
+    it("reads Agent Testing again once the plan is left", () => {
+      const view = renderHeader({
+        tab: "results",
+        openPlan: { name: "Checkout", note: "Test suite" },
+      });
+
+      view.rerender(
+        <ChakraProvider value={defaultSystem}>
+          <AgentTestingHeader
+            tab="results"
+            onTabChange={vi.fn()}
+            openPlan={null}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.getByRole("heading", { name: "Agent Testing" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("agent-testing-title-note"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("given the Results tab is open", () => {
     /** @scenario "The header carries no action on either tab" */
     it("offers no action of its own", () => {

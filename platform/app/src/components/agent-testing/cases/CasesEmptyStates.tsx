@@ -6,7 +6,7 @@
 
 import { Box, Button, EmptyState } from "@chakra-ui/react";
 import { FlaskConical, FolderCode, Plus } from "lucide-react";
-import { FG_FAINT } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 export type EmptyStateActionProps = {
   canManage: boolean;
@@ -60,7 +60,7 @@ export function NoCasesHereEmptyState() {
       paddingX={4}
       paddingY={4}
       fontSize="12px"
-      color={FG_FAINT}
+      color={FG_MUTED}
       data-testid="agent-testing-empty-suite"
     >
       Empty suite. Add a test case, or move one here from another suite.

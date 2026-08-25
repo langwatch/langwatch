@@ -59,6 +59,7 @@ export function useRunPlanRunDialog({
       initialTarget: persisted
         ? { type: persisted.type, id: persisted.referenceId }
         : null,
+      persistedTarget: persisted ?? null,
     });
   }, [suite]);
 

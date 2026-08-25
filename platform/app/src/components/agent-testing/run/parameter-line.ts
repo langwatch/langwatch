@@ -41,6 +41,19 @@ export function parseParameterLine(line: string): [string, string][] {
   return pairs;
 }
 
+/**
+ * The line a set of remembered values reads as.
+ *
+ * The values come back from the suite the run was started on, so the dialog
+ * opens on the overrides the last run used rather than on the declared
+ * defaults.
+ */
+export function formatStoredParameterLine(values: RunParameterValues): string {
+  return Object.entries(values)
+    .map(([name, value]) => `${name}=${displayOptionalValue(value)}`)
+    .join(", ");
+}
+
 /** The line a set of declared parameters starts on: every default, in order. */
 export function formatParameterLine(
   definitions: ScenarioParameterDefinition[],

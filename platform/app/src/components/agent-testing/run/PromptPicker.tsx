@@ -8,7 +8,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, FileText, Folder } from "lucide-react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 /** One prompt as the picker lists it. */
 export type PromptEntry = {
@@ -67,6 +67,7 @@ function PromptRow({
       gap={2.5}
       onClick={() => onSelect({ type: "prompt", id: prompt.id })}
       data-testid={`run-dialog-prompt-${prompt.id}`}
+      aria-pressed={isActive}
     >
       <FileText size={15} color="var(--chakra-colors-green-500)" />
       <Box minWidth={0} flex={1}>
@@ -150,7 +151,7 @@ export function PromptPicker({
         />
       ))}
       {prompts.length === 0 && (
-        <Text fontSize="12px" color={FG_FAINT} paddingX={1} paddingY={2}>
+        <Text fontSize="12px" color={FG_MUTED} paddingX={1} paddingY={2}>
           No saved prompts in this project yet.
         </Text>
       )}

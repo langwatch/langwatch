@@ -69,6 +69,7 @@ export function RunDialog({
     target: form.target,
     note: form.note,
     runParameters: form.runParameters,
+    storableRunParameters: form.storableRunParameters,
     onRunStarted,
     onCaseRunSettled,
     onClose,

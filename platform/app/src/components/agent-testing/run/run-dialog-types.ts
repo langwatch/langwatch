@@ -6,6 +6,7 @@
  */
 
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import type { SuiteTarget } from "~/server/suites/types";
 
 /** What the dialog is about to run. */
 export type RunDialogSubject =
@@ -16,6 +17,12 @@ export type RunDialogSubject =
       name: string;
       scenarioIds: string[];
       initialTarget: TargetValue;
+      /**
+       * The run options the suite carries from its last run: the target, its
+       * bindings and its parameter overrides. The dialog opens on them, so a
+       * repeat run is one click for everyone on the team.
+       */
+      persistedTarget?: SuiteTarget | null;
     }
   | {
       kind: "case";

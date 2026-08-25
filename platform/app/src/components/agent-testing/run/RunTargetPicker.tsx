@@ -11,7 +11,7 @@ import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 const AGENT_ICONS = {
   http: Globe,
@@ -147,7 +147,7 @@ export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
       <Text fontSize="12.5px" fontWeight="medium">
         Setup agent
       </Text>
-      <Text fontSize="11.5px" color={FG_FAINT}>
+      <Text fontSize="11.5px" color={FG_MUTED}>
         Connect the agent you want to test
       </Text>
     </VStack>

@@ -6,7 +6,8 @@ Feature: The Agent Testing page
   Background: the shape of the page.
     Agent Testing is one page behind a release flag. Its header holds the page
     title on the left and the tabs in the middle, on one line. The content of
-    the selected tab starts directly under that line.
+    the selected tab starts directly under that line. With a run plan open the
+    title reads the name of that plan instead.
 
     The header carries no action. Every action sits in the section header above
     the table it acts on, so the entry point is beside what it writes into.
@@ -60,6 +61,16 @@ Feature: The Agent Testing page
     Then "Agent Testing" is on the far left
     And the tabs "Test cases" and "Results" are in the middle
     And the header spans the full width of the page
+
+  @integration
+  Scenario: The title reads the run plan while one is open
+    Given the Agent Testing page is open on a run plan named "Checkout"
+    When the header is read
+    Then "Checkout" is on the far left
+    And what the plan is reads small and muted beside it
+    And the tabs are still in the middle
+    When the plan is left
+    Then "Agent Testing" is on the far left again
 
   @integration
   Scenario: Each tab name carries how many rows it holds

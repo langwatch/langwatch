@@ -229,7 +229,12 @@ describe("<RunPlanDetail/>", () => {
       viewMode: "table",
       pendingRun: null,
       cancellingJobId: null,
-      caseEditor: { open: false, scenarioId: null, folderId: null },
+      caseEditor: {
+        open: false,
+        scenarioId: null,
+        folderId: null,
+        showHistory: false,
+      },
     });
     mockGetBatchRunCount.mockReturnValue({ data: { count: 3 } });
     mockFreshnessQuery.mockReturnValue({ data: undefined });
@@ -462,6 +467,7 @@ describe("<RunPlanDetail/>", () => {
       open: true,
       scenarioId: "scen_7",
       folderId: null,
+      showHistory: false,
     });
   });
 
@@ -537,17 +543,19 @@ describe("<RunPlanDetail/>", () => {
     expect(screen.getByTestId("runs-sidebar-item-batch_3")).toBeInTheDocument();
   });
 
-  /** @scenario "The header of the results names the run plan and holds the actions" */
-  it("names the run plan in the header and keeps the back control in the rail", () => {
+  /** @scenario "The results header holds the run and the actions on one line" */
+  it("holds the run and the actions on one line, with the back control in the rail", () => {
     renderDetail();
 
-    const detail = screen.getByTestId("agent-testing-run-plan-detail");
-    expect(within(detail).getByText("Checkout")).toBeInTheDocument();
-    expect(screen.getByText("Test suite")).toBeInTheDocument();
-    expect(screen.getByTestId("view-mode-toggle")).toBeInTheDocument();
+    // The name of the plan is the page title now, so the line itself carries
+    // the run and the actions of the plan.
+    const line = screen.getByTestId("run-summary-line");
+    expect(within(line).getByText("Run #3")).toBeInTheDocument();
+    expect(within(line).getByTestId("view-mode-toggle")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "More actions for Checkout" }),
+      within(line).getByRole("button", { name: "More actions for Checkout" }),
     ).toBeInTheDocument();
+    expect(within(line).getByTestId("run-plan-button")).toBeInTheDocument();
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
     expect(
@@ -582,6 +590,21 @@ describe("<RunPlanDetail/>", () => {
       undefined,
       { shallow: true },
     );
+  });
+
+  /** @scenario "The cards of the grid line up with the line above them" */
+  it("draws the grid with no padding of its own", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(
+      screen.getByRole("button", { name: "Grid, watch the conversations" }),
+    );
+
+    // The results column is already padded, so the grid adds none: the first
+    // card starts where the summary line above it starts.
+    const grid = screen.getByTestId("scenario-grid");
+    expect(grid).toHaveStyle({ padding: "0px" });
   });
 
   /** @scenario "A run that is still going updates without a reload" */

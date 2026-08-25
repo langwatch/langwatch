@@ -6,16 +6,16 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
-import { Box, Button, Heading, HStack, VStack } from "@chakra-ui/react";
-import { History, Square } from "lucide-react";
+import { Button, Heading, HStack, VStack } from "@chakra-ui/react";
+import { Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { CopyIdChip } from "~/components/simulations/CopyIdChip";
 import { RunCriteriaChip } from "~/components/simulations/RunCriteriaChip";
 import { ScenarioRunActions } from "~/components/simulations/ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 import { hasNoResults } from "~/components/simulations/scenario-run-status.utils";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
 import { useAgentTestingStore } from "../useAgentTestingStore";
@@ -28,7 +28,7 @@ import type {
 
 export type RunDrawerHeaderBandProps = Pick<
   RunDrawerState,
-  "detail" | "scenarioVersion" | "openVersionHistory"
+  "detail" | "scenarioVersion"
 > & { stop: ReturnType<typeof useRunDrawerStop> };
 
 type SectionProps = {
@@ -36,17 +36,20 @@ type SectionProps = {
   scenarioState: RunScenarioState;
 };
 
-/** The status, the name of the run, and the version of the case it ran. */
+/**
+ * The status, the name of the run, and the version of the case it ran.
+ *
+ * The version is a fact of this run, not a way into the history of the case:
+ * the history belongs to the case, and the case dialog is where it reads.
+ */
 function HeadingRow({
   scenarioState,
   displayTitle,
   scenarioVersion,
-  onOpenVersionHistory,
 }: {
   scenarioState: RunScenarioState;
   displayTitle: string;
   scenarioVersion: number | null;
-  onOpenVersionHistory: () => void;
 }) {
   return (
     <HStack gap={3} flex={1} minWidth={0}>
@@ -55,15 +58,9 @@ function HeadingRow({
         {displayTitle}
       </Heading>
       {scenarioVersion != null && (
-        <Box
-          as="button"
-          cursor="pointer"
-          onClick={onOpenVersionHistory}
-          aria-label={`Open the history of this test case at version ${scenarioVersion}`}
-          data-testid="run-drawer-version"
-        >
+        <HStack data-testid="run-drawer-version">
           <CaseVersionChip version={scenarioVersion} />
-        </Box>
+        </HStack>
       )}
     </HStack>
   );
@@ -73,10 +70,8 @@ function HeadingRow({
 function HeaderActions({
   detail,
   scenarioState,
-  onOpenVersionHistory,
   stop,
 }: SectionProps & {
-  onOpenVersionHistory: () => void;
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
   const { scenarioData } = detail;
@@ -94,22 +89,6 @@ function HeaderActions({
 
   return (
     <HStack gap={1} flexShrink={0}>
-      {scenarioData && (
-        <Tooltip
-          content="Version history"
-          positioning={{ placement: "bottom" }}
-        >
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label="Version history"
-            onClick={onOpenVersionHistory}
-            data-testid="run-drawer-history"
-          >
-            <History size={14} />
-          </Button>
-        </Tooltip>
-      )}
       <ScenarioRunActions
         scenario={scenarioData}
         isRunning={detail.isRunning}
@@ -141,6 +120,10 @@ function HeaderActions({
 function ChipStrip({ detail, scenarioState }: SectionProps) {
   return (
     <HStack w="100%" gap={1.5} flexWrap="wrap">
+      <Chip
+        label="Status"
+        value={SCENARIO_RUN_STATUS_CONFIG[scenarioState.status].label}
+      />
       {scenarioState.results && !hasNoResults(scenarioState.status) && (
         <RunCriteriaChip
           metCriteria={scenarioState.results.metCriteria ?? []}
@@ -170,7 +153,6 @@ function ChipStrip({ detail, scenarioState }: SectionProps) {
 export function RunDrawerHeaderBand({
   detail,
   scenarioVersion,
-  openVersionHistory,
   stop,
 }: RunDrawerHeaderBandProps) {
   const { scenarioState } = detail;
@@ -202,12 +184,10 @@ export function RunDrawerHeaderBand({
           scenarioState={scenarioState}
           displayTitle={detail.displayTitle}
           scenarioVersion={scenarioVersion}
-          onOpenVersionHistory={openVersionHistory}
         />
         <HeaderActions
           detail={detail}
           scenarioState={scenarioState}
-          onOpenVersionHistory={openVersionHistory}
           stop={stop}
         />
       </HStack>

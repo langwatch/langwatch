@@ -57,7 +57,6 @@ function RunDrawerBody({
       <RunDrawerHeaderBand
         detail={detail}
         scenarioVersion={state.scenarioVersion}
-        openVersionHistory={state.openVersionHistory}
         stop={stop}
       />
       <RunDrawerContent detail={detail} isSideBySide={state.isSideBySide} />

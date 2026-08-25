@@ -9,7 +9,7 @@
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { FG_FAINT, GROUP_HEADER_BG } from "./design";
+import { FG_MUTED, GROUP_HEADER_BG } from "./design";
 
 export type FolderHeaderRowProps = {
   name: string;
@@ -60,13 +60,13 @@ export function FolderHeaderRow({
       data-testid={`folder-header-row-${name}`}
     >
       <HStack gap={1.5} minWidth={0}>
-        <Icon as={FolderIcon} boxSize="12px" color={FG_FAINT} flexShrink={0} />
+        <Icon as={FolderIcon} boxSize="12px" color={FG_MUTED} flexShrink={0} />
         <Text fontSize="12px" fontWeight="semibold" color="fg" truncate>
           {name}
         </Text>
         <Text
           fontSize="10.5px"
-          color={FG_FAINT}
+          color={FG_MUTED}
           aria-label={
             caseCount === 1 ? "1 test case" : `${caseCount} test cases`
           }
@@ -84,7 +84,7 @@ export function FolderHeaderRow({
           <Icon
             as={ChevronRight}
             boxSize="13px"
-            color={FG_FAINT}
+            color={FG_MUTED}
             marginLeft="auto"
             flexShrink={0}
           />

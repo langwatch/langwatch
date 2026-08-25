@@ -14,7 +14,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 
 export type RunsSidebarEntryProps = {
   title: string;
@@ -91,7 +91,7 @@ function EntryResult({
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
       {passedCount !== null ? (
-        <Text fontSize="10.5px" color={FG_FAINT}>
+        <Text fontSize="10.5px" color={FG_MUTED}>
           · {passedCount} passed
         </Text>
       ) : null}
@@ -117,7 +117,7 @@ function EntryTitleLine({
         {title}
       </Text>
       <Box flex={1} />
-      <Text fontSize="10px" color={FG_FAINT} whiteSpace="nowrap">
+      <Text fontSize="10px" color={FG_MUTED} whiteSpace="nowrap">
         {timeAgo}
       </Text>
     </HStack>

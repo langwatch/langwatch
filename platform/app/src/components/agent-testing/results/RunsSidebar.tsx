@@ -8,7 +8,7 @@
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { PeriodControls } from "./period-controls";
 import { RunsSidebarBatchEntry } from "./RunsSidebarBatchEntry";
@@ -76,7 +76,7 @@ function RunsList({
       ))}
 
       {isEmptyShown ? (
-        <Text fontSize="11.5px" color={FG_FAINT} paddingX={1} paddingTop={2}>
+        <Text fontSize="11.5px" color={FG_MUTED} paddingX={1} paddingTop={2}>
           No run in this period.
         </Text>
       ) : null}

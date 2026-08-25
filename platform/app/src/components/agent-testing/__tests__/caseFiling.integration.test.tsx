@@ -63,7 +63,10 @@ vi.mock("~/utils/api", () => ({
         getAll: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
-      suites: { folders: { getAll: { invalidate: vi.fn() } } },
+      suites: {
+        folders: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getAll: { useQuery: mockScenariosGetAll },
@@ -191,6 +194,24 @@ describe("the Test cases tab", () => {
     expect(caseEditor().open).toBe(false);
   });
 
+  /** @scenario "History opens from the row menu of a test case" */
+  it("opens the case editor with its history already open, from the row menu", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    await user.click(
+      screen.getByRole("button", { name: "Actions for Double charge" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "History" }));
+
+    expect(caseEditor()).toEqual({
+      open: true,
+      scenarioId: "case_1",
+      folderId: null,
+      showHistory: true,
+    });
+  });
+
   /** @scenario "A case created from inside a suite is filed into that suite" */
   it("files a case made inside a suite into that suite", async () => {
     const user = userEvent.setup();
@@ -208,6 +229,7 @@ describe("the Test cases tab", () => {
       open: true,
       scenarioId: null,
       folderId: REFUNDS.id,
+      showHistory: false,
     });
   });
 

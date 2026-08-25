@@ -20,7 +20,11 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import type { CustomizeRunChip } from "./CustomizeRunChips";
 import type { PromptEntry } from "./PromptPicker";
-import { formatParameterLine, toLineRunParameters } from "./parameter-line";
+import {
+  formatParameterLine,
+  formatStoredParameterLine,
+  toLineRunParameters,
+} from "./parameter-line";
 import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
 
 /** One key per subject the dialog can be open on, "closed" when it is not. */
@@ -42,6 +46,17 @@ function scenarioIdsOfSubject(
   return allScenarios.map((scenario) => scenario.id);
 }
 
+/**
+ * The parameter overrides the subject remembers, as the line the dialog
+ * opens on. Nothing remembered means the parameter block stays folded away.
+ */
+function rememberedParameterLine(subject: RunDialogSubject | null): string {
+  if (subject?.kind !== "suite") return "";
+  const values = subject.persistedTarget?.runParameters;
+  if (!values || Object.keys(values).length === 0) return "";
+  return formatStoredParameterLine(values);
+}
+
 /** The fields of the dialog, reset whenever it opens on a new subject. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
   const [target, setTarget] = useState<TargetValue>(null);
@@ -57,13 +72,16 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
 
   const subjectKey = subjectKeyOf(subject);
   const initialTarget = subject?.initialTarget ?? null;
+  const initialParameterLine = rememberedParameterLine(subject);
   useEffect(() => {
     setTarget(initialTarget);
     setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
+    // The note is the one field a run never remembers: it says what this run
+    // is for, so it starts empty every time.
     setShowNote(false);
     setNote("");
-    setShowParams(false);
-    setParameterLine("");
+    setShowParams(initialParameterLine !== "");
+    setParameterLine(initialParameterLine);
     setSecretValues({});
     setInlineError(null);
     setMissingProvider(false);
@@ -181,6 +199,12 @@ function useRunDialogParameters({
     ? toLineRunParameters({ line: parameterLine, secretValues })
     : undefined;
 
+  // What the suite is allowed to remember: the line alone. A secret is typed
+  // for one run and never written down.
+  const storableRunParameters = showParams
+    ? toLineRunParameters({ line: parameterLine, secretValues: {} })
+    : undefined;
+
   const hasMissingSecrets =
     showParams &&
     secretDefinitions.some(
@@ -194,6 +218,7 @@ function useRunDialogParameters({
     hideParameters,
     setSecretValue,
     runParameters,
+    storableRunParameters,
     hasMissingSecrets,
   };
 }

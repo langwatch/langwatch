@@ -17,7 +17,7 @@ import {
   FieldError,
   FieldLabel,
 } from "../shared/DialogFields";
-import { FG_FAINT } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
 /** The list of test cases a hand-assembled run plan holds. */
@@ -52,7 +52,7 @@ function ScenarioScopeField({
         onRemoveArchived={suiteForm.removeArchivedScenario}
         folders={editor.folders}
       />
-      <Text marginTop={1} fontSize="11px" color={FG_FAINT}>
+      <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
         {count === 1
           ? "1 test case will run."
           : `${count} test cases will run.`}
@@ -153,7 +153,7 @@ function FixedScopeRow({
       <Folder size={13} color="var(--chakra-colors-fg-muted)" />
       <Text color="fg.muted">Test cases from the {suiteName} test suite</Text>
       <Box flex={1} />
-      <Text fontSize="11.5px" color={FG_FAINT} whiteSpace="nowrap">
+      <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
         {caseCount === 1 ? "1 case" : `${caseCount} cases`}
       </Text>
     </HStack>

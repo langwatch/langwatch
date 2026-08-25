@@ -9,6 +9,11 @@ Feature: The wide run detail drawer
     sit side by side when the width allows. When it does not, the results stay
     stacked under the conversation, exactly as they are today.
 
+    The results read as one flat list of the criteria of the test case, in the
+    order the case declares them, each one marked met or unmet. Nothing there
+    repeats the chips at the top of the drawer: no status, no success rate, no
+    criteria count and no duration.
+
     The v1 drawer is not changed. Without the wide variant the drawer renders
     as it does today, at its current width and with the results below.
 
@@ -50,6 +55,28 @@ Feature: The wide run detail drawer
     Given a finished run with a conversation, rubric verdicts, a duration and a cost
     When the drawer is read in the wide layout and then in the stacked layout
     Then the same conversation, verdicts, duration and cost are shown in both
+
+  @integration
+  Scenario: The results read as one flat list of the criteria
+    Given a finished run whose judge met two criteria and missed one
+    When the results are read
+    Then the three criteria read as one list, in the order the case declares them
+    And met and unmet are not split into two sections
+    And a met criterion carries a green check and an unmet one a red cross
+
+  @integration
+  Scenario: The results panel is headed Results and repeats no chip
+    Given a finished run open in the drawer
+    When the results panel is read
+    Then it is headed "Results"
+    And it shows no status, no success rate, no criteria count and no duration
+    And there is no terminal log box
+
+  @integration
+  Scenario: What the judge said about the run as a whole reads last
+    Given a finished run whose judge gave a reason for the whole run
+    When the results are read
+    Then that reason reads as a muted paragraph under the criteria
 
   @integration
   Scenario: The drawer header offers Edit for the test case that ran

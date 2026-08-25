@@ -49,11 +49,11 @@ Feature: A run records the test case version it used
     Then the drawer shows the test case name with version 5 beside it
 
   @integration
-  Scenario: The version in the drawer opens the history of that case
+  Scenario: The version in the drawer is a fact of the run, not a control
     Given a run detail drawer that shows a version
     When the version is chosen
-    Then the history drawer for that test case opens
-    And the version the run used is marked in the list
+    Then nothing opens
+    And the history stays where it belongs, in the editor of the test case
 
   @integration
   Scenario: A run made before versions were recorded shows no version

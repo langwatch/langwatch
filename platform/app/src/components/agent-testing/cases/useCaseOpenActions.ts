@@ -6,7 +6,6 @@
  */
 
 import { useCallback } from "react";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { CaseLastResult } from "./CasesTable";
 import type { TestCase } from "./test-cases";
@@ -23,7 +22,6 @@ export type CaseOpenActions = {
 export function useCaseOpenActions(
   lastResults: Map<string, CaseLastResult>,
 ): CaseOpenActions {
-  const { openDrawer } = useDrawer();
   const { openLiveRun } = useOpenLiveRun();
   const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
 
@@ -32,13 +30,12 @@ export function useCaseOpenActions(
     [openCaseEditor],
   );
 
+  // The history reads inside the case dialog, beside the version it is the
+  // history of, so History opens the case with its versions already open.
   const openHistory = useCallback(
-    (testCase: TestCase) => {
-      openDrawer("scenarioVersionHistory", {
-        urlParams: { scenarioId: testCase.id },
-      });
-    },
-    [openDrawer],
+    (testCase: TestCase) =>
+      openCaseEditor({ scenarioId: testCase.id, showHistory: true }),
+    [openCaseEditor],
   );
 
   const openLastRun = useCallback(

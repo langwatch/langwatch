@@ -21,6 +21,7 @@ import { ResultsTab } from "./results/ResultsTab";
 import { useAgentTestingLiveUpdates } from "./useAgentTestingLiveUpdates";
 import { useHydrateViewFromUrl } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
+import { useAgentTestingStore } from "./useAgentTestingStore";
 
 /** How many test cases and how many run plans the tabs count. */
 function useTabCounts(projectId: string) {
@@ -46,6 +47,7 @@ export function AgentTestingPage() {
   useHydrateViewFromUrl();
   const { isSseConnected } = useAgentTestingLiveUpdates(project?.id ?? "");
   const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
+  const openPlanTitle = useAgentTestingStore((state) => state.openPlanTitle);
 
   return (
     <NowProvider>
@@ -56,6 +58,7 @@ export function AgentTestingPage() {
             onTabChange={routing.setTab}
             casesCount={casesCount}
             plansCount={plansCount}
+            openPlan={routing.tab === "results" ? openPlanTitle : null}
           />
 
           <Box flex={1} width="full" minHeight={0} overflow="hidden">

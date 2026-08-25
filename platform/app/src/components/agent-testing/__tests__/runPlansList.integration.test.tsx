@@ -242,6 +242,31 @@ describe("the Test Runs list", () => {
     expect(within(row).getByText("2h ago")).toBeInTheDocument();
   });
 
+  /** @scenario "A run plan row opens on a click and carries no chevron" */
+  it("ends the row on its menu, with no chevron after it", async () => {
+    const user = userEvent.setup();
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [makeSuite()],
+      suiteSummaries: {},
+      externalSets: [],
+      oneOffLastRun: null,
+    });
+
+    const props = renderPlans(plans);
+
+    const row = screen.getByTestId("run-plan-row-checkout");
+    const menu = within(row).getByRole("button", {
+      name: "Actions for Checkout",
+    });
+    // The menu is the last thing in the row: a chevron after it would repeat
+    // what the whole row already does.
+    expect(row.lastElementChild?.contains(menu)).toBe(true);
+
+    await user.click(row);
+    expect(props.onSelectPlan).toHaveBeenCalledWith("checkout");
+  });
+
   /** @scenario "A run plan row shows its last result" */
   it("draws no empty pill on a plan whose summary holds no verdict", () => {
     const plans = buildRunPlans({

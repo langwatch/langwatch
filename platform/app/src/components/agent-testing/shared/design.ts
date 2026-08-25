@@ -1,16 +1,13 @@
 /**
- * The greys and the type sizes the Agent Testing surface is drawn with.
+ * The greys and the backgrounds the Agent Testing surface is drawn with.
  *
- * The surface uses a lighter grey for its faintest text than the shared
- * `fg.muted` token gives, so that value is kept here once and read by every
- * part of the page rather than repeated as a literal.
+ * Secondary text and muted icons read in the same grey as the rest of the
+ * product, so the page keeps the product's contrast rather than a lighter one
+ * of its own. The sizes and the paddings are what make the surface compact.
  */
 
-/** The faintest text and icon colour of the surface. */
-export const FG_FAINT = { _light: "gray.400", _dark: "gray.450" } as const;
-
-/** The muted text colour of the surface, one step above faint. */
-export const FG_MUTED = { _light: "gray.500", _dark: "gray.400" } as const;
+/** Secondary text and muted icons: the product's standard grey. */
+export const FG_MUTED = "fg.muted";
 
 export const TABLE_HEADER_BG = "bg.muted/50";
 

@@ -15,7 +15,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { FG_FAINT, TABLE_HEADER_BG } from "../shared/design";
+import { FG_MUTED, TABLE_HEADER_BG } from "../shared/design";
 import { RunResultRow } from "./RunResultRow";
 
 /**
@@ -74,7 +74,7 @@ export function RunResultsTable({
         fontWeight="semibold"
         textTransform="uppercase"
         letterSpacing="0.025em"
-        color={FG_FAINT}
+        color={FG_MUTED}
       >
         <Text as="span">Result</Text>
         <Text as="span">Test case</Text>

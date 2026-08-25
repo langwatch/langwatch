@@ -8,7 +8,7 @@
 import { HStack, IconButton } from "@chakra-ui/react";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { FG_FAINT } from "../shared/design";
+import { FG_MUTED } from "../shared/design";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";
 
 export type ViewModeToggleProps = {
@@ -44,7 +44,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
             height="26px"
             borderRadius="md"
             background={viewMode === value ? "bg.muted" : undefined}
-            color={viewMode === value ? "fg" : FG_FAINT}
+            color={viewMode === value ? "fg" : FG_MUTED}
             aria-label={label}
             aria-pressed={viewMode === value}
             onClick={() => onChange(value)}

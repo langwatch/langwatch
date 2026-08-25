@@ -34,6 +34,7 @@ function runSubjectForSuite({
     initialTarget: persisted
       ? { type: persisted.type, id: persisted.referenceId }
       : null,
+    persistedTarget: persisted ?? null,
   };
 }
 

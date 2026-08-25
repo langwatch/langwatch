@@ -169,19 +169,6 @@ export function useRunDrawerState({ open }: { open: boolean }) {
   const scenarioVersion =
     scenarioState?.metadata?.langwatch?.scenarioVersion ?? null;
 
-  const openVersionHistory = useCallback(() => {
-    const caseId = detail.scenarioId ?? knownScenarioId;
-    if (!caseId) return;
-    detail.openDrawer("scenarioVersionHistory", {
-      urlParams: {
-        scenarioId: caseId,
-        ...(scenarioVersion != null
-          ? { markVersion: String(scenarioVersion) }
-          : {}),
-      },
-    });
-  }, [detail, knownScenarioId, scenarioVersion]);
-
   return {
     scenarioRunId,
     knownScenarioId,
@@ -189,7 +176,6 @@ export function useRunDrawerState({ open }: { open: boolean }) {
     scenarioState,
     scenarioVersion,
     isSideBySide,
-    openVersionHistory,
   };
 }
 
