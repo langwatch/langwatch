@@ -131,23 +131,19 @@ export class ImpersonationService {
    * to it.
    *
    * Reads the TARGET's organizations, because those are the ones whose data
-   * the operator is about to see.
+   * the operator is about to see. Those slugs are read off the target row in
+   * `start` rather than here — see the note on that query.
    */
   private async assertOperatorCanProveSecondFactor({
     operatorUserId,
     targetUserId,
+    requiringOrganizationSlugs,
   }: {
     operatorUserId: string;
     targetUserId: string;
+    requiringOrganizationSlugs: readonly string[];
   }): Promise<void> {
-    const requiring = await this.prisma.organizationUser.findMany({
-      where: {
-        userId: targetUserId,
-        organization: { mfaRequired: true },
-      },
-      select: { organization: { select: { slug: true } } },
-    });
-    if (requiring.length === 0) return;
+    if (requiringOrganizationSlugs.length === 0) return;
 
     const operator = await this.prisma.user.findUnique({
       where: { id: operatorUserId },
@@ -156,13 +152,31 @@ export class ImpersonationService {
     if (operator?.twoFactorEnabled) return;
 
     throw new CannotImpersonateWithoutSecondFactorError(
-      `impersonate: operator ${operatorUserId} has no second factor; target ${targetUserId} belongs to ${requiring
-        .map((membership) => membership.organization.slug)
-        .join(", ")}`,
+      `impersonate: operator ${operatorUserId} has no second factor; target ${targetUserId} belongs to ${requiringOrganizationSlugs.join(
+        ", ",
+      )}`,
     );
   }
 
   async start(input: StartImpersonationInput): Promise<void> {
+    /**
+     * The target, plus the memberships that decide whether the operator needs
+     * a second factor of their own.
+     *
+     * The memberships ride along as a NESTED read on purpose. "Which of this
+     * person's organizations require a factor" is a question about one person
+     * across many organizations, so a top-level
+     * `organizationUser.findMany({ where: { userId, ... } })` carries no
+     * single-organization predicate and `guardOrganizationId` (ADR-021)
+     * rejects it outright — which is exactly what took every impersonation
+     * down with a 500 rather than merely skipping the check. The guard runs on
+     * top-level model operations (`$allOperations` in `src/server/db.ts`), so
+     * reading the memberships through the target row asks the same question
+     * without presenting the guard a query it must refuse. Same reason, same
+     * shape as the nurturing lookup in `src/server/better-auth/hooks.ts`.
+     *
+     * It also costs one round trip instead of two.
+     */
     const target = await this.prisma.user.findUnique({
       where: { id: input.userIdToImpersonate },
       select: {
@@ -171,6 +185,10 @@ export class ImpersonationService {
         email: true,
         image: true,
         deactivatedAt: true,
+        orgMemberships: {
+          where: { organization: { mfaRequired: true } },
+          select: { organization: { select: { slug: true } } },
+        },
       },
     });
 
@@ -186,6 +204,9 @@ export class ImpersonationService {
     await this.assertOperatorCanProveSecondFactor({
       operatorUserId: input.impersonatorUserId,
       targetUserId: target.id,
+      requiringOrganizationSlugs: target.orgMemberships.map(
+        (membership) => membership.organization.slug,
+      ),
     });
 
     await this.auditLog({
