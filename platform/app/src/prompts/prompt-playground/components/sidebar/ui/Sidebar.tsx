@@ -215,13 +215,26 @@ function SidebarItem({
     // looking at?". Neutral rather than branded: a coloured fill on a list this
     // dense shouts, and the fill alone already reads as selected. Hover is the
     // fainter fill, so the two never look alike.
-    // A row that does something is a button, not a div that happens to take
-    // clicks: as a `Box` it had no focus target, no role and no Enter/Space,
-    // so the rail was reachable with a mouse and with nothing else. Rows
-    // without an `onClick` stay plain -- there is nothing to activate.
+    // A row that does something has to be reachable by something other than a
+    // mouse: as a plain `Box` it had no focus target, no role and no
+    // Enter/Space. Given the role and tab stop explicitly rather than through
+    // `as="button"` -- a conditional `as` cannot be narrowed, so Chakra types
+    // the element as a div and rejects `type`. Rows without an `onClick` stay
+    // plain and stay out of the tab order: there is nothing to activate.
     <Box
-      as={onClick ? "button" : undefined}
-      type={onClick ? "button" : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              // Space scrolls the rail otherwise, and the row would activate
+              // AND the panel would jump.
+              event.preventDefault();
+              onClick();
+            }
+          : undefined
+      }
       textAlign="left"
       fontSize="sm"
       color="fg"
