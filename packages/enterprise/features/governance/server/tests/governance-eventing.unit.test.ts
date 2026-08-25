@@ -17,7 +17,7 @@ import {
   type ProcessEventEnvelope,
   type StateProjectionStore,
 } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { IngestionPullEventingAdapter } from "../src/adapters/ingestion-pull.ingestion-pull.adapter";
 import { PulledUsageEventingAdapter } from "../src/adapters/pulled-usage.pulled-usage.adapter";
 import {
@@ -85,6 +85,59 @@ class UnusedOutcome extends IngestionPullOutcomePort {
 class UnusedMetrics extends IngestionPullMetricsPort {
   count(): void {}
   observeDuration(): void {}
+}
+
+class FailingPull extends IngestionPullRunPort {
+  constructor(private readonly error: Error) {
+    super();
+  }
+
+  async run(): Promise<{ nextCursor: string | null; eventCount: number }> {
+    throw this.error;
+  }
+}
+
+class RecordingPullOutcome extends IngestionPullOutcomePort {
+  readonly completedCalls = vi.fn();
+  readonly failedCalls = vi.fn();
+
+  async completed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    nextCursor: string | null;
+    eventCount: number;
+  }): Promise<void> {
+    this.completedCalls(input);
+  }
+
+  async failed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    error: string;
+    errorCode: string;
+    retryable: false;
+  }): Promise<void> {
+    this.failedCalls(input);
+  }
+}
+
+class RecordingPullMetrics extends IngestionPullMetricsPort {
+  readonly counts: string[] = [];
+  readonly durations: number[] = [];
+
+  count(outcome: "completed" | "failed_retryable" | "failed_final"): void {
+    this.counts.push(outcome);
+  }
+
+  observeDuration(durationMs: number): void {
+    this.durations.push(durationMs);
+  }
 }
 
 class RecordingPulledUsageLedger extends PulledUsageLedgerPort {
@@ -289,6 +342,35 @@ describe("ingestion pull process and projection", () => {
     expect(result.state.currentRun?.runId).toBe("run-2");
   });
 
+  it("holds the cursor until the durable retry budget is exhausted", () => {
+    const state: IngestionPullProcessState = {
+      sourceId: "source-1",
+      enabled: true,
+      cron: "*/15 * * * *",
+      cursor: "held",
+      currentRun: { runId: "run-1", scheduledFor: 1_000, startedAt: 1_000 },
+    };
+    const result = definition.evolve({
+      previousState: state,
+      ref,
+      input: {
+        kind: "event",
+        event: processEvent(INGESTION_PULL_EVENT_TYPES.RUN_FAILED, {
+          sourceId: "source-1",
+          runId: "run-1",
+          scheduledFor: 1_000,
+          error: "deadline exceeded",
+          errorCode: "pull_failed",
+          retryable: false,
+        }),
+        now: 2_000,
+      },
+    });
+
+    expect(result.state).toMatchObject({ cursor: "held", currentRun: null });
+    expect(result.nextWakeAt).toBe(902_000);
+  });
+
   it("does not let an older projected completion regress the run cursor", () => {
     const projection = IngestionPullRunStatusEventingProjection.create({
       tryLoad: async () => null,
@@ -342,6 +424,46 @@ describe("ingestion pull process and projection", () => {
       LastRunEventCount: 5,
       LastRunScheduledFor: 2_000,
     });
+  });
+});
+
+describe("ingestion pull retry outcomes", () => {
+  it("redelivers a failed window, then records one terminal durable failure", async () => {
+    const outcome = new RecordingPullOutcome();
+    const metrics = new RecordingPullMetrics();
+    const service = IngestionPullService.create(
+      new FailingPull(new Error("provider unavailable")),
+      outcome,
+      metrics,
+      { clock: () => 2_000 },
+    );
+    const pull = {
+      sourceId: "source-1",
+      runId: "run-1",
+      scheduledFor: 1_000,
+      cursor: "held",
+    };
+
+    await expect(
+      service.execute({ tenantId: "project-1", attempt: 1, pull }),
+    ).rejects.toThrow("provider unavailable");
+    expect(outcome.failedCalls).not.toHaveBeenCalled();
+    expect(metrics.counts).toEqual(["failed_retryable"]);
+
+    await expect(
+      service.execute({ tenantId: "project-1", attempt: 3, pull }),
+    ).resolves.toBeUndefined();
+    expect(outcome.failedCalls).toHaveBeenCalledWith({
+      tenantId: "project-1",
+      occurredAt: 2_000,
+      sourceId: "source-1",
+      runId: "run-1",
+      scheduledFor: 1_000,
+      error: "provider unavailable",
+      errorCode: "pull_failed",
+      retryable: false,
+    });
+    expect(metrics.counts).toEqual(["failed_retryable", "failed_final"]);
   });
 });
 
