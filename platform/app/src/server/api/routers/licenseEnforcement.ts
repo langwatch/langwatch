@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { captureException } from "../../../utils/posthogErrorCapture";
-import { getApp } from "../../app-layer/app";
 import {
   createLicenseEnforcementService,
   limitTypeSchema,
@@ -75,8 +74,8 @@ export const licenseEnforcementRouter = createTRPCRouter({
       );
 
       if (!result.allowed) {
-        void getApp()
-          .usageLimits.notifyResourceLimitReached({
+        void ctx.app.usageLimits
+          .notifyResourceLimitReached({
             organizationId: input.organizationId,
             limitType: input.limitType,
             current: result.current,

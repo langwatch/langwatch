@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { getApp } from "../../app-layer/app";
 import { prisma } from "../../db";
 import { UsageStatsService } from "../../license-enforcement/usage-stats.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -28,8 +27,8 @@ export const limitsRouter = createTRPCRouter({
     // impact spam vector). Zero TS callers, so the bump is invisible
     // to legitimate UX.
     .permission("organization:manage")
-    .mutation(async ({ input }) => {
-      const notification = await getApp().usageLimits.checkAndSendWarning({
+    .mutation(async ({ input, ctx }) => {
+      const notification = await ctx.app.usageLimits.checkAndSendWarning({
         organizationId: input.organizationId,
         currentMonthMessagesCount: input.currentMonthMessagesCount,
         maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
