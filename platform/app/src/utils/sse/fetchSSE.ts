@@ -89,6 +89,7 @@ export async function fetchSSE<T>({
   // instead of becoming unhandled exceptions
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
+    const abortFromSignal = () => controller.abort();
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
 
@@ -96,9 +97,12 @@ export async function fetchSSE<T>({
       resolve();
       return;
     }
-    signal?.addEventListener("abort", () => controller.abort(), { once: true });
+    signal?.addEventListener("abort", abortFromSignal, { once: true });
 
     const cleanup = () => {
+      // The caller owns `signal` and outlives this request. Without the removal
+      // a settled stream's controller is retained until the caller aborts.
+      signal?.removeEventListener("abort", abortFromSignal);
       controller.abort();
       if (timeoutId) clearTimeout(timeoutId);
     };

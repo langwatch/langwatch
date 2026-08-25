@@ -51,7 +51,7 @@ export interface PromptExecution {
   setMessages: (messages: PlaygroundMessage[]) => void;
 }
 
-const describe = (error: unknown): string =>
+const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
@@ -121,6 +121,9 @@ export function usePromptExecution({
     onMessagesChange,
   });
   const [isRunning, setIsRunning] = useState(false);
+  // Two `send` calls dispatched in one tick both read the same stale `isRunning`
+  // from their closure, so the state alone cannot keep a second stream closed.
+  const isRunningRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const buffer = useDeltaBuffer(({ id, content }) =>
@@ -144,7 +147,8 @@ export function usePromptExecution({
 
   const send = useCallback(
     async (content: string) => {
-      if (!projectId || !content.trim() || isRunning) return;
+      if (!projectId || !content.trim() || isRunningRef.current) return;
+      isRunningRef.current = true;
 
       const history: PlaygroundMessage[] = [
         ...conversation.messages,
@@ -161,10 +165,11 @@ export function usePromptExecution({
       } finally {
         buffer.cancel();
         abortRef.current = null;
+        isRunningRef.current = false;
         setIsRunning(false);
       }
     },
-    [projectId, isRunning, conversation, buffer, run],
+    [projectId, conversation, buffer, run],
   );
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
@@ -267,7 +272,7 @@ function useRunPrompt({
         }
         conversation.recordFailure(assistantId!, {
           type: "unknown",
-          message: describe(error),
+          message: describeError(error),
         });
       } finally {
         conversation.settle({ assistantId, content: accumulated });

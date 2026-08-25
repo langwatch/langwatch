@@ -33,9 +33,15 @@ export function useDeltaBuffer(
 
   useEffect(() => cancel, [cancel]);
 
-  const begin = useCallback((id: string) => {
-    pendingRef.current = { id, content: "" };
-  }, []);
+  const begin = useCallback(
+    (id: string) => {
+      // A frame queued by the previous run would otherwise fire against the new
+      // id and write its empty starting content over the reply.
+      cancel();
+      pendingRef.current = { id, content: "" };
+    },
+    [cancel],
+  );
 
   const set = useCallback((content: string) => {
     const pending = pendingRef.current;
