@@ -47,6 +47,7 @@ export const APP_ERROR_CODES = [
   "billing_quote_expired",
   "broadcaster_not_active",
   "budget_not_found",
+  "cache_entry_not_found",
   "cache_rule_not_found",
   "cannot_demote_last_admin",
   "cannot_disable_last_admin",

@@ -129,6 +129,15 @@ export const Resources = {
   // `release_langy_enabled` flag is — so it draws the line at "can this person
   // act on the project at all" rather than trying to be finer than that.
   LANGY: "langy",
+  // The per-project agent cache. An agent stores a value it produced during a
+  // run (a login session, a handle it paid to obtain) and reads it back on the
+  // next row, so the work happens once for the run instead of once per row.
+  // Entries expire on their own and the platform encrypts them at rest.
+  //
+  // `agentCache:view` reads one entry by name; `agentCache:manage` writes and
+  // deletes. Granted from MEMBER upward; VIEWER and EXTERNAL get nothing,
+  // because a cache entry is agent-written state a reader has no call to see.
+  AGENT_CACHE: "agentCache",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

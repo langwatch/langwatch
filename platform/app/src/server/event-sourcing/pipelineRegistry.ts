@@ -31,6 +31,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -103,6 +104,7 @@ import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAgentSandboxMaintenancePipeline } from "./pipelines/agent-sandbox-maintenance/pipeline";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
@@ -554,6 +556,20 @@ export class PipelineRegistry {
         sessionKeyReap: {
           reap: () =>
             reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Code agent credential maintenance, on the same footing. A sandbox key is
+    // minted per run and nothing revokes it at the end of one, so this sweep
+    // is what retires it.
+    this.deps.eventSourcing.register(
+      createAgentSandboxMaintenancePipeline({
+        sandboxKeyReap: {
+          reap: () =>
+            reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
