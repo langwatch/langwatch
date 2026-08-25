@@ -12,6 +12,18 @@ Feature: Workflow service boundary
     Then it returns that version
     And a workflow from another project is not visible
 
+  Scenario: Version history preserves the Studio response
+    Given a workflow has current, latest, published and parent versions
+    When the service lists its version history
+    Then it returns the author and sparse version tags
+    And it includes DSL only in the requested history mode
+
+  Scenario: Restoring an old version migrates its graph
+    Given a persisted workflow version uses an older graph shape
+    When the service restores that version
+    Then it migrates the graph through the application port
+    And updates the current pointer and display metadata together
+
   Scenario: Copying referenced datasets uses the Dataset service
     Given a workflow copy includes referenced datasets
     When Workflow copies the definition into another project

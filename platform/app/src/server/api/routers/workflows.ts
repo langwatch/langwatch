@@ -9,11 +9,12 @@ import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
-import type { Prisma, PrismaClient, WorkflowVersion } from "~/generated/prisma/client";
+import type { PrismaClient, WorkflowVersion } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import {
   WorkflowNotFoundError,
+  WorkflowVersionNotFoundError,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -27,7 +28,6 @@ import {
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
-import type { Unpacked } from "../../../utils/types";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
@@ -395,140 +395,50 @@ export const workflowRouter = createTRPCRouter({
     )
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
-      const workflow = await ctx.prisma.workflow.findUnique({
-        where: {
-          id: input.workflowId,
+      try {
+        return await ctx.app.workflows.getVersionHistory({
+          workflowId: input.workflowId,
           projectId: input.projectId,
-          archivedAt: null,
-        },
-        select: {
-          currentVersionId: true,
-          latestVersionId: true,
-          publishedId: true,
-        },
-      });
-
-      if (!workflow) {
+          mode:
+            input.returnDSL === true
+              ? "allDsl"
+              : input.returnDSL === "previousVersion"
+                ? "previousDsl"
+                : "metadata",
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowNotFoundError)) throw error;
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow not found",
         });
       }
-
-      const versions = await ctx.prisma.workflowVersion.findMany({
-        where: { workflowId: input.workflowId, projectId: input.projectId },
-        select: {
-          id: true,
-          version: true,
-          autoSaved: true,
-          commitMessage: true,
-          updatedAt: true,
-          dsl: input.returnDSL === true ? true : false,
-          parent: {
-            select: {
-              id: true,
-              version: true,
-              commitMessage: true,
-            },
-          },
-          author: {
-            select: {
-              name: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      const versionsWithTags = versions as unknown as (Omit<
-        Unpacked<typeof versions>,
-        "parent"
-      > & {
-        isCurrentVersion?: boolean;
-        isLatestVersion?: boolean;
-        isPublishedVersion?: boolean;
-        isPreviousVersion?: boolean;
-        parent?: {
-          id: string;
-          version: string;
-          commitMessage: string;
-        };
-      })[];
-      let previousVersionId: string | undefined;
-      for (const version of versionsWithTags) {
-        if (version.id === workflow?.currentVersionId) {
-          version.isCurrentVersion = true;
-          previousVersionId = version.parent?.id;
-        } else {
-          delete version.parent;
-        }
-        if (version.id === workflow?.latestVersionId) {
-          version.isLatestVersion = true;
-        }
-        if (version.id === workflow?.publishedId) {
-          version.isPublishedVersion = true;
-        }
-      }
-      for (const version of versionsWithTags) {
-        if (version.id === previousVersionId) {
-          version.isPreviousVersion = true;
-          if (input.returnDSL === "previousVersion") {
-            version.dsl = (
-              await ctx.prisma.workflowVersion.findFirst({
-                where: { id: version.id, projectId: input.projectId },
-                select: { dsl: true },
-              })
-            )?.dsl as Prisma.JsonValue;
-          }
-        }
-      }
-
-      return versionsWithTags.map((version) => ({
-        ...version,
-        dsl: version.dsl as unknown as Workflow | undefined,
-      }));
     }),
 
   restoreVersion: protectedProcedure
     .input(z.object({ projectId: z.string(), versionId: z.string() }))
     .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
-      const version = await ctx.prisma.workflowVersion.findUnique({
-        where: { id: input.versionId, projectId: input.projectId },
-      });
-
-      if (!version?.dsl) {
+      try {
+        return await ctx.app.workflows.restoreVersion({
+          versionId: input.versionId,
+          projectId: input.projectId,
+        });
+      } catch (error) {
+        if (
+          !(error instanceof WorkflowVersionNotFoundError) &&
+          !(error instanceof WorkflowNotFoundError)
+        ) {
+          throw error;
+        }
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Workflow version not found",
+          message:
+            error instanceof WorkflowVersionNotFoundError
+              ? "Workflow version not found"
+              : "Workflow not found",
         });
       }
-
-      const workflow = await ctx.prisma.workflow.findUnique({
-        where: { id: version.workflowId, projectId: input.projectId },
-      });
-
-      if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
-
-      const dsl = migrateDSLVersion(version.dsl as unknown as Workflow);
-
-      await ctx.prisma.workflow.update({
-        where: { id: workflow.id, projectId: input.projectId },
-        data: {
-          name: dsl.name,
-          icon: dsl.icon,
-          description: dsl.description,
-          currentVersionId: version.id,
-        },
-      });
-
-      return { ...version, dsl };
     }),
 
   autosave: protectedProcedure

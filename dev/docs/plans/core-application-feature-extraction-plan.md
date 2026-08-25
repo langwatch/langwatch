@@ -81,7 +81,7 @@ as a directory rename.
 | `prompt` | prompt definitions, versions, tags and prompt configuration | `prompts`, `promptTags`; `/api/prompts` | `server/prompt-config`, `src/prompts`, prompt components/hooks | contract/server/web packages landed; page composition, client query adapters and cross-feature Trace/Evaluation bridges remain in the application |
 | `dataset` | datasets, records, imports and dataset file handling | `dataset`, `datasetRecord`; `/api/dataset`, `/api/dataset/generate` | `server/datasets`, dataset components | contract/server/web packages landed; remaining application files are transport, page composition and cross-feature execution seams |
 | `agent` | agent definitions and agent-specific HTTP node configuration | `agents`, `/api/agents`; agent portions of `httpProxy` and `setupSkills` | Agent feature package plus remaining `server/agents` and agent UI | package partial |
-| `workflow` | workflow definitions, versions, graph nodes and workflow execution-facing behaviour | `workflow`; `/api/workflows`, legacy workflow routes | `server/workflows`, `optimization_studio` workflow domain and workflow UI | contract/server and process App service landed; ordinary CRUD transports delegate to it, while version/copy propagation and execution composition still contain legacy persistence |
+| `workflow` | workflow definitions, versions, graph nodes and workflow execution-facing behaviour | `workflow`; `/api/workflows`, legacy workflow routes | `server/workflows`, `optimization_studio` workflow domain and workflow UI | contract/server and process App service landed; CRUD, version history and restore delegate to it, while copy propagation and evaluation composition still contain legacy persistence |
 | `evaluator` | evaluator definitions, evaluator providers and evaluator configuration | `evaluators`, evaluator portion of `optimization`; `/api/evaluators` | `server/evaluators`, evaluator components | contract/server/web packages landed and the duplicate app service is deleted; copy/cascade transport orchestration remains |
 | `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | the process owns one canonical service for execution, run persistence, trace reads, deferred inputs and monitor performance; duplicate run/read/performance repositories are deleted, while the evaluator execution engine, stored-object resolution adapter, DSPy steps and UI still need relocation |
 | `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | monitor router and online-evaluation UI | definition, replication and reads use the process App service; monitor performance is an Evaluation-service read, leaving dataset-provider compatibility and reusable UI to drain |
@@ -368,8 +368,8 @@ The foundation, identity spine, Automation, Prompt, Dataset and the first
 execution package boundaries are landed. The queue now tracks only unfinished
 vertical drains:
 
-1. finish Scenario cancellation/failure/browser seams and Workflow
-   version/copy/history compatibility paths;
+1. move cancellation, failure and browser-run coordination to Simulation, then
+   finish Workflow copy propagation and evaluation compatibility paths;
 2. move Evaluation's remaining execution engine and stored-object adapter,
    finish Evaluator's compatibility reads, and drain Monitor/Evaluation UI;
 3. finish Langy turn/relay and API Key grant/project-resolution seams;

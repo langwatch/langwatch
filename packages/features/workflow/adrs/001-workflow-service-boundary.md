@@ -33,10 +33,10 @@ service used by workflow copying. Prisma is confined to
 
 ## Dependencies
 
-NLP execution is an explicit port supplied by the application composition
-root. A cross-feature dependency is added only when Workflow actually calls
-that service; speculative Model Provider and Agent dependencies are not part of
-the constructor.
+NLP execution and persisted-DSL migration are explicit ports supplied by the
+application composition root. A cross-feature dependency is added only when
+Workflow actually calls that service; speculative Model Provider and Agent
+dependencies are not part of the constructor.
 
 ## Public surfaces and transports
 
@@ -49,7 +49,8 @@ version selection and Evaluation execution.
 The process creates one `PostgresWorkflowAdapter` during App composition and
 passes its resulting `WorkflowService` through request context. The adapter
 constructor obligations are `database`, the optional canonical `datasets`
-service when copies may include datasets, and the injected `execution` port.
+service when copies may include datasets, plus the DSL migration and execution
+ports.
 
 ## Environment and configuration
 

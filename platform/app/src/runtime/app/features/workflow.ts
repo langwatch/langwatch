@@ -2,10 +2,15 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PostgresWorkflowAdapter,
+  WorkflowDslMigrationPort,
   WorkflowExecutionPort,
 } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import { WorkflowNlpExecutor } from "~/server/workflows/runWorkflow";
+import type { WorkflowDsl } from "@langwatch/workflow-contract";
+import {
+  migrateWorkflowDslForExecution,
+  WorkflowNlpExecutor,
+} from "~/server/workflows/runWorkflow";
 
 /**
  * Application-owned composition seam for Workflow. The App root supplies the
@@ -20,6 +25,7 @@ export type AppWorkflowRuntimeOptions = {
   database: PrismaClient;
   datasets?: DatasetService;
   execution?: WorkflowExecutionPort;
+  dslMigration?: WorkflowDslMigrationPort;
   generateId?: () => string;
 };
 
@@ -40,6 +46,20 @@ export class AppWorkflowExecutionPort extends WorkflowExecutionPort {
   }
 }
 
+export class AppWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
+  static create(): AppWorkflowDslMigrationPort {
+    return new AppWorkflowDslMigrationPort();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  migrate(dsl: WorkflowDsl): WorkflowDsl {
+    return migrateWorkflowDslForExecution(dsl);
+  }
+}
+
 export class AppWorkflowRuntime {
   private constructor(private readonly options: AppWorkflowRuntimeOptions) {}
 
@@ -48,6 +68,10 @@ export class AppWorkflowRuntime {
   }
 
   build(): WorkflowService {
-    return PostgresWorkflowAdapter.create(this.options);
+    return PostgresWorkflowAdapter.create({
+      ...this.options,
+      dslMigration:
+        this.options.dslMigration ?? AppWorkflowDslMigrationPort.create(),
+    });
   }
 }

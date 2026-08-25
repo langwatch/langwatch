@@ -10,6 +10,7 @@ import {
   WorkflowRepository,
   type PersistWorkflowInput,
   type PersistWorkflowVersionInput,
+  type WorkflowVersionHistoryRecord,
 } from "../workflow.repository";
 
 /** Narrow database shape keeps generated Prisma types inside this directory. */
@@ -67,9 +68,18 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     super();
   }
 
-  async tryFindById(input: { id: string; projectId: string; includeVersion?: boolean }): Promise<WorkflowWithVersion | null> {
+  async tryFindById(input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+    includeArchived?: boolean;
+  }): Promise<WorkflowWithVersion | null> {
     const row = await this.database.workflow.findFirst({
-      where: { id: input.id, projectId: input.projectId, archivedAt: null },
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        ...(input.includeArchived ? {} : { archivedAt: null }),
+      },
       ...(input.includeVersion ? { include: { currentVersion: true, latestVersion: true } } : {}),
     });
     if (!row) return null;
@@ -95,6 +105,54 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       where: { workflowId: input.workflowId, projectId: input.projectId }, orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => mapVersion(row, input.includeDsl !== false));
+  }
+
+  async findVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl: boolean;
+  }): Promise<WorkflowVersionHistoryRecord[]> {
+    const rows = await this.database.workflowVersion.findMany({
+      where: { workflowId: input.workflowId, projectId: input.projectId },
+      select: {
+        id: true,
+        version: true,
+        autoSaved: true,
+        commitMessage: true,
+        updatedAt: true,
+        ...(input.includeDsl ? { dsl: true } : {}),
+        parent: {
+          select: { id: true, version: true, commitMessage: true },
+        },
+        author: { select: { name: true, image: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => {
+      const value = row as WorkflowVersionHistoryRecord & { dsl?: unknown };
+      return {
+        id: value.id,
+        version: value.version,
+        autoSaved: value.autoSaved,
+        commitMessage: value.commitMessage,
+        updatedAt: value.updatedAt,
+        ...(input.includeDsl
+          ? { dsl: workflowDslSchema.parse(value.dsl) }
+          : {}),
+        parent: value.parent,
+        author: value.author,
+      };
+    });
+  }
+
+  async tryFindVersionById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<WorkflowVersion | null> {
+    const row = await this.database.workflowVersion.findFirst({
+      where: { id: input.id, projectId: input.projectId },
+    });
+    return row ? mapVersion(row) : null;
   }
 
   async tryFindVersion(input: { id: string; workflowId: string; projectId: string }): Promise<WorkflowVersion | null> {

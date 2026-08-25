@@ -16,10 +16,15 @@ import {
   type Workflow,
   type WorkflowEvaluatorFields,
   type WorkflowVersion,
+  type WorkflowVersionHistoryEntry,
+  type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import type { DatasetService, Dataset } from "@langwatch/dataset-contract";
-import type { WorkflowExecutionPort } from "../ports/workflow.port";
+import type {
+  WorkflowDslMigrationPort,
+  WorkflowExecutionPort,
+} from "../ports/workflow.port";
 import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
@@ -29,6 +34,7 @@ export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
   datasets?: DatasetService;
   execution?: WorkflowExecutionPort;
+  dslMigration: WorkflowDslMigrationPort;
   generateId?: () => string;
 };
 
@@ -87,6 +93,89 @@ export class WorkflowService extends WorkflowServiceContract {
 
   getVersions(input: { workflowId: string; projectId: string; includeDsl?: boolean }): Promise<WorkflowVersion[]> {
     return this.options.repository.findVersions(input);
+  }
+
+  async getVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    mode: WorkflowVersionHistoryMode;
+  }): Promise<WorkflowVersionHistoryEntry[]> {
+    const workflow = await this.getById({
+      id: input.workflowId,
+      projectId: input.projectId,
+    });
+    const records = await this.options.repository.findVersionHistory({
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      includeDsl: input.mode === "allDsl",
+    });
+    const current = records.find(
+      (record) => record.id === workflow.currentVersionId,
+    );
+    const previousVersionId = current?.parent?.id;
+    const previousVersion =
+      input.mode === "previousDsl" && previousVersionId
+        ? await this.options.repository.tryFindVersionById({
+            id: previousVersionId,
+            projectId: input.projectId,
+          })
+        : null;
+
+    return records.map((record) => ({
+      id: record.id,
+      version: record.version,
+      autoSaved: record.autoSaved,
+      commitMessage: record.commitMessage,
+      updatedAt: record.updatedAt,
+      ...(record.dsl ? { dsl: record.dsl } : {}),
+      ...(record.id === workflow.currentVersionId
+        ? { isCurrentVersion: true as const, parent: record.parent }
+        : {}),
+      ...(record.id === workflow.latestVersionId
+        ? { isLatestVersion: true as const }
+        : {}),
+      ...(record.id === workflow.publishedId
+        ? { isPublishedVersion: true as const }
+        : {}),
+      ...(record.id === previousVersionId
+        ? {
+            isPreviousVersion: true as const,
+            ...(previousVersion ? { dsl: previousVersion.dsl } : {}),
+          }
+        : {}),
+      author: record.author,
+    }));
+  }
+
+  async restoreVersion(input: {
+    versionId: string;
+    projectId: string;
+  }): Promise<WorkflowVersion> {
+    const version = await this.options.repository.tryFindVersionById({
+      id: input.versionId,
+      projectId: input.projectId,
+    });
+    if (!version) throw new WorkflowVersionNotFoundError(input.versionId);
+    const workflow = await this.options.repository.tryFindById({
+      id: version.workflowId,
+      projectId: input.projectId,
+      includeArchived: true,
+    });
+    if (!workflow) {
+      throw new WorkflowNotFoundError(version.workflowId, input.projectId);
+    }
+    const dsl = this.options.dslMigration.migrate(version.dsl);
+    await this.options.repository.updateWorkflow({
+      id: workflow.id,
+      projectId: input.projectId,
+      data: {
+        name: dsl.name,
+        icon: dsl.icon,
+        description: dsl.description,
+        currentVersionId: version.id,
+      },
+    });
+    return { ...version, dsl };
   }
 
   async getPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion> {

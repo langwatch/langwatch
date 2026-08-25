@@ -4,9 +4,17 @@ import {
   WorkflowNotPublishedError,
   type RunWorkflowCommand,
 } from "@langwatch/workflow-contract";
-import { WorkflowExecutionPort } from "../src/ports/workflow.port";
+import {
+  WorkflowDslMigrationPort,
+  WorkflowExecutionPort,
+} from "../src/ports/workflow.port";
 import { WorkflowService as ServerWorkflowService } from "../src/services/workflow.service";
-import { WorkflowRepository, type PersistWorkflowInput, type PersistWorkflowVersionInput } from "../src/repositories/workflow.repository";
+import {
+  WorkflowRepository,
+  type PersistWorkflowInput,
+  type PersistWorkflowVersionInput,
+  type WorkflowVersionHistoryRecord,
+} from "../src/repositories/workflow.repository";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
   id, projectId, name: "Triage", icon: null, description: null,
@@ -20,14 +28,34 @@ class FakeWorkflowRepository extends WorkflowRepository {
   private readonly versions = new Map<string, WorkflowVersion>();
 
   constructor() { super(); this.workflows.set("workflow_1", workflow()); }
-  async tryFindById(input: { id: string; projectId: string; includeVersion?: boolean }): Promise<WorkflowWithVersion | null> {
+  async tryFindById(input: { id: string; projectId: string; includeVersion?: boolean; includeArchived?: boolean }): Promise<WorkflowWithVersion | null> {
     const value = this.workflows.get(input.id);
-    if (!value || value.projectId !== input.projectId || value.archivedAt) return null;
+    if (!value || value.projectId !== input.projectId || (!input.includeArchived && value.archivedAt)) return null;
     const current = value.currentVersionId ? this.versions.get(value.currentVersionId) : null;
     return { ...value, ...(input.includeVersion ? { currentVersion: current, latestVersion: current } : {}) };
   }
   async findAll(input: { projectId: string }): Promise<Workflow[]> { return [...this.workflows.values()].filter((item) => item.projectId === input.projectId && !item.archivedAt); }
   async findVersions(input: { workflowId: string; projectId: string }): Promise<WorkflowVersion[]> { return [...this.versions.values()].filter((item) => item.workflowId === input.workflowId && item.projectId === input.projectId); }
+  async findVersionHistory(input: { workflowId: string; projectId: string; includeDsl: boolean }): Promise<WorkflowVersionHistoryRecord[]> {
+    return (await this.findVersions(input)).reverse().map((item) => ({
+      id: item.id,
+      version: item.version,
+      autoSaved: item.autoSaved,
+      commitMessage: item.commitMessage,
+      updatedAt: item.updatedAt,
+      ...(input.includeDsl ? { dsl: item.dsl } : {}),
+      parent: item.parentId
+        ? {
+            id: item.parentId,
+            version: this.versions.get(item.parentId)?.version ?? "",
+            commitMessage:
+              this.versions.get(item.parentId)?.commitMessage ?? "",
+          }
+        : null,
+      author: null,
+    }));
+  }
+  async tryFindVersionById(input: { id: string; projectId: string }): Promise<WorkflowVersion | null> { const item = this.versions.get(input.id); return item?.projectId === input.projectId ? item : null; }
   async tryFindVersion(input: { id: string; workflowId: string; projectId: string }): Promise<WorkflowVersion | null> { const item = this.versions.get(input.id); return item?.workflowId === input.workflowId && item.projectId === input.projectId ? item : null; }
   async tryFindPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion | null> { const item = this.workflows.get(input.workflowId); return item?.publishedId ? this.versions.get(input.versionId ?? item.publishedId) ?? null : null; }
   async createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion> { const item = { ...workflow(input.id, input.projectId), name: input.name, icon: input.icon, description: input.description }; this.workflows.set(item.id, item); return item; }
@@ -51,45 +79,157 @@ class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
   }
 }
 
+class FakeWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
+  migrate(dsl: WorkflowVersion["dsl"]): WorkflowVersion["dsl"] {
+    return { ...dsl, name: `${dsl.name} migrated` };
+  }
+}
+
+const service = (
+  repository = new FakeWorkflowRepository(),
+  options: { execution?: WorkflowExecutionPort } = {},
+) =>
+  ServerWorkflowService.create({
+    repository,
+    dslMigration: new FakeWorkflowDslMigrationPort(),
+    ...options,
+  });
+
 describe("WorkflowService", () => {
   it("creates, versions and publishes through the repository boundary", async () => {
-    const service = ServerWorkflowService.create({ repository: new FakeWorkflowRepository(), generateId: () => "id" });
-    const result = await service.create({ projectId: "project_1", dsl: { version: "1", name: "Triage", nodes: [], edges: [] }, commitMessage: "first", publish: true });
+    const workflowService = ServerWorkflowService.create({ repository: new FakeWorkflowRepository(), dslMigration: new FakeWorkflowDslMigrationPort(), generateId: () => "id" });
+    const result = await workflowService.create({ projectId: "project_1", dsl: { version: "1", name: "Triage", nodes: [], edges: [] }, commitMessage: "first", publish: true });
     expect(result.version.workflowId).toBe(result.workflow.id);
     expect(result.workflow.publishedId).toBe(result.version.id);
   });
 
   it("throws a concrete error when a workflow is not published", async () => {
-    const service = ServerWorkflowService.create({ repository: new FakeWorkflowRepository() });
-    await expect(service.getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" })).rejects.toBeInstanceOf(WorkflowNotPublishedError);
+    await expect(service().getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" })).rejects.toBeInstanceOf(WorkflowNotPublishedError);
   });
 
   it("unpublishes through the workflow repository boundary", async () => {
     const repository = new FakeWorkflowRepository();
-    const service = ServerWorkflowService.create({ repository });
+    const workflowService = service(repository);
     await repository.publish({
       id: "workflow_1",
       projectId: "project_1",
       versionId: "version_1",
     });
-    await service.unpublish({ id: "workflow_1", projectId: "project_1" });
+    await workflowService.unpublish({ id: "workflow_1", projectId: "project_1" });
     await expect(
-      service.getById({ id: "workflow_1", projectId: "project_1" }),
+      workflowService.getById({ id: "workflow_1", projectId: "project_1" }),
     ).resolves.toMatchObject({ publishedId: null, publishedById: null });
   });
 
   it("exposes evaluator fields without exposing persistence", async () => {
     const repo = new FakeWorkflowRepository();
-    const service = ServerWorkflowService.create({ repository: repo });
-    const fields = await service.getFields({ workflowId: "workflow_1", projectId: "project_1" });
+    const fields = await service(repo).getFields({ workflowId: "workflow_1", projectId: "project_1" });
     expect(fields).toMatchObject({ workflowId: "workflow_1", workflowName: "Triage" });
     expect(fields.outputFields.map((field) => field.identifier)).toEqual(["passed", "score", "label"]);
+  });
+
+  it("returns version history with the same sparse tags and previous DSL as the transport", async () => {
+    const repository = new FakeWorkflowRepository();
+    const previous = await repository.createVersion({
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: null,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "first",
+      dsl: { name: "First", version: "1", nodes: [], edges: [] },
+    });
+    const current = await repository.createVersion({
+      id: "version_2",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: previous.id,
+      version: "2",
+      autoSaved: false,
+      commitMessage: "second",
+      dsl: { name: "Second", version: "2", nodes: [], edges: [] },
+    });
+    await repository.updateWorkflow({
+      id: "workflow_1",
+      projectId: "project_1",
+      data: {
+        currentVersionId: current.id,
+        latestVersionId: current.id,
+        publishedId: previous.id,
+      },
+    });
+
+    await expect(
+      service(repository).getVersionHistory({
+        workflowId: "workflow_1",
+        projectId: "project_1",
+        mode: "previousDsl",
+      }),
+    ).resolves.toEqual([
+      {
+        id: current.id,
+        version: current.version,
+        autoSaved: false,
+        commitMessage: current.commitMessage,
+        updatedAt: expect.any(Date),
+        author: null,
+        isCurrentVersion: true,
+        isLatestVersion: true,
+        parent: {
+          id: previous.id,
+          version: previous.version,
+          commitMessage: previous.commitMessage,
+        },
+      },
+      {
+        id: previous.id,
+        version: previous.version,
+        autoSaved: false,
+        commitMessage: previous.commitMessage,
+        updatedAt: expect.any(Date),
+        author: null,
+        dsl: previous.dsl,
+        isPreviousVersion: true,
+        isPublishedVersion: true,
+      },
+    ]);
+  });
+
+  it("restores the migrated graph and updates the workflow display metadata", async () => {
+    const repository = new FakeWorkflowRepository();
+    const version = await repository.createVersion({
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: null,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "first",
+      dsl: { name: "Old shape", version: "1", nodes: [], edges: [] },
+    });
+
+    await expect(
+      service(repository).restoreVersion({
+        versionId: version.id,
+        projectId: "project_1",
+      }),
+    ).resolves.toMatchObject({
+      id: version.id,
+      dsl: { name: "Old shape migrated" },
+    });
+    await expect(
+      repository.tryFindById({ id: "workflow_1", projectId: "project_1" }),
+    ).resolves.toMatchObject({
+      currentVersionId: version.id,
+      name: "Old shape migrated",
+    });
   });
 
   it("validates and dispatches a resolved published version through the execution port", async () => {
     const repository = new FakeWorkflowRepository();
     const execution = new FakeWorkflowExecutionPort();
-    const service = ServerWorkflowService.create({ repository, execution });
+    const workflowService = service(repository, { execution });
     const version = await repository.createVersion({
       id: "version_1",
       workflowId: "workflow_1",
@@ -107,7 +247,7 @@ describe("WorkflowService", () => {
     });
 
     await expect(
-      service.run({
+      workflowService.run({
         workflowId: "workflow_1",
         projectId: "project_1",
         inputs: { ticket: "42" },

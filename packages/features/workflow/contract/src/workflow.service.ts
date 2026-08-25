@@ -7,7 +7,14 @@ import type {
   SaveWorkflowVersionCommand,
   UpdateWorkflowCommand,
 } from "./workflow.commands";
-import type { Workflow, WorkflowEvaluatorFields, WorkflowVersion, WorkflowWithVersion } from "./workflow";
+import type {
+  Workflow,
+  WorkflowEvaluatorFields,
+  WorkflowVersion,
+  WorkflowVersionHistoryEntry,
+  WorkflowVersionHistoryMode,
+  WorkflowWithVersion,
+} from "./workflow";
 
 export abstract class WorkflowService {
   abstract getById(input: { id: string; projectId: string; includeVersion?: boolean }): Promise<WorkflowWithVersion>;
@@ -15,6 +22,15 @@ export abstract class WorkflowService {
   abstract getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
   abstract list(input: { projectId: string }): Promise<Workflow[]>;
   abstract getVersions(input: { workflowId: string; projectId: string; includeDsl?: boolean }): Promise<WorkflowVersion[]>;
+  abstract getVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    mode: WorkflowVersionHistoryMode;
+  }): Promise<WorkflowVersionHistoryEntry[]>;
+  abstract restoreVersion(input: {
+    versionId: string;
+    projectId: string;
+  }): Promise<WorkflowVersion>;
   abstract getPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion>;
   abstract create(input: CreateWorkflowCommand): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   abstract update(input: UpdateWorkflowCommand): Promise<Workflow>;

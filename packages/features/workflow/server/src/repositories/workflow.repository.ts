@@ -28,10 +28,39 @@ export type PersistWorkflowVersionInput = {
   dsl: WorkflowDsl;
 };
 
+export type WorkflowVersionHistoryRecord = {
+  id: string;
+  version: string;
+  autoSaved: boolean;
+  commitMessage: string;
+  updatedAt: Date;
+  dsl?: WorkflowDsl;
+  parent: {
+    id: string;
+    version: string;
+    commitMessage: string;
+  } | null;
+  author: { name: string | null; image: string | null } | null;
+};
+
 export abstract class WorkflowRepository {
-  abstract tryFindById(input: { id: string; projectId: string; includeVersion?: boolean }): Promise<WorkflowWithVersion | null>;
+  abstract tryFindById(input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+    includeArchived?: boolean;
+  }): Promise<WorkflowWithVersion | null>;
   abstract findAll(input: { projectId: string }): Promise<Workflow[]>;
   abstract findVersions(input: { workflowId: string; projectId: string; includeDsl?: boolean }): Promise<WorkflowVersion[]>;
+  abstract findVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl: boolean;
+  }): Promise<WorkflowVersionHistoryRecord[]>;
+  abstract tryFindVersionById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<WorkflowVersion | null>;
   abstract tryFindVersion(input: { id: string; workflowId: string; projectId: string }): Promise<WorkflowVersion | null>;
   abstract tryFindPublishedVersion(input: { workflowId: string; projectId: string; versionId?: string }): Promise<WorkflowVersion | null>;
   abstract createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion>;
