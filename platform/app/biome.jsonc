@@ -341,6 +341,69 @@
 			}
 		},
 		{
+			// ADR-117's front door and ADR-119/120's password and passkey
+			// sections. Each of these is one screen: a form's state, its
+			// submit, its refusals and its markup, written as a single
+			// component because that is the unit the screen is designed,
+			// reviewed and tested as -- signin-signup-screens.feature binds
+			// them screen by screen, not piece by piece, and 119 tests across
+			// 17 files address them the same way.
+			//
+			// The length here is a count of the states one screen can be in
+			// (identifier, password, passkey, refusal, resend, verification),
+			// not of anything tangled. Splitting each into presentational
+			// children would move markup out of the file that owns the state
+			// driving it, and the seam would be drawn to satisfy a line count
+			// rather than to name a part anybody reuses.
+			//
+			// REMOVE THIS BLOCK when IDENTITY_ROUTER_V2 retires and the legacy
+			// screens go: the surviving components stop carrying both the
+			// flagged and unflagged paths, and should come back under the
+			// limits on their own. If they do not, split them then -- with the
+			// flag gone there is one shape to split rather than two.
+			"includes": [
+				"src/components/me/PasskeysSection.tsx",
+				"src/components/me/SignInMethodsSection.tsx",
+				"src/components/settings/ChangePasswordDialog.tsx",
+				"src/features/auth-front-door/components/CredentialSignInForm.tsx",
+				"src/features/auth-front-door/components/FrontDoorGround.tsx",
+				"src/features/auth-front-door/components/IdentifierFirstSignIn.tsx",
+				"src/features/auth-front-door/components/SignUpCredentialForm.tsx",
+				"src/features/auth-front-door/components/VerificationFirstSignUp.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
+			// The identity fold. Its length is a count of the event types the
+			// aggregate answers to, one arm each, and every arm is a
+			// projection write with no logic above it. A fold that grows by
+			// one arm per event is the shape event sourcing asks for; cutting
+			// it into several folds to satisfy a line limit would hide which
+			// events the aggregate handles, which is the one thing a reader
+			// opens this file to learn.
+			//
+			// REMOVE THIS BLOCK if the arms ever stop being flat -- the moment
+			// one does more than project, the file has earned the split the
+			// rule is asking for.
+			"includes": [
+				"src/server/event-sourcing/pipelines/identity/pipeline.ts"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// A floating promise in a test is still an unhandled rejection, but
 			// these are assertion chains and setup calls where the assertion
 			// already owns the failure. Scoped to test files only.
