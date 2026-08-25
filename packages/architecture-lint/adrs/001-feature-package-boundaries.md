@@ -187,11 +187,10 @@ package from re-exporting a forbidden type indirectly.
 Feature contracts remain transport-neutral. The source rule rejects
 `@hono/zod-validator` and `hono-openapi/zod`; REST adapters consume contract
 schemas through Standard Schema instead of coupling a feature to a
-Hono-specific adapter. Feature contracts declare Zod 4, and governed feature
-surfaces import it only through the canonical `zod` package root. The source
-rule rejects both legacy `zod/v3` imports and version-coupled `zod/v4` imports.
-This is a narrow package-boundary invariant, not a general dependency-upgrade
-rule.
+Hono-specific adapter. Zod 3 is an explicitly retired package runtime, so
+feature contracts declare Zod 4 and governed feature surfaces may not
+reintroduce `zod/v3`. This is a narrow compatibility invariant, not a general
+dependency-upgrade rule.
 
 ### Failures are actionable and adoption is strict
 

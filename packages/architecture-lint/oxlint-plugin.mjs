@@ -132,7 +132,6 @@ function importedPackage(specifier, workspace) {
 
 const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
   ["zod/v3", "zod"],
-  ["zod/v4", "zod"],
   [
     "@langwatch/automations",
     "@langwatch/automation-contract, @langwatch/automation-server, or @langwatch/automation-web",

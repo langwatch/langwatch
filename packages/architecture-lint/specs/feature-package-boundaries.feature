@@ -185,10 +185,10 @@ Feature: Feature package boundary lint
     And directs the service to receive its own repository or another service
 
   @unit @architecture
-  Scenario: Feature packages use the canonical Zod 4 entry point
-    Given a feature package declares Zod 3 or imports zod/v3 or zod/v4
+  Scenario: Retired schema runtimes cannot re-enter feature packages
+    Given a feature package declares Zod 3 or imports zod/v3
     When architecture lint checks its manifest and source
-    Then it rejects the retired or version-coupled package entry point
+    Then it rejects the retired package runtime
 
   @unit @architecture
   Scenario: Retired package surfaces cannot remain in application code
