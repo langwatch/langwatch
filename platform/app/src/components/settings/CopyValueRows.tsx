@@ -11,6 +11,14 @@ import { toaster } from "../ui/toaster";
  * affordance is a promise the row does not keep. What a reader does with
  * these is copy them, so the whole row is the copy target and the button
  * restates it for the pointer that wants one.
+ *
+ * THE VALUE IS THE CONTENT; THE LABEL IS THE CHROME. These rows used to be
+ * drawn the other way round — a medium-weight label at full contrast over a
+ * muted extra-small value — which made the one string the reader came to
+ * copy the faintest thing in the group, and the whole block read as a single
+ * flat grey slab with nothing to fix the eye on. The value now carries the
+ * contrast and sits on a surface of its own, so a row has a foreground and a
+ * background rather than one tone throughout.
  */
 export function CopyValueRows({
   rows,
@@ -20,9 +28,10 @@ export function CopyValueRows({
   return (
     <Box
       borderWidth="1px"
-      borderColor="border.muted"
+      borderColor="border.emphasized"
       borderRadius="lg"
       overflow="hidden"
+      background="bg.panel"
     >
       {rows.map((row, index) => (
         <CopyValueRow

@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Heading,
   HStack,
@@ -12,12 +13,14 @@ import type {
   SelfServeDomainClaimView,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
-import { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { domainNextStepFor } from "~/features/sso/logic/domainNextStep";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
 import { CopyValueRows } from "../CopyValueRows";
-import { reportRefusal } from "./refusals";
+import { InlineRefusal } from "./refusals";
 
 /**
  * The domains this connection may carry, and where each one's evidence
@@ -66,9 +69,14 @@ export function DomainsSection({
 
   return (
     <VStack align="stretch" gap={3}>
+      <WhyADomainIsProved provesWithLicense={provesWithLicense} />
+
       {domains.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
-          No domain has been claimed yet.
+          No domain has been claimed yet. Add the domain your team&apos;s email
+          addresses end in — <Text as="span" fontFamily="mono">acme.com</Text>{" "}
+          for somebody signing in as{" "}
+          <Text as="span" fontFamily="mono">jane@acme.com</Text>.
         </Text>
       ) : (
         <Table.Root size="sm">
@@ -98,32 +106,34 @@ export function DomainsSection({
       )}
 
       {canManage && (
-        <HStack align="stretch">
-          <Input
-            placeholder="Domain, for example acme.com"
-            value={domain}
-            onChange={(event) => setDomain(event.target.value)}
-          />
-          <Button
-            height="auto"
-            flexShrink={0}
-            loading={claim.isPending}
-            onClick={() =>
-              claim.mutate(
-                { organizationId, connectionId, domain },
-                {
-                  onSuccess: () => {
-                    setDomain("");
-                    void utils.ssoSetup.getSetup.invalidate();
+        <VStack align="stretch" gap={2}>
+          <HStack align="stretch">
+            <Input
+              placeholder="Domain, for example acme.com"
+              value={domain}
+              onChange={(event) => setDomain(event.target.value)}
+            />
+            <Button
+              height="auto"
+              flexShrink={0}
+              loading={claim.isPending}
+              onClick={() =>
+                claim.mutate(
+                  { organizationId, connectionId, domain },
+                  {
+                    onSuccess: () => {
+                      setDomain("");
+                      void utils.ssoSetup.getSetup.invalidate();
+                    },
                   },
-                  onError: reportRefusal,
-                },
-              )
-            }
-          >
-            Claim domain
-          </Button>
-        </HStack>
+                )
+              }
+            >
+              Claim domain
+            </Button>
+          </HStack>
+          <InlineRefusal error={claim.error} what="Claiming that domain" />
+        </VStack>
       )}
 
       {record !== null && (
@@ -169,17 +179,40 @@ function DomainRow({
     graceEndsAtMs: proof?.graceEndsAtMs ?? null,
     claim: claimed,
   });
+  const next = domainNextStepFor({
+    proved,
+    proofState: proof?.proofState ?? "VERIFIED",
+    claim: claimed,
+    provesWithLicense,
+  });
+
+  const settle = {
+    onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+  };
+  const target = { organizationId, connectionId, domain };
+  // "Claim it again" is a claim; every other move on this row asks to prove.
+  const takeNextStep = () =>
+    next.kind === "claim-again"
+      ? claim.mutate(target, settle)
+      : prove.mutate(target, settle);
 
   return (
     <Table.Row>
-      <Table.Cell>{domain}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell verticalAlign="top">{domain}</Table.Cell>
+      <Table.Cell verticalAlign="top">
         <VStack align="start" gap={1}>
           <IdentityChip
             label={chip.label}
             tone={chip.tone}
             title={chip.title}
           />
+          {/* WHAT HAPPENS NEXT, IN WORDS. A chip is a label, not an
+              instruction, and this row's whole job is to move somebody
+              along. Every state answers it, including the two whose
+              answer is "wait". */}
+          <Text fontSize="xs" color="fg.muted" maxWidth="52ch">
+            {next.explanation}
+          </Text>
           {/* The reviewer's own words, read back so a second attempt starts
               from what a human already said. */}
           {claimed?.note && (
@@ -187,74 +220,131 @@ function DomainRow({
               {claimed.note}
             </Text>
           )}
+          <InlineRefusal
+            error={claim.error ?? prove.error ?? remove.error}
+            what={`That step on ${domain}`}
+          />
         </VStack>
       </Table.Cell>
-      <Table.Cell>
-        {canManage && claimed?.state === "APPROVED" && (
-          <Button
-            size="xs"
-            loading={prove.isPending}
-            onClick={() =>
-              prove.mutate(
-                { organizationId, connectionId, domain },
-                {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-                  onError: reportRefusal,
-                },
-              )
-            }
-          >
-            {provesWithLicense
-              ? "Prove with our licence"
-              : "Get the record to publish"}
-          </Button>
-        )}
-        {/* A rejected claim can be made again, without registering a second
-            connection. */}
-        {canManage && claimed?.state === "REJECTED" && (
-          <Button
-            size="xs"
-            variant="outline"
-            loading={claim.isPending}
-            onClick={() =>
-              claim.mutate(
-                { organizationId, connectionId, domain },
-                {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-                  onError: reportRefusal,
-                },
-              )
-            }
-          >
-            Claim it again
-          </Button>
-        )}
-        {/* The way back out, quiet beside the way forward. The server
-            refuses removing a verified domain from a live connection with
-            copy naming the alternative, so the dangerous case never goes
-            through this button. */}
-        {canManage && (
-          <Button
-            size="xs"
-            variant="ghost"
-            color="fg.muted"
-            _hover={{ color: "red.solid" }}
-            loading={remove.isPending}
-            onClick={() =>
-              remove.mutate(
-                { organizationId, connectionId, domain },
-                {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-                  onError: reportRefusal,
-                },
-              )
-            }
-          >
-            Remove
-          </Button>
-        )}
+      <Table.Cell verticalAlign="top">
+        <HStack gap={1} justify="end">
+          {canManage && next.action && (
+            <Button
+              size="xs"
+              variant={next.kind === "claim-again" ? "outline" : "solid"}
+              loading={prove.isPending || claim.isPending}
+              onClick={takeNextStep}
+            >
+              {next.action}
+            </Button>
+          )}
+          {/* The way back out, quiet beside the way forward. The server
+              refuses removing a verified domain from a live connection with
+              copy naming the alternative, so the dangerous case never goes
+              through this button. */}
+          {canManage && (
+            <Button
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              _hover={{ color: "red.solid" }}
+              loading={remove.isPending}
+              onClick={() => remove.mutate(target, settle)}
+            >
+              Remove
+            </Button>
+          )}
+        </HStack>
       </Table.Cell>
     </Table.Row>
+  );
+}
+
+/**
+ * Why anybody is being asked to edit DNS at all — one line on screen, the
+ * rest a click away.
+ *
+ * TWO FAILURES, AND THE SECOND WAS MINE. The screen used to skip straight to
+ * the value: a record type, a name, a secret, "publish it", and a retry
+ * button — perfectly clear to somebody who had done it before and opaque to
+ * everybody else. Explaining it in full then made the opposite mistake, and
+ * buried the four things a reader needs under several hundred words they only
+ * need once. The teaching goes behind a disclosure, where the person who
+ * needs it can find it and the person who does not never sees it.
+ */
+function WhyADomainIsProved({
+  provesWithLicense,
+}: {
+  provesWithLicense: boolean;
+}) {
+  if (provesWithLicense) {
+    return (
+      <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+        A domain has to be proved before it decides how people sign in. On this
+        installation your enterprise licence is that proof, so there is nothing
+        to publish anywhere.
+      </Text>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+        A domain has to be proved before it decides how people sign in. You
+        publish a short value we give you in the domain&apos;s DNS, and we look
+        for it.
+      </Text>
+      <Disclosure summary="What is a DNS record, and who can add one?">
+        <Text>
+          Anybody could type <Text as="span" fontFamily="mono">acme.com</Text>{" "}
+          into this box, so proving it means showing us something only its
+          owner could put there.
+        </Text>
+        <Text>
+          DNS is the public address book for a domain — the same place its
+          website and email records are set. It is not in LangWatch: it lives
+          with whoever administers the domain, usually a registrar or DNS host
+          such as Cloudflare, Route 53 or GoDaddy, and often another team. The
+          record we ask for is a plain public one. It grants nothing, it is
+          visible to anyone who looks, and it can be deleted once the
+          connection is retired.
+        </Text>
+        <Text>
+          If DNS is a ticket away, you can serve the same value as a file on
+          the website instead. Either one proves the domain.
+        </Text>
+      </Disclosure>
+    </VStack>
+  );
+}
+
+/**
+ * The long answer, folded away.
+ *
+ * A native `details` rather than a component with state: it is one line of
+ * markup, it is keyboard- and screen-reader-correct without any help, and
+ * nothing about it needs to survive a re-render.
+ */
+function Disclosure({
+  summary,
+  children,
+}: {
+  summary: string;
+  children: ReactNode;
+}) {
+  return (
+    <Box as="details" fontSize="sm" color="fg.muted" maxWidth="72ch">
+      <Box
+        as="summary"
+        cursor="pointer"
+        color="colorPalette.fg"
+        _hover={{ textDecoration: "underline" }}
+      >
+        {summary}
+      </Box>
+      <VStack align="stretch" gap={2} paddingTop={2}>
+        {children}
+      </VStack>
+    </Box>
   );
 }
 
@@ -277,60 +367,61 @@ function PublishedRecord({
   const target = { organizationId, connectionId, domain: record.domain };
   const settle = {
     onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-    onError: reportRefusal,
   };
 
   return (
     <VStack align="stretch" gap={3} paddingTop={2}>
-      <VStack align="stretch" gap={1}>
-        <Heading size="xs">
-          Prove {record.domain} with a record, or with a file
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          One value, two ways to hand it back: publish it wherever you manage
-          DNS for {record.domain} — some providers ask for the whole name and
-          some for the part before your domain, so both are here — or serve it
-          as a file on your website.
+      <VStack align="stretch" gap={2}>
+        <Heading size="xs">Publish this on {record.domain}</Heading>
+        <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+          Add it wherever {record.domain}&apos;s DNS is administered, then come
+          back and check.
         </Text>
       </VStack>
+      {/* THE FIVE FACTS AND NOTHING ELSE: what kind of record, where it
+          goes, and what goes in it. Everything a reader needed once is
+          folded below. */}
       <CopyValueRows
         rows={[
-          { label: "Record type", value: record.type },
+          { label: "Type", value: record.type },
           {
-            label: "Record name",
-            hint: "The whole name, for providers that want one",
+            label: "Name",
+            hint: "The whole name",
             value: record.name,
-          },
-          {
-            label: "Record name, without your domain",
-            hint: "For providers that ask for the label alone",
-            value: record.label,
           },
           ...(record.value === null
             ? []
             : [
                 {
-                  label: "Record value",
+                  label: "Value",
                   hint: "Shown once — this is the secret",
                   value: record.value,
                 },
               ]),
         ]}
       />
-      <Text color="fg.muted" fontSize="sm">
-        No DNS access, or a ticket away? Serve the record value as the entire
-        body of a plain-text file at this address instead — either one proves
-        the domain.
-      </Text>
-      <CopyValueRows
-        rows={[
-          {
-            label: "File address",
-            hint: "Served over https, holding the record value and nothing else",
-            value: record.file.url,
-          },
-        ]}
-      />
+      <Disclosure summary="My DNS provider wants something different, or I have no DNS access">
+        <Text>
+          Some providers ask for the label alone rather than the whole name.
+          Yours is{" "}
+          <Text as="span" fontFamily="mono" color="fg">
+            {record.label}
+          </Text>
+          .
+        </Text>
+        <Text>
+          No DNS access? Serve the value as the entire body of a plain-text
+          file, over https, at this address instead — either one proves the
+          domain.
+        </Text>
+        <CopyValueRows
+          rows={[{ label: "File address", value: record.file.url }]}
+        />
+        <Text>
+          New records take a few minutes to travel, occasionally up to an hour.
+          If the first check does not find it, that is usually all it is.
+        </Text>
+      </Disclosure>
       {/* The value is shown once, when it is issued. What is kept is its
           hash, so a reload shows the record rather than the secret. */}
       {record.value === null && (
@@ -352,28 +443,39 @@ function PublishedRecord({
         </Alert.Root>
       )}
       {canManage && (
-        <HStack flexWrap="wrap">
-          <Button
-            loading={check.isPending}
-            onClick={() => check.mutate(target, settle)}
-          >
-            Check for the record
-          </Button>
-          <Button
-            variant="outline"
-            loading={checkFile.isPending}
-            onClick={() => checkFile.mutate(target, settle)}
-          >
-            Check for the file
-          </Button>
-          <Button
-            variant="ghost"
-            loading={prove.isPending}
-            onClick={() => prove.mutate(target, settle)}
-          >
-            Give me a fresh value
-          </Button>
-        </HStack>
+        <VStack align="stretch" gap={2}>
+          <HStack flexWrap="wrap">
+            <Button
+              loading={check.isPending}
+              onClick={() => check.mutate(target, settle)}
+            >
+              <RefreshCw size={14} />
+              Check for the record
+            </Button>
+            <Button
+              variant="outline"
+              loading={checkFile.isPending}
+              onClick={() => checkFile.mutate(target, settle)}
+            >
+              <RefreshCw size={14} />
+              Check for the file
+            </Button>
+            <Button
+              variant="ghost"
+              loading={prove.isPending}
+              onClick={() => prove.mutate(target, settle)}
+            >
+              Give me a fresh value
+            </Button>
+          </HStack>
+          {/* The check's verdict, where the reader is looking. A check that
+              found nothing is the single most common thing to happen here,
+              and it must say so rather than appearing to do nothing. */}
+          <InlineRefusal
+            error={check.error ?? checkFile.error ?? prove.error}
+            what={`Checking ${record.domain}`}
+          />
+        </VStack>
       )}
     </VStack>
   );

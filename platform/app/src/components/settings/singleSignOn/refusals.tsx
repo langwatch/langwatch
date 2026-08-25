@@ -85,3 +85,37 @@ export function reportRefusal(error: unknown): void {
     duration: 8000,
   });
 }
+
+/**
+ * A refusal from a change, ON THE PAGE, beside the control that caused it.
+ *
+ * A toast is the wrong place for a setup journey's failures. The reader is
+ * mid-task, the message is the only thing telling them why the step will not
+ * complete, and eight seconds later it is gone with the step still stuck and
+ * nothing on screen admitting it. Rendered inline it stays until the next
+ * attempt replaces it, which is how somebody debugging a connection actually
+ * works.
+ *
+ * Renders nothing when there is no error, so a call site is one line and
+ * never a conditional.
+ */
+export function InlineRefusal({
+  error,
+  what,
+}: {
+  error: unknown;
+  /** The act that was refused, named for the title's fallback. */
+  what?: string;
+}) {
+  if (!error) return null;
+  const copy = explainAnyError(error);
+  return (
+    <Alert.Root status="error" data-testid="sso-inline-refusal">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{what ? `${what} didn't work` : copy.title}</Alert.Title>
+        <Alert.Description>{copy.description}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}

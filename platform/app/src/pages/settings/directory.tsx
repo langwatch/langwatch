@@ -13,7 +13,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Key, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { DirectoryMembersSection } from "../../components/access/DirectoryMembersSection";
@@ -25,6 +25,7 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { CopyValueRows } from "../../components/settings/CopyValueRows";
 import { ScimReconciliationPanel } from "../../components/settings/ScimReconciliationPanel";
 import { Dialog } from "../../components/ui/dialog";
+import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { showErrorToast } from "../../features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -161,12 +162,22 @@ function DirectorySettingsContent({
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
-        <VStack align="start" gap={1} width="full">
+        <VStack align="start" gap={2} width="full">
           <Heading>Directory</Heading>
           <Text color="fg.muted" fontSize="sm">
             Your identity provider creates, updates and removes people here on
             its own, over SCIM.
           </Text>
+          {/* THE WAY BACK. This page is the second half of a subject whose
+              first half is Authentication, and until now the only route
+              between them ran one way. A reader who followed a card here and
+              wanted the connection itself had to find it in the menu again. */}
+          <Link href="/settings/authentication">
+            <Button size="xs" variant="ghost" paddingX={0}>
+              <ArrowLeft size={14} />
+              Authentication — the connections this comes from
+            </Button>
+          </Link>
         </VStack>
 
         {reach.maySeeSync && (
@@ -376,16 +387,33 @@ function TokensSection({
 
   return (
     <>
-      <HStack width="full">
-        <Heading size="md">Provisioning tokens</Heading>
-        <Spacer />
-        {mayManage && (
-          <Button size="sm" onClick={onGenerateOpen}>
-            <Plus size={16} />
-            Issue token
-          </Button>
-        )}
-      </HStack>
+      <VStack width="full" align="stretch" gap={2}>
+        <HStack width="full">
+          <Heading size="md">Provisioning tokens</Heading>
+          <Spacer />
+          {mayManage && (
+            <Button size="sm" onClick={onGenerateOpen}>
+              <Plus size={16} />
+              Issue token
+            </Button>
+          )}
+        </HStack>
+        {/* WHAT THE THING IS, BEFORE THE TABLE OF THEM. "Provisioning token"
+            names a mechanism to somebody who already knows it and nothing at
+            all to anybody else, and the page below it went straight to
+            descriptions and last-used dates. */}
+        <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
+          A provisioning token is the password your identity provider uses to
+          reach us. You issue one here, paste it into the provider alongside
+          the provisioning address, and from then on the provider can create,
+          update and remove people in this organization on its own — nobody
+          signs in to do it. Each token works against one single sign-on
+          connection and can only touch the people that connection
+          provisioned, so revoking one stops exactly that provider and nothing
+          else. The value is shown once when it is issued; if it is lost or
+          leaked, revoke it and issue another.
+        </Text>
+      </VStack>
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0} overflowX="auto">

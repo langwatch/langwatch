@@ -1,5 +1,7 @@
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
+import { RefreshCw } from "lucide-react";
+import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
 
 /**
@@ -20,7 +22,7 @@ export function TestSignInSection({
   canManage: boolean;
   testSignIn: SelfServeGoLiveView["testSignIn"];
 }) {
-  const { start, sending, callbackFailure } = useTestSignIn({ connectionId });
+  const { start, sending, failure } = useTestSignIn({ connectionId });
 
   return (
     <VStack align="stretch" gap={3}>
@@ -30,28 +32,7 @@ export function TestSignInSection({
         that proves the connection carries a real person — not a setting we can
         tick for you.
       </Text>
-      {callbackFailure && (
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              {providerName} sent you back with an error
-            </Alert.Title>
-            <Alert.Description>
-              <VStack align="start" gap={1}>
-                <Text fontFamily="mono" fontSize="xs">
-                  {callbackFailure}
-                </Text>
-                <Text fontSize="sm">
-                  These are {providerName}&apos;s own words. Check them against
-                  the application you created there — the redirect address and
-                  the client values are the usual suspects — then try again.
-                </Text>
-              </VStack>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-      )}
+      {failure && <TestSignInFailureNotice failure={failure} />}
       {testSignIn.done && (
         <Alert.Root status="success">
           <Alert.Indicator />
@@ -68,11 +49,19 @@ export function TestSignInSection({
       {canManage && (
         <Button
           alignSelf="start"
-          variant={testSignIn.done ? "outline" : "solid"}
+          // A failed attempt is still the step to do, so the button stays
+          // solid — an outline button after a failure reads as "this is
+          // finished, do it again if you like".
+          variant={testSignIn.done && !failure ? "outline" : "solid"}
           loading={sending}
           onClick={() => void start()}
         >
-          {testSignIn.done ? "Test it again" : "Test sign-in"}
+          {(failure ?? testSignIn.done) && <RefreshCw size={14} />}
+          {failure
+            ? "Try the sign-in again"
+            : testSignIn.done
+              ? "Test it again"
+              : "Test sign-in"}
         </Button>
       )}
     </VStack>

@@ -64,6 +64,17 @@ export interface ConnectionReconciliation {
    *  connections apart by something other than an identifier. */
   providerId: string;
   verifiedDomains: string[];
+  /**
+   * Where the CONNECTION stands, as opposed to where its sync does.
+   *
+   * Two different lifecycles were being reported through one field. `state`
+   * below is the sync's — has a token ever pushed, is it revoked — and a
+   * connection that was withdrawn before it ever went live has no sync at
+   * all, so it arrived on the page as a connection with no status beside
+   * every connection that is genuinely running. A reader looking at a list
+   * of four could not tell which two were history.
+   */
+  connectionState: string;
   /** Null for a connection no token has ever been minted against. */
   state: ScimSyncLifecycleState | null;
   status: ScimSyncStatusCopy;
@@ -203,6 +214,7 @@ function toConnectionReconciliation({
     connectionId: connection.connectionId,
     providerId: connection.providerId,
     verifiedDomains: connection.verifiedDomains,
+    connectionState: connection.state,
     state: sync?.state ?? null,
     status: scimSyncStatusCopy({
       state: sync?.state ?? null,

@@ -15,11 +15,11 @@ import { useState } from "react";
 import { api } from "../../../utils/api";
 import { IconRadioCardGroup } from "../../forms/IconRadioCardGroup";
 import {
-  IDENTITY_PROVIDER_PRESETS,
   type IdentityProviderPreset,
+  identityProvidersIn,
   type SsoProtocol,
 } from "./identityProviders";
-import { reportRefusal } from "./refusals";
+import { InlineRefusal } from "./refusals";
 import { ServiceProviderDetails } from "./ServiceProviderDetails";
 
 /**
@@ -86,7 +86,7 @@ export function RegisterConnection({
     // the audit log and the sign-in screen, and the provider's product name
     // is almost always what a team calls it.
     if (
-      next.id !== "other" &&
+      next.group === "product" &&
       (form.providerId === "" || form.providerId === preset?.name)
     ) {
       update("providerId")(next.name);
@@ -111,10 +111,7 @@ export function RegisterConnection({
           } as const);
     register.mutate(
       { organizationId, providerId: form.providerId, allowsJit: false, idp },
-      {
-        onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-        onError: reportRefusal,
-      },
+      { onSuccess: () => void utils.ssoSetup.getSetup.invalidate() },
     );
   };
 
@@ -136,6 +133,7 @@ export function RegisterConnection({
             update={update}
             pending={register.isPending}
             onSubmit={submit}
+            error={register.error}
           />
         </>
       )}
@@ -143,7 +141,15 @@ export function RegisterConnection({
   );
 }
 
-/** Act one: the recognition question, and nothing else on screen yet. */
+/**
+ * Act one: the recognition question, and nothing else on screen yet.
+ *
+ * TWO GROUPS, BECAUSE TWO PEOPLE ARRIVE HERE. The administrator who knows
+ * their company runs Okta, and the engineer holding a metadata file who knows
+ * only that it is SAML. The second used to have to pick "Something else" —
+ * which reads as "your product is not supported" rather than "you already
+ * know the answer" — so the protocols are named tiles of their own.
+ */
 function ProviderPicker({
   selected,
   onPick,
@@ -151,8 +157,18 @@ function ProviderPicker({
   selected: IdentityProviderPreset | null;
   onPick: (preset: IdentityProviderPreset) => void;
 }) {
+  const tilesFor = (group: "product" | "protocol") =>
+    identityProvidersIn(group).map((entry) => (
+      <ProviderTile
+        key={entry.id}
+        preset={entry}
+        selected={selected?.id === entry.id}
+        onPick={() => onPick(entry)}
+      />
+    ));
+
   return (
-    <VStack align="stretch" gap={3}>
+    <VStack align="stretch" gap={4}>
       <VStack align="stretch" gap={1}>
         <Heading size="sm">Who signs your team in?</Heading>
         <Text color="fg.muted" fontSize="sm">
@@ -166,15 +182,22 @@ function ProviderPicker({
         role="radiogroup"
         aria-label="Who signs your team in?"
       >
-        {IDENTITY_PROVIDER_PRESETS.map((entry) => (
-          <ProviderTile
-            key={entry.id}
-            preset={entry}
-            selected={selected?.id === entry.id}
-            onPick={() => onPick(entry)}
-          />
-        ))}
+        {tilesFor("product")}
       </SimpleGrid>
+
+      <VStack align="stretch" gap={2}>
+        <Text color="fg.muted" fontSize="sm">
+          Or connect by protocol, if you already know which one you have.
+        </Text>
+        <SimpleGrid
+          columns={{ base: 2, md: 4 }}
+          gap={2}
+          role="radiogroup"
+          aria-label="Connect by protocol"
+        >
+          {tilesFor("protocol")}
+        </SimpleGrid>
+      </VStack>
     </VStack>
   );
 }
@@ -194,7 +217,7 @@ function ProviderConsoleAct({
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={1}>
         <Heading size="sm">
-          {preset.id === "other"
+          {preset.group === "protocol"
             ? "Give it our addresses"
             : `Set it up in ${preset.name}`}
         </Heading>
@@ -223,6 +246,7 @@ function CredentialsAct({
   update,
   pending,
   onSubmit,
+  error,
 }: {
   preset: IdentityProviderPreset;
   protocol: SsoProtocol;
@@ -231,42 +255,52 @@ function CredentialsAct({
   update: UpdateField;
   pending: boolean;
   onSubmit: () => void;
+  /** Why the last attempt was refused, rendered under the button rather
+   *  than thrown into a corner for eight seconds. */
+  error: unknown;
 }) {
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={1}>
         <Heading size="sm">
-          {preset.id === "other"
+          {preset.group === "protocol"
             ? "Then bring back what it gives you"
             : `Then bring back what ${preset.name} gives you`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Two ways to connect — pick whichever your identity provider&apos;s app
-          gave you. Either one works.
+          {preset.protocolIsChosen
+            ? "These are the values your identity provider's app hands back."
+            : "Two ways to connect — pick whichever your identity provider's app gave you. Either one works."}
         </Text>
       </VStack>
-      <IconRadioCardGroup
-        ariaLabel="How will you connect?"
-        value={protocol}
-        onChange={(value) =>
-          onProtocolChange(value === "saml" ? "saml" : "oidc")
-        }
-        items={[
-          {
-            title: "OpenID Connect",
-            value: "oidc",
-            icon: KeyRound,
-            description: "You have a client id and a client secret.",
-          },
-          {
-            title: "SAML",
-            value: "saml",
-            icon: FileCode2,
-            description:
-              "You have a metadata file, or a sign-in address and a certificate.",
-          },
-        ]}
-      />
+      {/* A tile that IS a protocol has answered this already; asking again
+          under the tile they just pressed reads as the screen not having
+          heard them. Every other tile only PRE-answered it, so the cards
+          stay — pre-answered must never mean hidden. */}
+      {!preset.protocolIsChosen && (
+        <IconRadioCardGroup
+          ariaLabel="How will you connect?"
+          value={protocol}
+          onChange={(value) =>
+            onProtocolChange(value === "saml" ? "saml" : "oidc")
+          }
+          items={[
+            {
+              title: "OpenID Connect",
+              value: "oidc",
+              icon: KeyRound,
+              description: "You have a client id and a client secret.",
+            },
+            {
+              title: "SAML",
+              value: "saml",
+              icon: FileCode2,
+              description:
+                "You have a metadata file, or a sign-in address and a certificate.",
+            },
+          ]}
+        />
+      )}
       <Field.Root>
         <Field.Label>Connection name</Field.Label>
         <Input
@@ -284,6 +318,7 @@ function CredentialsAct({
       ) : (
         <SamlFields preset={preset} form={form} update={update} />
       )}
+      <InlineRefusal error={error} what="Registering that connection" />
       <Button alignSelf="start" loading={pending} onClick={onSubmit}>
         Register
       </Button>
@@ -380,8 +415,8 @@ function SamlFields({
   );
 }
 
-/** One provider the administrator recognises by name: a monogram, the name,
- *  and nothing else. Honest lettermarks rather than borrowed logos. */
+/** One provider the administrator recognises: its own mark where the icon
+ *  set has one, its initials where it does not, and the name. */
 function ProviderTile({
   preset,
   selected,
@@ -426,7 +461,13 @@ function ProviderTile({
         fontWeight="semibold"
         flexShrink={0}
       >
-        {selected ? <Check size={14} aria-hidden /> : preset.monogram}
+        {selected ? (
+          <Check size={14} aria-hidden />
+        ) : preset.icon ? (
+          <preset.icon size={15} aria-hidden />
+        ) : (
+          preset.monogram
+        )}
       </Box>
       <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
         {preset.name}

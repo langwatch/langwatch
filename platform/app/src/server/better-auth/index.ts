@@ -48,6 +48,11 @@ import { passkeySignUpRegistration } from "./passkey-signup";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
 import { runSignInRouterShadow } from "./signInRouterShadow";
+import {
+  isSingleSignOnRequest,
+  registeredIssuers,
+} from "./registeredIssuers";
+import { resolveTrustedOrigins } from "./trustedOrigins";
 import { runTwoStepCeremony } from "./two-step-ceremonies";
 
 const logger = createLogger("langwatch:better-auth");
@@ -380,18 +385,30 @@ function refusesCredentialRoute({
 
 export const auth = betterAuth({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
+  /**
+   * Our own address, plus the identity providers our customers registered —
+   * the list the SSO plugin checks a discovery URL against before it will
+   * fetch one.
+   *
+   * A FUNCTION, because the answer is not fixed at boot. Every customer
+   * brings their own issuer, so no list we could ship contains the next
+   * one; what makes an issuer trusted is an administrator of that
+   * organization having registered it. Resolved per request, and only
+   * single sign-on requests pay for the read. See `trustedOrigins.ts`.
+   */
   trustedOrigins: isBuildTime
     ? []
-    : [
-        env.NEXTAUTH_URL,
-        // Behind a reverse proxy (Boxd forks, preview deploys, tunneling
-        // services), BASE_HOST is the external URL while NEXTAUTH_URL may
-        // be the internal one. Accept both so sign-in/sign-up don't fail
-        // with "Invalid origin".
-        ...(env.BASE_HOST && env.BASE_HOST !== env.NEXTAUTH_URL
-          ? [env.BASE_HOST]
-          : []),
-      ],
+    : async (request) =>
+        resolveTrustedOrigins({
+          nextAuthUrl: env.NEXTAUTH_URL,
+          baseHost: env.BASE_HOST,
+          trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+          idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+          registeredIssuers: isSingleSignOnRequest(request)
+            ? await registeredIssuers()
+            : [],
+          isProduction: env.NODE_ENV === "production",
+        }),
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,

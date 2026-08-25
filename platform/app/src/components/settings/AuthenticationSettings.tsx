@@ -1,4 +1,4 @@
-import { Button, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Button, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Settings2 } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { Link } from "~/components/ui/link";
@@ -134,12 +134,21 @@ export function AuthenticationSettings({
         />
       </SimpleGrid>
 
-      <HStack width="full">
+      {/* THE WAY TO CHANGE OR END IT, NAMED. "Manage connection" is a door
+          with nothing written on it: an administrator who came to turn their
+          identity provider off, re-check a domain, or hand over new
+          credentials had no way of knowing any of that was behind it, and a
+          control nobody can predict the contents of is one nobody presses. */}
+      <VStack align="start" gap={0} width="full">
         <Button size="sm" variant="ghost" onClick={() => showManage(true)}>
           <Settings2 size={14} />
-          Manage connection
+          Manage or turn off this connection
         </Button>
-      </HStack>
+        <Text fontSize="xs" color="fg.muted" paddingLeft={3}>
+          Claim another domain, test the sign-in again, name a way back in, or
+          remove the connection.
+        </Text>
+      </VStack>
 
       <PersonalMethodsFooter />
     </VStack>

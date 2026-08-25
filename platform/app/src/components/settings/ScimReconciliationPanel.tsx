@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Plug } from "lucide-react";
 import type { ReactNode } from "react";
+import { IdentityChip } from "~/components/access/IdentityRow";
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
 import { SettingsEmptyState } from "./SettingsEmptyState";
@@ -79,12 +80,22 @@ export function ScimReconciliationPanel({
         {connections.length === 0 && (
           <NoConnectionYet maySetUp={maySetUpSingleSignOn} />
         )}
-        {connections.map((connection) => (
+        {connections.filter(isRunningConnection).map((connection) => (
           <ConnectionCard
             key={connection.connectionId}
             connection={connection}
           />
         ))}
+        {/* A connection that has left is not one of the connections. It stays
+            on the page — the people it provisioned are still here, and that
+            is exactly the question somebody has when they find it — but under
+            its own heading and dimmed, so a list of four cannot be read as
+            four working directories. */}
+        <RetiredConnections
+          connections={connections.filter(
+            (connection) => !isRunningConnection(connection),
+          )}
+        />
       </VStack>
 
       <RecentDirectoryChanges changes={recentChanges} />
@@ -133,6 +144,71 @@ type Reconciliation = NonNullable<
   ReturnType<typeof api.scimReconciliation.getAll.useQuery>["data"]
 >;
 type ConnectionPanel = Reconciliation["connections"][number];
+
+/** The lifecycle states in which a connection has left for good. */
+const RETIRED_STATES = new Set(["DISCARDED", "TORN_DOWN"]);
+
+function isRunningConnection(connection: ConnectionPanel): boolean {
+  return !RETIRED_STATES.has(connection.connectionState);
+}
+
+/**
+ * The connections that are history, said as history.
+ *
+ * KEPT, NOT HIDDEN. The accounts a withdrawn connection provisioned are
+ * still members of this organization, so a reader who removes a connection
+ * and then asks "where did those forty people come from" needs to find it.
+ * What they do not need is for it to look like it is still syncing.
+ */
+function RetiredConnections({
+  connections,
+}: {
+  connections: ConnectionPanel[];
+}) {
+  if (connections.length === 0) return null;
+  return (
+    <VStack gap={2} width="full" align="stretch" paddingTop={2}>
+      <Text fontSize="xs" color="fg.muted" fontWeight={500}>
+        No longer connected
+      </Text>
+      <Text fontSize="xs" color="fg.muted" maxWidth="72ch">
+        These connections have been removed. They provision nobody and their
+        tokens do nothing. Anyone they created is still a member here — taking
+        a connection away never takes people away with it.
+      </Text>
+      {connections.map((connection) => (
+        <HStack
+          key={connection.connectionId}
+          gap={2}
+          paddingX={3}
+          paddingY={2}
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="lg"
+          opacity={0.7}
+          data-testid="retired-connection"
+        >
+          <Text fontSize="sm" fontWeight="medium">
+            {connection.providerId}
+          </Text>
+          <IdentityChip
+            label={
+              connection.connectionState === "DISCARDED"
+                ? "Withdrawn before it went live"
+                : "Removed"
+            }
+          />
+          <Spacer />
+          {connection.managedPeople > 0 && (
+            <Text fontSize="xs" color="fg.muted">
+              {connection.managedPeople} still here
+            </Text>
+          )}
+        </HStack>
+      ))}
+    </VStack>
+  );
+}
 type DirectoryChange = Reconciliation["recentChanges"][number];
 
 /**

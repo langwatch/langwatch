@@ -182,6 +182,31 @@ export function createEnvConfig() {
           process.env.VERCEL ? z.string().min(1) : z.string().url(),
         ),
       ),
+      /**
+       * Internal identity providers this installation may fetch OIDC
+       * discovery from, comma or whitespace separated. An issuer whose
+       * origin is not our own address and not on this list is refused
+       * before it is fetched, which is what stops a registration form
+       * being a server-side request forgery. Enterprises whose identity
+       * provider lives inside their own network list it here.
+       */
+      SSO_TRUSTED_IDP_ORIGINS: z.string().optional(),
+      /**
+       * Nameservers the single sign-on domain proof asks, in node's
+       * `setServers` shape (`127.0.0.1:15353`, `[::1]:15353`), comma or
+       * whitespace separated. Unset — every deployed installation — the
+       * machine's own resolver answers. Set locally so a reserved name like
+       * `acme.test`, which no public resolver will ever answer for, can be
+       * proved against the identity provider simulator's nameserver.
+       */
+      SSO_DOMAIN_PROOF_DNS_SERVERS: z.string().optional(),
+      /**
+       * The identity provider simulator haven starts for this worktree.
+       * Trusted for discovery OUTSIDE production only — it signs whatever
+       * it is asked to, so a production installation trusting one would be
+       * trusting an oracle. Written by haven; nobody sets it by hand.
+       */
+      LANGWATCH_IDPSIM_URL: z.string().optional(),
       AUTH0_CLIENT_ID: z.string().optional(),
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
@@ -634,6 +659,9 @@ export function createEnvConfig() {
       LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
       LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+      SSO_TRUSTED_IDP_ORIGINS: process.env.SSO_TRUSTED_IDP_ORIGINS,
+      SSO_DOMAIN_PROOF_DNS_SERVERS: process.env.SSO_DOMAIN_PROOF_DNS_SERVERS,
+      LANGWATCH_IDPSIM_URL: process.env.LANGWATCH_IDPSIM_URL,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,

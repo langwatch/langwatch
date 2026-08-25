@@ -84,7 +84,11 @@ export function DirectoryCard({
         </Link>
       }
     >
-      <OverviewDetail label="Sources">
+      {/* "Sources" alone left a reader guessing what kind of source, on a
+          page whose other half is the connection these ARE. Naming them for
+          what they are also makes the trip back obvious: the thing listed
+          here is configured on Authentication. */}
+      <OverviewDetail label="Authentication source">
         <DirectorySourceChips connections={facts.connections} />
       </OverviewDetail>
 
@@ -110,6 +114,25 @@ export function DirectoryCard({
             ? "No push yet"
             : new Date(facts.lastPushedAtMs).toLocaleString()}
         </Text>
+      </OverviewDetail>
+
+      {/* SAID HERE, NOT ONLY WHERE THEY ARE MANAGED. "Provisioning token" is
+          the phrase this page hands somebody, and sending them to another
+          screen to find out what one is makes the trip the explanation. The
+          short version lives here; the full one is beside the table. */}
+      <OverviewDetail label="Provisioning token">
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" color="fg.muted">
+            The password your identity provider uses to create and remove
+            people here on its own, without anybody signing in. One token per
+            connection, shown once when it is issued.
+          </Text>
+          <Link href="/settings/directory?tab=tokens">
+            <Text fontSize="sm" color="colorPalette.fg">
+              Issue or revoke tokens
+            </Text>
+          </Link>
+        </VStack>
       </OverviewDetail>
 
       <OverviewDetail label="Groups it sent">

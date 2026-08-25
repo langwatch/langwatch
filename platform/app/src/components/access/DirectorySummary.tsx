@@ -96,7 +96,10 @@ export function DirectorySummary({
         gap={3}
         data-testid="directory-summary"
       >
-        <Fact label="Sources connected">
+        <Fact
+          label="Authentication source"
+          hint="Configured on the Authentication page. A source is the single sign-on connection your identity provider pushes people through."
+        >
           {/* The names ARE the value here: an administrator with two sources
               is not asking how many they have, they are asking which one is
               the one that stopped. */}

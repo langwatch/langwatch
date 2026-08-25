@@ -18,6 +18,7 @@ import {
   connectionProtocolName,
   connectionStatusChipFor,
 } from "~/features/sso/logic/connectionStatus";
+import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { IdentityChip } from "../access/IdentityRow";
@@ -31,7 +32,7 @@ import {
   reportRefusal,
 } from "./singleSignOn/refusals";
 import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
-import { SetupStep } from "./singleSignOn/SetupStep";
+import { SetupStep, SetupSteps } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
 
 /**
@@ -101,18 +102,25 @@ export function SingleSignOnSetup({
   if (connection === null) {
     return (
       <VStack align="stretch" gap={6} width="full">
-        <SetupStep number={1} title="Connect your identity provider">
-          {canManage ? (
-            <RegisterConnection
-              organizationId={organizationId}
-              serviceProvider={serviceProvider}
-            />
-          ) : (
-            <Text color="fg.muted">
-              No identity provider is registered for this organization yet.
-            </Text>
-          )}
-        </SetupStep>
+        <SetupSteps>
+          <SetupStep
+            number={1}
+            title="Connect your identity provider"
+            state="current"
+            last
+          >
+            {canManage ? (
+              <RegisterConnection
+                organizationId={organizationId}
+                serviceProvider={serviceProvider}
+              />
+            ) : (
+              <Text color="fg.muted">
+                No identity provider is registered for this organization yet.
+              </Text>
+            )}
+          </SetupStep>
+        </SetupSteps>
       </VStack>
     );
   }
@@ -140,71 +148,96 @@ function ConnectedJourney({
   connection: NonNullable<SelfServeSetupView["connection"]>;
 }) {
   const { availability, claims, record, serviceProvider, goLive } = view;
+  const progress = setupProgressFor({
+    domainProved: goLive?.domainProved ?? false,
+    testSignInDone: goLive?.testSignIn.done ?? false,
+    breakGlassInPlace: goLive?.breakGlass.inPlace ?? false,
+    activated: goLive?.activated ?? false,
+  });
 
   return (
     <VStack align="stretch" gap={6} width="full">
       <ConnectionSummary connection={connection} goLive={goLive} />
 
-      <SetupStep number={1} title="Your identity provider" done>
-        <ServiceProviderDetails
-          serviceProvider={serviceProvider}
-          connected
-          protocol={connection.type}
-        />
-      </SetupStep>
+      <SetupSteps>
+        <SetupStep
+          number={1}
+          title="Your identity provider"
+          state={progress.provider}
+          summary={connection.providerId}
+        >
+          <ServiceProviderDetails
+            serviceProvider={serviceProvider}
+            connected
+            protocol={connection.type}
+          />
+        </SetupStep>
 
-      <SetupStep
-        number={2}
-        title="Prove a domain is yours"
-        done={goLive?.domainProved ?? false}
-      >
-        <DomainsSection
-          claims={claims}
-          connection={connection}
-          record={record}
-          canManage={canManage}
-          organizationId={organizationId}
-          connectionId={connection.connectionId}
-          provesWithLicense={availability.proof === "license-token"}
-        />
-      </SetupStep>
+        <SetupStep
+          number={2}
+          title="Prove a domain is yours"
+          state={progress.domain}
+          summary={
+            connection.verifiedDomains.length > 0
+              ? `${connection.verifiedDomains.join(", ")} proved`
+              : undefined
+          }
+        >
+          <DomainsSection
+            claims={claims}
+            connection={connection}
+            record={record}
+            canManage={canManage}
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+            provesWithLicense={availability.proof === "license-token"}
+          />
+        </SetupStep>
 
-      <SetupStep
-        number={3}
-        title="Sign in through it once"
-        done={goLive?.testSignIn.done ?? false}
-      >
-        <TestSignInSection
-          connectionId={connection.connectionId}
-          providerName={connection.providerId}
-          canManage={canManage}
-          testSignIn={goLive?.testSignIn ?? { done: false, atMs: null }}
-        />
-      </SetupStep>
+        <SetupStep
+          number={3}
+          title="Sign in through it once"
+          state={progress.testSignIn}
+          summary={
+            goLive?.testSignIn.atMs
+              ? `Worked on ${new Date(goLive.testSignIn.atMs).toLocaleString()}`
+              : undefined
+          }
+        >
+          <TestSignInSection
+            connectionId={connection.connectionId}
+            providerName={connection.providerId}
+            canManage={canManage}
+            testSignIn={goLive?.testSignIn ?? { done: false, atMs: null }}
+          />
+        </SetupStep>
 
-      <SetupStep
-        number={4}
-        title="Name someone who can still get in"
-        done={goLive?.breakGlass.inPlace ?? false}
-      >
-        <BreakGlassSection
-          organizationId={organizationId}
-          canManage={canManage}
-        />
-      </SetupStep>
+        <SetupStep
+          number={4}
+          title="Name someone who can still get in"
+          state={progress.breakGlass}
+        >
+          <BreakGlassSection
+            organizationId={organizationId}
+            canManage={canManage}
+          />
+        </SetupStep>
 
-      <SetupStep
-        number={5}
-        title="Turn it on"
-        done={goLive?.activated ?? false}
-      >
-        <GoLiveSection
-          organizationId={organizationId}
-          connectionId={connection.connectionId}
-          canManage={canManage}
-          goLive={goLive}
-        />
-      </SetupStep>
+        <SetupStep
+          number={5}
+          title="Turn it on"
+          state={progress.goLive}
+          note={progress.goLiveBlockedBecause ?? undefined}
+          last
+        >
+          <GoLiveSection
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+            canManage={canManage}
+            goLive={goLive}
+          />
+        </SetupStep>
+      </SetupSteps>
 
       {canManage && (
         <RemoveConnectionSection

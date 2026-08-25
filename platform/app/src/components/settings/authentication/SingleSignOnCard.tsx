@@ -1,8 +1,9 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import type { SelfServeSetupView } from "@langwatch/identity-server";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { Link } from "~/components/ui/link";
+import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
 import {
   connectionProtocolName,
@@ -46,7 +47,7 @@ export function SingleSignOnCard({
   canManage: boolean;
 }) {
   const { connection, claims, goLive, serviceProvider } = setup;
-  const { start, sending } = useTestSignIn({
+  const { start, sending, failure } = useTestSignIn({
     connectionId: connection.connectionId,
   });
 
@@ -67,11 +68,12 @@ export function SingleSignOnCard({
           {canManage && (
             <Button
               size="sm"
-              variant="outline"
+              variant={failure ? "solid" : "outline"}
               loading={sending}
               onClick={() => void start()}
             >
-              Test sign-in
+              <RefreshCw size={14} />
+              {failure ? "Try the sign-in again" : "Test sign-in"}
             </Button>
           )}
           {/* Only SAML has a published document to point at. */}
@@ -86,6 +88,12 @@ export function SingleSignOnCard({
         </>
       }
     >
+      {/* Above the details rather than below them: a test sign-in that just
+          failed is the newest thing the reader knows about this connection,
+          and it belongs where they are already looking — on the card naming
+          the provider that refused, not in a corner for eight seconds. */}
+      {failure && <TestSignInFailureNotice failure={failure} />}
+
       <OverviewDetail label="Identity provider">
         <Text fontSize="sm">{connection.providerId}</Text>
       </OverviewDetail>

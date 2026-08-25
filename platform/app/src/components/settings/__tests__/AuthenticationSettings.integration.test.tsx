@@ -334,7 +334,7 @@ describe("the organization's authentication page", () => {
       expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
 
       await user.click(
-        screen.getByRole("button", { name: /manage connection/i }),
+        screen.getByRole("button", { name: /manage or turn off this connection/i }),
       );
 
       expect(screen.getByText(/prove a domain is yours/i)).toBeTruthy();
@@ -417,7 +417,7 @@ describe("the organization's authentication page", () => {
         /claim domain/i,
         /test sign-in/i,
         /go live/i,
-        /manage connection/i,
+        /manage or turn off this connection/i,
       ]) {
         expect(
           screen.queryByRole("button", { name: refusedControl }),

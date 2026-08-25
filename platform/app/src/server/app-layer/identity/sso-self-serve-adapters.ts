@@ -181,6 +181,56 @@ const LOOKUP_TIMEOUT_MS = 3_000;
 const LOOKUP_TRIES = 2;
 
 /**
+ * The resolver a proof lookup asks, and the one case where it is not the
+ * machine's own.
+ *
+ * A DOMAIN NOBODY OWNS CANNOT BE PROVED AGAINST THE PUBLIC INTERNET, which
+ * is the whole of local development: a developer walking this journey types
+ * something like `acme.test`, a reserved name that every real resolver
+ * answers NXDOMAIN for, and the ceremony can never finish. Our identity
+ * provider simulator already answers TXT for exactly those names on a
+ * nameserver of its own — the missing piece was only ever that nothing told
+ * this lookup to ask it.
+ *
+ * `SSO_DOMAIN_PROOF_DNS_SERVERS` names that nameserver, as node's
+ * `setServers` shape: `127.0.0.1:15353`, or `[::1]:15353` for IPv6, comma
+ * separated. Unset — which is every deployed installation — the resolver is
+ * the machine's, exactly as before.
+ *
+ * It is deliberately NOT gated on `NODE_ENV`. An operator running an
+ * air-gapped installation against an internal nameserver has the same need
+ * and no other way to express it, and a variable nobody sets in production
+ * is not made safer by refusing to read it there.
+ */
+function nameserverBackedResolver(): TxtRecordResolver {
+  const resolver = new Resolver({
+    timeout: LOOKUP_TIMEOUT_MS,
+    tries: LOOKUP_TRIES,
+  });
+  const servers = (env.SSO_DOMAIN_PROOF_DNS_SERVERS ?? "")
+    .split(/[\s,]+/)
+    .filter((entry) => entry !== "");
+  if (servers.length === 0) return resolver;
+
+  try {
+    resolver.setServers(servers);
+    logger.info(
+      { servers },
+      "single sign-on domain proofs resolve against a configured nameserver",
+    );
+  } catch (error) {
+    // A malformed value must not take domain proof down with it: the
+    // machine's own resolver is a working answer, and the misconfiguration
+    // is worth a line rather than a dead ceremony.
+    logger.warn(
+      { servers, error },
+      "SSO_DOMAIN_PROOF_DNS_SERVERS could not be applied; using the system resolver",
+    );
+  }
+  return resolver;
+}
+
+/**
  * Reading the record a customer published.
  *
  * A plain DNS lookup with no cache of our own: the resolver's cache is the
@@ -197,9 +247,7 @@ export class DnsDomainProofLookup implements SsoDomainProofLookup {
   private readonly resolver: TxtRecordResolver;
 
   constructor({ resolver }: { resolver?: TxtRecordResolver } = {}) {
-    this.resolver =
-      resolver ??
-      new Resolver({ timeout: LOOKUP_TIMEOUT_MS, tries: LOOKUP_TRIES });
+    this.resolver = resolver ?? nameserverBackedResolver();
   }
 
   async lookupTxtValues({
