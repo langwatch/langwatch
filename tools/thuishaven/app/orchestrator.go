@@ -152,7 +152,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 2)
+	ports, err := o.sys.FreePorts(nSvc + 3)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -162,7 +162,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
-	// ports[nSvc+1] the worker metrics endpoint.
+	// ports[nSvc+1] the worker metrics endpoint, and ports[nSvc+2] the IdP
+	// simulator's verification nameserver — the one listener that is reached by
+	// address rather than by hostname, so it cannot go through the proxy.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -197,11 +199,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// preallocated port so it is neither routed (dead 502) nor emitted into the
 		// overlay (e.g. an OPENCODE_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
 		// socket). The app is always local.
+		if r.Name == domain.IdPService {
+			svc.DNSPort = ports[nSvc+2]
+		}
 		if !runsLocally(r.Name, opts) {
-			if bp, ok := o.baselinePort(r.Name); ok {
-				svc.Port, svc.IsFallback = bp, true
+			if base, ok := o.baselineService(r.Name); ok {
+				// The nameserver comes with it: a fallback idp answers domain
+				// proofs on the baseline's listener, not on the port this
+				// stack allocated for a simulator it is not running.
+				svc.Port, svc.DNSPort, svc.IsFallback = base.Port, base.DNSPort, true
 			} else {
-				svc.Port = 0
+				svc.Port, svc.DNSPort = 0, 0
 			}
 		}
 		// Portless enabled: the proxy routes every service through one shared
@@ -915,6 +923,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.NLP
 	case "langyagent":
 		return opts.Selection.Langy
+	case "idp":
+		return opts.Selection.IDP
 	default:
 		return true
 	}
@@ -932,8 +942,8 @@ func (o *Orchestrator) slugOwnedByOther(slug, worktreeDir string) bool {
 }
 
 // baselinePort routes an opted-out service's hostname to a live baseline stack.
-func (o *Orchestrator) baselinePort(service string) (int, bool) {
-	return domain.BaselinePort(o.store.Stacks(), service, o.sys.ProcessAlive)
+func (o *Orchestrator) baselineService(service string) (domain.Service, bool) {
+	return domain.BaselineService(o.store.Stacks(), service, o.sys.ProcessAlive)
 }
 
 func (o *Orchestrator) printStack(st domain.Stack) {

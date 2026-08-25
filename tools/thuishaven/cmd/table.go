@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -263,6 +264,24 @@ var table = []commandSpec{
 				name = inv.args[0]
 			}
 			return d.orch.Restart(ctx, d.params, name, inv.has("--rebuild"))
+		},
+	},
+	{
+		name:    "idp",
+		summary: "run only the IdP simulator — no app, API or databases; routed at idp.langwatch.localhost",
+		flags: []flagSpec{
+			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
+		},
+		run: func(ctx context.Context, d deps, inv invocation) error {
+			tenants := 0
+			if raw := inv.value("--tenants"); raw != "" {
+				n, err := strconv.Atoi(raw)
+				if err != nil || n < 1 {
+					return fmt.Errorf("--tenants needs a positive integer, got %q", raw)
+				}
+				tenants = n
+			}
+			return d.orch.RunIdPSolo(ctx, tenants)
 		},
 	},
 	{
