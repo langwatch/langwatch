@@ -94,21 +94,27 @@ export function SetupStep({
       borderTopWidth={number === 1 ? 0 : "1px"}
       borderColor="border.muted"
       background={state === "current" ? "bg.subtle" : undefined}
+      // The rail is the ROW's, not the header's. Drawn inside the header it
+      // could only ever be as tall as the header, so an open step's thread
+      // stopped a few pixels below its own marker and left the body hanging
+      // off nothing.
+      position="relative"
       data-testid={`setup-step-${number}`}
       data-step-state={state}
     >
+      {!last && <Rail done={done} />}
       <Collapsible.Trigger asChild>
         <HStack
-          gap={2.5}
-          paddingX={5}
-          paddingY={3.5}
+          gap={`${MARKER_GAP}px`}
+          paddingX={`${PADDING_X}px`}
+          paddingY={`${PADDING_Y}px`}
           cursor="pointer"
           alignItems="start"
           _hover={{ background: "bg.muted" }}
           width="full"
           textAlign="left"
         >
-          <Marker number={number} state={state} last={last} open={open} />
+          <Marker number={number} state={state} />
           <VStack align="start" gap={0.5} flex="1" minWidth={0}>
             <Heading size="sm">{title}</Heading>
             {/* The answer a closed step keeps. Never rendered while the step
@@ -139,14 +145,12 @@ export function SetupStep({
         </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
-        {/* Indented to the rail, so the body reads as hanging off its own
-            marker rather than starting a new column. */}
         <VStack
           align="stretch"
           gap={3}
-          paddingLeft="52px"
-          paddingRight={5}
-          paddingBottom={5}
+          paddingLeft={`${BODY_INDENT}px`}
+          paddingRight={`${PADDING_X}px`}
+          paddingBottom={`${PADDING_Y + 6}px`}
         >
           {state === "blocked" && note && (
             <Text
@@ -164,65 +168,92 @@ export function SetupStep({
   );
 }
 
-/** The numbered marker, and the rail running down to the next one. */
+/**
+ * Where the marker sits, in one place.
+ *
+ * The rail is positioned against the ROW while the marker is laid out by the
+ * header's flex row, so the two agree only because these numbers say so: the
+ * header's horizontal padding puts the marker's left edge at `PADDING_X`, and
+ * its vertical padding puts the top edge at `PADDING_Y`.
+ */
+const PADDING_X = 20;
+const PADDING_Y = 14;
+const MARKER = 22;
+const MARKER_GAP = 10;
+const RAIL_WIDTH = 2;
+/** Where a row's body begins: past the marker and the gap after it, so the
+ *  content hangs off its own marker rather than starting a new column. */
+const BODY_INDENT = PADDING_X + MARKER + MARKER_GAP;
+
+/**
+ * The thread between one marker and the next.
+ *
+ * It starts under this row's marker and runs past the row's own bottom edge,
+ * far enough to reach where the next row's marker begins — the rows are
+ * separated by a divider and the next marker sits `PADDING_Y` below it, so
+ * stopping at `bottom: 0` leaves a visible break at every join.
+ */
+function Rail({ done }: { done: boolean }) {
+  return (
+    <Box
+      position="absolute"
+      left={`${PADDING_X + MARKER / 2 - RAIL_WIDTH / 2}px`}
+      top={`${PADDING_Y + MARKER}px`}
+      bottom={`-${PADDING_Y}px`}
+      width={`${RAIL_WIDTH}px`}
+      background={done ? "green.solid" : "border.emphasized"}
+      opacity={done ? 0.5 : 1}
+      // Above the NEXT row's top border, which is painted by a later sibling
+      // and would otherwise cut a hairline gap across the thread at every
+      // join — the exact break this rail exists to close.
+      zIndex={1}
+      aria-hidden
+    />
+  );
+}
+
+/** The numbered marker. */
 function Marker({
   number,
   state,
-  last,
-  open,
 }: {
   number: number;
   state: SetupStepState;
-  last: boolean;
-  open: boolean;
 }) {
   const done = state === "done";
   return (
-    <Box position="relative" flexShrink={0} alignSelf="stretch">
-      <Box
-        width="22px"
-        height="22px"
-        borderRadius="full"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        background={
-          done
-            ? "green.solid"
-            : state === "current"
-              ? "colorPalette.solid"
-              : "bg.muted"
-        }
-        borderWidth={done || state === "current" ? 0 : "1px"}
-        borderColor="border.emphasized"
-        color={
-          done
-            ? "white"
-            : state === "current"
-              ? "colorPalette.contrast"
-              : "fg.muted"
-        }
-        fontSize="11px"
-        fontWeight="semibold"
-        zIndex={1}
-        position="relative"
-      >
-        {done ? "✓" : number}
-      </Box>
-      {/* The thread. A closed row is short, so the rail only has to cross the
-          header; an open one is arbitrarily tall, and `bottom: 0` on a
-          stretched marker follows it. */}
-      {!last && (
-        <Box
-          position="absolute"
-          left="10px"
-          top="22px"
-          bottom={open ? "-20px" : "-14px"}
-          width="2px"
-          background={done ? "green.solid" : "border.muted"}
-          opacity={done ? 0.35 : 1}
-        />
-      )}
+    <Box
+      width={`${MARKER}px`}
+      height={`${MARKER}px`}
+      borderRadius="full"
+      flexShrink={0}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      background={
+        done
+          ? "green.solid"
+          : state === "current"
+            ? "colorPalette.solid"
+            : "bg.muted"
+      }
+      borderWidth={done || state === "current" ? 0 : "1px"}
+      borderColor="border.emphasized"
+      color={
+        done
+          ? "white"
+          : state === "current"
+            ? "colorPalette.contrast"
+            : "fg.muted"
+      }
+      fontSize="11px"
+      fontWeight="semibold"
+      // Above the rail, so the thread runs behind the circle rather than
+      // into its edge.
+      zIndex={2}
+      position="relative"
+    >
+      {done ? "✓" : number}
     </Box>
   );
 }
