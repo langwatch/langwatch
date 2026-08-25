@@ -199,11 +199,10 @@ function isLiveAncestor(candidate) {
  * An explicit CHECK_SLOTS always wins, including under CI, which is what lets
  * the tests exercise the queue on a CI runner. One exception: a gate-off value
  * from an agent shell is ignored, see the comment at the check. Unset, CI gets
- * no queue at all
- * (one job runs one check, so a gate could only add risk) and a developer
- * machine gets a limit bounded by both memory and cores: tsgo is memory-hungry
- * AND parallel, so the tighter of the two bounds is the honest one. Never below
- * 1, or the queue would deadlock every run.
+ * no queue at all (one job runs one check, so a gate could only add risk) and a
+ * developer machine gets a limit bounded by both memory and cores: tsgo is
+ * memory-hungry AND parallel, so the tighter of the two bounds is the honest
+ * one. Never below 1, or the queue would deadlock every run.
  *
  * A machine already under memory pressure gets one slot, whatever the formula
  * says. The formula assumes an otherwise idle machine, and pressure is the

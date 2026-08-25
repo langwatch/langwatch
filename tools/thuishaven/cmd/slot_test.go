@@ -318,7 +318,6 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	}
 }
 
-// @scenario "A signal delivered to the whole process group still counts as forwarded"
 // @scenario "A borrowed held-marker does not turn the queue off"
 func TestHeldByLiveAncestor(t *testing.T) {
 	if !heldByLiveAncestor(strconv.Itoa(os.Getppid())) {
@@ -345,6 +344,7 @@ func TestHeldByLiveAncestor(t *testing.T) {
 	}
 }
 
+// @scenario "A signal delivered to the whole process group still counts as forwarded"
 func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
 	child := exec.Command("sleep", "10")
 	if err := child.Start(); err != nil {
