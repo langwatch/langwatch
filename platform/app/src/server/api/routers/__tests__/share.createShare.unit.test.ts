@@ -22,6 +22,14 @@ const { mockCreateShare, mockGetDecision } = vi.hoisted(() => ({
   mockGetDecision: vi.fn(),
 }));
 
+// Mutations audit through the global prisma, not ctx.prisma -- unmocked, the
+// middleware reaches for a real database this unit environment does not have.
+// The suite this file mirrors is a query router, where the middleware
+// short-circuits on `type !== "mutation"` and never needed the mock.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("~/server/app-layer/app", () => {
   // `traces:share` is not what this suite is about, so the permission
   // middleware is answered rather than exercised — the mutation cannot be
