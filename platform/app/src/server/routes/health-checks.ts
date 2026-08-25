@@ -472,17 +472,19 @@ secured
 
     const triggerId = c.req.query("triggerId") ?? "";
 
-    const trigger = await prisma.trigger.findUnique({
-      where: { id: triggerId, projectId: project.id },
+    const trigger = await c.app.automation.tryGetById({
+      triggerId,
+      projectId: project.id,
     });
 
     if (!trigger) {
       return c.json({ message: "Trigger not found." }, { status: 404 });
     }
 
-    const lastTriggerSent = await prisma.triggerSent.findFirst({
-      where: { triggerId, projectId: project.id },
-      orderBy: { createdAt: "desc" },
+    const [lastTriggerSent] = await c.app.automation.getRecentFires({
+      projectId: project.id,
+      triggerId,
+      limit: 1,
     });
 
     if (!lastTriggerSent) {

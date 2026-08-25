@@ -28,14 +28,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
+import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "../../../app-layer/presets";
 import { prisma } from "../../../db";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
 import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -51,7 +50,7 @@ const leaverEmail = `${ns}-leaver@example.com`;
 let organizationId: string;
 let adminUserId: string;
 let leaverUserId: string;
-let workspaceService: PersonalWorkspaceService;
+let workspaceService: OrganizationServiceContract;
 let personalTeamId: string;
 let personalProjectId: string;
 
@@ -66,7 +65,7 @@ const callerAsAdmin = () =>
   );
 
 const ensureLeaverWorkspace = () =>
-  workspaceService.ensure({
+  workspaceService.ensurePersonalWorkspace({
     userId: leaverUserId,
     organizationId,
     displayName: "Leaver",
@@ -84,6 +83,9 @@ const workspaceRows = () =>
 
 describe("given a member with a personal workspace in an organization", () => {
   beforeAll(async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp();
+    workspaceService = globalForApp.__langwatch_app.organizations;
     const admin = await prisma.user.create({
       data: { name: "Org Admin", email: adminEmail },
     });
@@ -122,7 +124,6 @@ describe("given a member with a personal workspace in an organization", () => {
       },
     });
 
-    workspaceService = new PersonalWorkspaceService(prisma);
     const workspace = await ensureLeaverWorkspace();
     personalTeamId = workspace.team.id;
     personalProjectId = workspace.project.id;
@@ -134,7 +135,8 @@ describe("given a member with a personal workspace in an organization", () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        new PromptTagRepository(prisma),
+        createTestApp().prompts,
+        workspaceService,
       ),
     });
   });

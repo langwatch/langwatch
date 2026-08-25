@@ -3,14 +3,10 @@ import type { Secret } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const create = vi.fn();
-const getOrganizationIdByTeamId = vi.fn();
-const listScopeBindings = vi.fn();
 let authenticatedUserId: string | undefined = "user-1";
 
 const langwatchApp = {
   secrets: { create },
-  organizations: { getOrganizationIdByTeamId },
-  permissions: { listScopeBindings },
 };
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -36,6 +32,9 @@ vi.mock("~/app/api/middleware/auth", () => ({
       teamId: "team-1",
       name: "Test Project",
     });
+    if (authenticatedUserId) {
+      context.set("apiKeyUserId", authenticatedUserId);
+    }
     await next();
   },
   canonicalAuthMiddleware: async (context: any, next: any) => {
@@ -78,8 +77,6 @@ describe("Secret API composition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authenticatedUserId = "user-1";
-    getOrganizationIdByTeamId.mockResolvedValue("organization-1");
-    listScopeBindings.mockResolvedValue([{ userId: "user-1" }]);
     create.mockResolvedValue(secret);
   });
 
@@ -104,24 +101,8 @@ describe("Secret API composition", () => {
     });
   });
 
-  it("resolves a legacy project-key actor through Organization and AuthZ services", async () => {
-    await app.request("/api/secrets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "MY_SECRET", value: "secret-value" }),
-    });
-
-    expect(getOrganizationIdByTeamId).toHaveBeenCalledWith("team-1");
-    expect(listScopeBindings).toHaveBeenCalledWith({
-      organizationId: "organization-1",
-      scopeType: "TEAM",
-      scopeIds: ["team-1"],
-    });
-  });
-
-  it("keeps the legacy system-owner fallback when no user binding exists", async () => {
+  it("refuses a legacy write without an authenticated user actor", async () => {
     authenticatedUserId = undefined;
-    listScopeBindings.mockResolvedValue([]);
 
     const response = await app.request("/api/secrets", {
       method: "POST",
@@ -129,13 +110,11 @@ describe("Secret API composition", () => {
       body: JSON.stringify({ name: "MY_SECRET", value: "secret-value" }),
     });
 
-    expect(response.status).toBe(201);
-    expect(create).toHaveBeenCalledWith({
-      projectId: "project-1",
-      name: "MY_SECRET",
-      value: "secret-value",
-      actorId: "system",
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "authenticated_actor_required",
     });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("serves the modern RPC API from the same App service", async () => {

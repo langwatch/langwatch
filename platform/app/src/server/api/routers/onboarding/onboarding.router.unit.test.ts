@@ -52,22 +52,13 @@ vi.mock("../project", () => ({
   },
 }));
 
-// The real service opens its own Prisma transaction, which a unit test has no
-// business reaching. Its behaviour is covered end to end in
-// onboarding.personal-workspace.integration.test.ts; here only the call and
-// its arguments matter. The specifier must match the router's import so
-// vi.mock hooks the same module.
-vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
-  PersonalWorkspaceService: class {
-    constructor(_prisma: unknown) {}
-    ensure = mockEnsurePersonalWorkspace;
-  },
-}));
-
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
+    organizations: {
+      ensurePersonalWorkspace: mockEnsurePersonalWorkspace,
+    },
     notifications: {
       sendSlackSignupEvent: mockSendSlackSignupEvent,
       sendHubspotSignupForm: mockSendHubspotSignupForm,

@@ -52,7 +52,6 @@ type McpServerLike = {
   ): unknown;
 };
 
-import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import type { Permission } from "../server/api/rbac";
 import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
@@ -152,7 +151,7 @@ export function registerGovernanceMcpTools(
   };
 
   const templateService = ctx.governance.ingestionTemplates;
-  const ingestionKeyService = IngestionKeyService.create(ctx.prisma);
+  const ingestionKeyService = ctx.governance.ingestionKeys;
 
   const text = (value: string) => ({
     content: [{ type: "text" as const, text: value }],
@@ -202,7 +201,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requireRead(r, "aiTools:view");
       if (denied) return text(denied);
-      const row = await templateService.findByIdForOrg({
+      const row = await templateService.tryFindByIdForOrg({
         id,
         organizationId: r.organizationId,
       });

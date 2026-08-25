@@ -18,6 +18,7 @@ import {
   AGENT_CHAT_TIMEOUT_MS,
   ADOPTABLE_CONVERSATION_ID,
   LangyTurnAccessStore,
+  LangyTokenBuffer,
 } from "@langwatch/langy-server";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
@@ -26,10 +27,7 @@ import {
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import {
-  createLangyTokenBuffer,
-  type LangyStreamEntry,
-} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyStreamEntry } from "@langwatch/langy-server";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
 import {
@@ -1052,7 +1050,7 @@ export const langyRouter = createTRPCRouter({
       if (!connection) return;
 
       const blocking = connection.duplicate();
-      const buffer = createLangyTokenBuffer({
+      const buffer = LangyTokenBuffer.create({
         redis: connection,
         blockingRedis: blocking,
       });

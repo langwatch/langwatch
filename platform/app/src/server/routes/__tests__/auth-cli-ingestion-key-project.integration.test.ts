@@ -18,9 +18,8 @@
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { splitApiKeyToken } from "~/server/api-key/api-key-token.utils";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { splitApiKeyToken } from "@langwatch/api-key-contract";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
@@ -84,7 +83,7 @@ async function liveIngestKeyCount(projectId: string): Promise<number> {
 }
 
 describe("POST /api/auth/cli/governance/ingestion-key with a named project", () => {
-  const resolver = TokenResolver.create(prisma);
+  const app = getApp();
 
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
@@ -259,7 +258,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         });
 
         // The token authorizes ingest and self-scopes to the named project.
-        const resolved = await resolver.resolve({
+        const resolved = await app.apiKeys.tryResolveToken({
           token: json.token as string,
           projectId: null,
         });
@@ -323,7 +322,10 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         expect(second.json.token).not.toBe(first.json.token);
 
         for (const token of [first.json.token, second.json.token] as string[]) {
-          const resolved = await resolver.resolve({ token, projectId: null });
+          const resolved = await app.apiKeys.tryResolveToken({
+            token,
+            projectId: null,
+          });
           expect(resolved?.type).toBe("apiKey");
           if (resolved?.type === "apiKey") {
             expect(resolved.project.id).toBe(PROJECT_ID);

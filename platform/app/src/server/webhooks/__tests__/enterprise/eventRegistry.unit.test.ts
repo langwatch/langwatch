@@ -5,7 +5,7 @@ import {
   eventMatches,
   isValidEventSelector,
   WEBHOOK_EVENT_TYPES,
-} from "@langwatch/enterprise-webhooks-contract";
+} from "@langwatch/enterprise-webhook-contract";
 import { WebhookEndpointValidationError } from "~/runtime/app/features/webhooks";
 
 describe("webhook event registry", () => {

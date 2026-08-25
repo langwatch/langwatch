@@ -14,9 +14,9 @@
  * if the ladder from allow to warn to block ever stops working.
  */
 import {
-  AppGatewayDebitsProcessRuntime,
   type WriteGatewayDebitsPayload,
-} from "@ee/governance/process-manager/gatewayDebits.process";
+} from "@langwatch/enterprise-governance-server";
+import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
@@ -191,10 +191,10 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
     service = GatewayBudgetService.create(prisma, chRepo);
 
-    const debitRuntime = AppGatewayDebitsProcessRuntime.create({
+    const debitRuntime = AppGatewayDebitAdapter.create({
       prisma,
       budgetCHRepository: chRepo,
-    });
+    }).build();
     writeDebits = (payload) => debitRuntime.write(payload);
 
     recordOneRequest = async () => {

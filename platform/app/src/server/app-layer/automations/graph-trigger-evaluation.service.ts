@@ -38,12 +38,12 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import { buildSeriesName } from "@langwatch/analytics-contract";
 import {
   aggregateSeriesValues,
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
-import type { TimeseriesReadOptions } from "~/server/app-layer/analytics/types";
+import type { TimeseriesReadOptions } from "@langwatch/analytics-contract";
 import {
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,

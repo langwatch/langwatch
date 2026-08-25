@@ -6,7 +6,7 @@
  * the drawer's edited/original toggle.
  */
 import { describe, expect, it } from "vitest";
-import { datasetSpanSchema } from "~/server/datasets/types";
+import { datasetSpanSchema } from "@langwatch/dataset-contract";
 import type { Span, Trace } from "~/server/tracer/types";
 import {
   applyOverlayToTrace,

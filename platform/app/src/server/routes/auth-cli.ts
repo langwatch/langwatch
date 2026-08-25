@@ -27,22 +27,22 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@langwatch/enterprise-governance-contract";
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
-import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
-  IngestionKeyService,
-  PersonalWorkspaceMissingError,
-} from "@ee/governance/services/ingestionKey.service";
+  ApiKeyScopeViolationError,
+  type ApiKeyService,
+  type CliKeyScopeSummary,
+  type CliKeySelection,
+} from "@langwatch/api-key-contract";
 import {
+  PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
-  PersonalVirtualKeyService,
+  PersonalWorkspaceMissingError,
   RoutingPolicyHasNoProvidersError,
-} from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+  type GovernanceIngestionKeyService,
+  type GovernancePersonalVirtualKeyService,
+} from "@langwatch/enterprise-governance-contract";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -54,23 +54,18 @@ import {
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import {
-  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
-  type CliKeySelection,
-  CliLoginKeyService,
-} from "~/server/api-key/cli-login-key.service";
-import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
 } from "~/server/app-layer/permissions/imperative";
+
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+
+type CliContext = Context<{ Variables: AppContextVariables }>;
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -79,6 +74,7 @@ const secured = createServiceApp<{ Variables: AppContextVariables }>({
 });
 
 const CLI_REASON = "CLI device-flow / user session validated in-handler";
+const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 
 // The device flow authenticates the CALLER and gates on no RBAC permission.
 const CLI_POLICY = handlerManagedAuth({
@@ -387,7 +383,7 @@ function getRedis() {
  * Returns the refusal response to send, or null when the handout is allowed.
  */
 async function refuseProjectKeyHandout(
-  c: Context,
+  c: CliContext,
   project: { id: string; isPersonal: boolean; ownerUserId: string | null },
   userId: string,
 ): Promise<Response | null> {
@@ -466,7 +462,7 @@ function bearerAccessToken(
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 async function ensureActiveOrgMemberOr403(
-  c: Context,
+  c: CliContext,
   tokenRecord: { user_id: string; organization_id: string },
 ): Promise<Response | null> {
   const [user, membership] = await Promise.all([
@@ -568,7 +564,7 @@ const deviceCodeRequestSchema = z.object({
     .default("device_session"),
 });
 
-secured.access(CLI_POLICY).post("/device-code", async (c: Context) => {
+secured.access(CLI_POLICY).post("/device-code", async (c: CliContext) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = deviceCodeRequestSchema.safeParse(body);
@@ -638,7 +634,7 @@ const exchangeRequestSchema = z.object({
   client_info: clientInfoSchema,
 });
 
-secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
+secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = exchangeRequestSchema.safeParse(body);
@@ -832,7 +828,8 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       | { id: string; slug: string; name: string; api_key: string }
       | undefined;
     try {
-      const workspace = await new PersonalWorkspaceService(prisma).ensure({
+      const workspace =
+        await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
         userId: user.id,
         organizationId: organization.id,
         displayName: user.name,
@@ -874,11 +871,13 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           parsed.data.client_info?.device_label ??
             parsed.data.client_info?.hostname,
         ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
-      let minted: Awaited<
-        ReturnType<CliLoginKeyService["mintForDeviceSession"]>
-      >;
+      let minted: {
+        token: string;
+        apiKeyId: string;
+        scope: CliKeyScopeSummary;
+      };
       try {
-        minted = await CliLoginKeyService.create(prisma).mintForDeviceSession({
+        minted = await c.var.langwatchApp.apiKeys.mintCliLoginKey({
           userId: user.id,
           organizationId: organization.id,
           deviceLabel,
@@ -1036,7 +1035,7 @@ const refreshRequestSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
-secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
+secured.access(CLI_POLICY).post("/refresh", async (c: CliContext) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = refreshRequestSchema.safeParse(body);
@@ -1226,7 +1225,7 @@ function requestIncreaseUrl(opts: {
   return `${base.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
+secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1242,8 +1241,8 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
   // Resolve the user's personal workspace (team + project). If none
   // exists yet (first login, hasn't activated the CLI), nothing can be
   // over budget — return 200 and let the wrapper exec normally.
-  const workspaceService = new PersonalWorkspaceService(prisma);
-  const workspace = await workspaceService.findExisting({
+  const workspace =
+    await c.var.langwatchApp.organizations.tryFindPersonalWorkspace({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1251,19 +1250,14 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
 
   // Resolve the user's personal VK. Same graceful-fallback rationale —
   // no VK means no traffic flowing, nothing to block on.
-  const vkService = PersonalVirtualKeyService.create(prisma);
-  const vks = await vkService.list({
+  const vks = await c.var.langwatchApp.governance.personalVirtualKeys.list({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
   const personalVk = vks[0];
   if (!personalVk) return c.json({ ok: true }, 200);
 
-  const budgetService = GatewayBudgetService.create(
-    prisma,
-    getApp().gateway.budgets,
-  );
-  const decision = await budgetService.check({
+  const decision = await c.var.langwatchApp.gateway.budgetDecisions.check({
     organizationId: tokenRecord.organization_id,
     teamId: workspace.team.id,
     projectId: workspace.project.id,
@@ -1313,7 +1307,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
 // formatLoginCeremony renders identically regardless of path.
 // ---------------------------------------------------------------------------
 
-secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
+secured.access(CLI_POLICY).get("/bootstrap", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1325,11 +1319,7 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
       401,
     );
   }
-  const service = CliBootstrapService.create({
-    prisma,
-    budgetRepository: getApp().gateway.budgets,
-  });
-  const result = await service.resolve({
+  const result = await c.var.langwatchApp.governance.cliBootstrap.resolve({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1346,7 +1336,7 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
 // /bootstrap `budget` field carries for older CLIs.
 // ---------------------------------------------------------------------------
 
-secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+secured.access(CLI_POLICY).get("/budget-overview", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1358,11 +1348,7 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
       401,
     );
   }
-  const service = BudgetOverviewService.create(
-    prisma,
-    getApp().gateway.budgets,
-  );
-  const result = await service.overviewForUser({
+  const result = await c.var.langwatchApp.gateway.budgetOverview.overviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1380,7 +1366,7 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
 //
 // Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
 // ---------------------------------------------------------------------------
-secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
+secured.access(CLI_POLICY).get("/personal-project", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1403,7 +1389,8 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
     select: { name: true, email: true },
   });
   try {
-    const workspace = await new PersonalWorkspaceService(prisma).ensure({
+    const workspace =
+      await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       displayName: user?.name,
@@ -1473,7 +1460,7 @@ function sanitizeDeviceLabel(raw: string | undefined): string | null {
   return cleaned.length > 0 ? cleaned : null;
 }
 
-secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
+secured.access(CLI_POLICY).post("/virtual-key", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1506,11 +1493,12 @@ secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
     where: { id: tokenRecord.user_id },
     select: { name: true, email: true },
   });
-  const service = PersonalVirtualKeyService.create(prisma);
+  const service = c.var.langwatchApp.governance.personalVirtualKeys;
 
   try {
     const issued = await issuePersonalVirtualKey({
       service,
+      organizations: c.var.langwatchApp.organizations,
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       displayName: user?.name,
@@ -1538,7 +1526,7 @@ secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
  * the same, and a key minted anyway would fail on its first request.
  */
 function virtualKeyFailureResponse(
-  c: Context,
+  c: CliContext,
   err: unknown,
   tokenRecord: AccessTokenRecord,
 ): Response {
@@ -1587,13 +1575,15 @@ function virtualKeyFailureResponse(
  */
 async function issuePersonalVirtualKey({
   service,
+  organizations,
   userId,
   organizationId,
   displayName,
   displayEmail,
   deviceLabel,
 }: {
-  service: PersonalVirtualKeyService;
+  service: GovernancePersonalVirtualKeyService;
+  organizations: OrganizationService;
   userId: string;
   organizationId: string;
   displayName?: string | null;
@@ -1611,7 +1601,7 @@ async function issuePersonalVirtualKey({
     if (!(err instanceof PersonalVirtualKeyAlreadyExistsError)) throw err;
   }
 
-  const workspace = await new PersonalWorkspaceService(prisma).ensure({
+  const workspace = await organizations.ensurePersonalWorkspace({
     userId,
     organizationId,
     displayName,
@@ -1644,7 +1634,7 @@ const projectKeyRequestSchema = z.object({
   slug: z.string().min(1),
 });
 
-secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
+secured.access(CLI_POLICY).post("/project-key", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -1729,12 +1719,16 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
 // ---------------------------------------------------------------------------
 
 async function ensureEnterpriseOr402(
-  c: Context,
+  c: CliContext,
   organizationId: string,
   errorMessage: string,
 ): Promise<Response | null> {
   try {
-    await assertEnterprisePlan({ organizationId, errorMessage });
+    await assertEnterprisePlan({
+      planProvider: c.var.langwatchApp.planProvider,
+      organizationId,
+      errorMessage,
+    });
     return null;
   } catch {
     const upgradeUrl = `${
@@ -1756,7 +1750,7 @@ async function ensureEnterpriseOr402(
 // this any org member could read sources / activity / status. Enforce the
 // same permission the web route requires for the caller's user.
 async function ensureGovernancePermissionOr403(
-  c: Context,
+  c: CliContext,
   tokenRecord: { user_id: string; organization_id: string },
   permission: Permission,
 ): Promise<Response | null> {
@@ -1777,7 +1771,7 @@ async function ensureGovernancePermissionOr403(
 
 secured
   .access(cliIngestionSourcesAuth)
-  .get("/governance/ingest/sources", async (c: Context) => {
+  .get("/governance/ingest/sources", async (c) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1804,7 +1798,7 @@ secured
     );
     if (denied) return denied;
     const includeArchived = c.req.query("include_archived") === "1";
-    const service = new IngestionSourceService(prisma);
+    const service = c.var.langwatchApp.governance.ingestionSources;
     const sources = await service.list(tokenRecord.organization_id);
     const filtered = includeArchived
       ? sources
@@ -1827,7 +1821,7 @@ secured
 
 secured
   .access(cliActivityMonitorAuth)
-  .get("/governance/ingest/sources/:id/events", async (c: Context) => {
+  .get("/governance/ingest/sources/:id/events", async (c) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1872,19 +1866,13 @@ secured
     // Defensive ownership check before hitting CH — prevents the
     // "querying any source-id with a valid bearer" footgun even
     // though ActivityMonitorService also filters by OrganizationId.
-    const sourceService = new IngestionSourceService(prisma);
-    const source = await sourceService.findById(
+    const sourceService = c.var.langwatchApp.governance.ingestionSources;
+    const source = await sourceService.getById(
       sourceId,
       tokenRecord.organization_id,
     );
-    if (!source) {
-      return c.json(
-        { error: "not_found", error_description: "IngestionSource not found" },
-        404,
-      );
-    }
 
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = c.var.langwatchApp.governance.activity;
     const events = await monitor.eventsForSource({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -1896,7 +1884,7 @@ secured
 
 secured
   .access(cliActivityMonitorAuth)
-  .get("/governance/ingest/sources/:id/health", async (c: Context) => {
+  .get("/governance/ingest/sources/:id/health", async (c) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -1932,18 +1920,12 @@ secured
         400,
       );
     }
-    const sourceService = new IngestionSourceService(prisma);
-    const source = await sourceService.findById(
+    const sourceService = c.var.langwatchApp.governance.ingestionSources;
+    const source = await sourceService.getById(
       sourceId,
       tokenRecord.organization_id,
     );
-    if (!source) {
-      return c.json(
-        { error: "not_found", error_description: "IngestionSource not found" },
-        404,
-      );
-    }
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = c.var.langwatchApp.governance.activity;
     const health = await monitor.sourceHealthMetrics({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -1954,7 +1936,7 @@ secured
     });
   });
 
-secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
+secured.access(CLI_POLICY).get("/governance/status", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
     return c.json(
@@ -2120,7 +2102,7 @@ async function findProjectInOrg({
  * which is exactly the permission the minted key carries.
  */
 async function mintProjectIngestionKey(
-  c: Context,
+  c: CliContext,
   {
     tokenRecord,
     service,
@@ -2129,7 +2111,7 @@ async function mintProjectIngestionKey(
     deviceLabel,
   }: {
     tokenRecord: AccessTokenRecord;
-    service: IngestionKeyService;
+    service: GovernanceIngestionKeyService;
     projectRef: string;
     sourceType: string;
     deviceLabel: string | null;
@@ -2226,7 +2208,7 @@ async function mintProjectIngestionKey(
 
 secured
   .access(CLI_POLICY)
-  .post("/governance/ingestion-key", async (c: Context) => {
+  .post("/governance/ingestion-key", async (c: CliContext) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -2273,7 +2255,8 @@ secured
       ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
       : undefined;
     if (policedSlug) {
-      const policy = await AiToolEntryService.create(prisma).resolveToolPolicy({
+      const policy =
+        await c.var.langwatchApp.governance.aiTools.resolveToolPolicy({
         organizationId: tokenRecord.organization_id,
         userId: tokenRecord.user_id,
         slug: policedSlug,
@@ -2289,7 +2272,7 @@ secured
       }
     }
 
-    const service = IngestionKeyService.create(prisma);
+    const service = c.var.langwatchApp.governance.ingestionKeys;
 
     if (parsed.data.project) {
       return await mintProjectIngestionKey(c, {
@@ -2313,14 +2296,14 @@ secured
  * workspace, rotating in place so one user never accumulates keys for a tool.
  */
 async function mintPersonalIngestionKey(
-  c: Context,
+  c: CliContext,
   {
     tokenRecord,
     service,
     sourceType,
   }: {
     tokenRecord: AccessTokenRecord;
-    service: IngestionKeyService;
+    service: GovernanceIngestionKeyService;
     sourceType: string;
   },
 ): Promise<Response> {
@@ -2393,7 +2376,7 @@ async function mintPersonalIngestionKey(
 // ---------------------------------------------------------------------------
 secured
   .access(CLI_POLICY)
-  .get("/governance/ingestion-keys", async (c: Context) => {
+  .get("/governance/ingestion-keys", async (c: CliContext) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -2407,8 +2390,8 @@ secured
         401,
       );
     }
-    const service = IngestionKeyService.create(prisma);
-    const keys = await service.listForPersonalProject({
+    const keys =
+      await c.var.langwatchApp.governance.ingestionKeys.listForPersonalProject({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
     });
@@ -2432,7 +2415,7 @@ secured
 // approves. Session-protected so unauthenticated visitors can't probe
 // outstanding device codes.
 // ---------------------------------------------------------------------------
-secured.access(CLI_POLICY).get("/lookup", async (c: Context) => {
+secured.access(CLI_POLICY).get("/lookup", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -2526,7 +2509,7 @@ const approveRequestSchema = z.object({
     .optional(),
 });
 
-secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
+secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -2707,14 +2690,13 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   // /virtual-key, and the user-scoped CLI ApiKey is minted by /exchange from
   // the selection stamped here, so an approval that is never exchanged
   // leaves no ApiKey row behind.
-  const cliLoginKeys = CliLoginKeyService.create(prisma);
   let keySelection: CliKeySelection | undefined;
   if (parsed.data.key_selection) {
     // Explicit selection from the authorize screen: validated against the
     // registry and the approving user's own ceiling. A violation throws a
     // HandledError (cli_key_selection_invalid / api_key_scope_violation /
     // personal_workspace_not_managed_here) and nothing is stamped.
-    keySelection = await cliLoginKeys.validateSelection({
+    keySelection = await c.var.langwatchApp.apiKeys.validateCliSelection({
       userId: session.user.id,
       organizationId: organization_id,
       selection: {
@@ -2732,7 +2714,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     // best-effort: a default that cannot be resolved must not fail the
     // login, it just completes without a scoped key.
     try {
-      await new PersonalWorkspaceService(prisma).ensure({
+      await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
         userId: session.user.id,
         organizationId: organization_id,
         displayName: session.user.name,
@@ -2746,7 +2728,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     try {
       keySelection =
-        (await cliLoginKeys.resolveDefaultSelection({
+        (await c.var.langwatchApp.apiKeys.tryResolveDefaultCliSelection({
           userId: session.user.id,
           organizationId: organization_id,
         })) ?? undefined;
@@ -2773,7 +2755,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
 // ---------------------------------------------------------------------------
 const denyRequestSchema = z.object({ user_code: z.string().min(1) });
 
-secured.access(CLI_POLICY).post("/deny", async (c: Context) => {
+secured.access(CLI_POLICY).post("/deny", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -2815,7 +2797,7 @@ const logoutRequestSchema = z.object({
   access_token: z.string().optional(),
 });
 
-secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
+secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
   const parsed = logoutRequestSchema.safeParse(body);
@@ -2846,7 +2828,10 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
   }
   await ops.exec();
 
-  await revokeCliKeysFromTokenRecords([refreshRaw, accessRaw]);
+  await revokeCliKeysFromTokenRecords(
+    c.var.langwatchApp.apiKeys,
+    [refreshRaw, accessRaw],
+  );
 
   return c.json({ ok: true });
 });
@@ -2858,6 +2843,7 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
  * the key still dies with the owner's next re-login from the same device.
  */
 async function revokeCliKeysFromTokenRecords(
+  apiKeys: ApiKeyService,
   raws: Array<string | null>,
 ): Promise<void> {
   const seen = new Set<string>();
@@ -2873,7 +2859,7 @@ async function revokeCliKeysFromTokenRecords(
     if (!apiKeyId || seen.has(apiKeyId)) continue;
     seen.add(apiKeyId);
     try {
-      await CliLoginKeyService.create(prisma).revokeForLogout({
+      await apiKeys.revokeCliLoginKeyForLogout({
         apiKeyId,
         userId: record.user_id,
         organizationId: record.organization_id,

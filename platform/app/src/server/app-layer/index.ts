@@ -18,7 +18,7 @@ export type { AppDependencies } from "./dependencies";
 // DSPy Steps
 export { DspyStepService } from "./dspy-steps/dspy-step.service";
 // Monitors
-export { MonitorService } from "./monitors/monitor.service";
+export { MonitorService } from "@langwatch/monitor-contract";
 export {
   createTestApp,
   initializeDefaultApp,
@@ -28,7 +28,7 @@ export {
 // Projects
 export {
   type ProjectFeatureFlag,
-  ProjectService,
-} from "./projects/project.service";
+} from "@langwatch/project-contract";
+export type { ProjectService } from "@langwatch/project-contract";
 // Tracing
 export { traced } from "./tracing";

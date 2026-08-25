@@ -32,7 +32,6 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -150,10 +149,12 @@ describe("organization member role plan limit enforcement", () => {
   beforeEach(async () => {
     await resetApp();
     mockGetActivePlan = vi.fn();
+    const planProvider = PlanProviderService.create({
+      getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
+    });
+    const base = createTestApp({ planProvider });
     globalForApp.__langwatch_app = createTestApp({
-      planProvider: PlanProviderService.create({
-        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
+      planProvider,
       // A REAL organization service, against the test database. `createTestApp`
       // defaults to a NullOrganizationRepository, which resolves without
       // writing — so an allow-path test could only assert "the call didn't
@@ -162,7 +163,7 @@ describe("organization member role plan limit enforcement", () => {
       // landed is what distinguishes "allowed" from "quietly dropped".
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        new PromptTagRepository(prisma),
+        base.prompts,
       ),
     });
 

@@ -8,7 +8,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -99,7 +99,7 @@ describe("Feature: Projects REST API", () => {
       },
     });
 
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     const created = await apiKeyService.create({
       name: `projects-key-${nanoid(6)}`,
       userId,
@@ -480,7 +480,7 @@ describe("Feature: Projects REST API", () => {
 
     const mintKey = async (permissions: string[], scopeId: string) =>
       (
-        await ApiKeyService.create(prisma).create({
+        await getApp().apiKeys.create({
           name: `scoped-${nanoid(6)}`,
           userId,
           createdByUserId: userId,

@@ -8,7 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
-import { chunkKey } from "~/server/datasets/dataset-chunking";
+import { chunkKey } from "@langwatch/dataset-contract";
 import { redactStorageUri } from "~/server/stored-objects/project-storage-destination";
 import type { StorageDriver } from "~/server/stored-objects/storage-driver";
 import type { StoredObject } from "~/server/stored-objects/stored-object";

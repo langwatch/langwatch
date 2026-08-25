@@ -10,7 +10,7 @@ import {
   runtimeParametersSchema,
   schemaVersionSchema,
   scopeSchema,
-} from "~/prompts/schemas/field-schemas";
+} from "@langwatch/prompt-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 /**

@@ -1,8 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { BugReport } from "~/generated/prisma/client";
-import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
 import { BugReportRepository } from "~/server/repositories/bug-report.repository";
@@ -50,6 +50,7 @@ export async function submitBugReport({
   callerKey,
   apiToken,
   projectIdHint,
+  apiKeys,
   notify = notifyBugReportOnSlack,
 }: {
   input: SubmitBugReportInput;
@@ -57,6 +58,7 @@ export async function submitBugReport({
   callerKey: string;
   apiToken?: string;
   projectIdHint?: string | null;
+  apiKeys?: ApiKeyService;
   notify?: BugReportNotifier;
 }): Promise<{ id: string }> {
   const limit = await rateLimit({
@@ -69,6 +71,7 @@ export async function submitBugReport({
   const linkedProjectId = await resolveLinkedProjectId({
     apiToken,
     projectIdHint,
+    apiKeys,
   });
 
   // Defense in depth: the CLI and MCP redact locally, but the endpoint is
@@ -153,13 +156,15 @@ function redactSubmission(input: SubmitBugReportInput): {
 async function resolveLinkedProjectId({
   apiToken,
   projectIdHint,
+  apiKeys,
 }: {
   apiToken?: string;
   projectIdHint?: string | null;
+  apiKeys?: ApiKeyService;
 }): Promise<string | null> {
-  if (!apiToken) return null;
+  if (!apiToken || !apiKeys) return null;
   try {
-    const resolved = await TokenResolver.create(prisma).resolve({
+    const resolved = await apiKeys.tryResolveToken({
       token: apiToken,
       projectId: projectIdHint ?? null,
     });

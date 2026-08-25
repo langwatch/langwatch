@@ -72,7 +72,7 @@ import {
 } from "../../app-layer/langy/langyApiKey";
 import type { LangyWorkerPort } from "../../app-layer/langy/langyWorker";
 import type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-import type { LangyTokenBuffer } from "../../app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import type { LangyTurnHandoffStore } from "@langwatch/langy-server";
 import {
   createAgentTurnLivenessSubscriber,

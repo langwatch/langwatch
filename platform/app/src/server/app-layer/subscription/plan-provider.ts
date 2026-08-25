@@ -3,12 +3,12 @@ import type {
   PlanInfo,
   PlanProvider,
   PlanProviderUser,
-} from "@langwatch/entitlements-contract";
+} from "@langwatch/entitlement-contract";
 
 export type {
   PlanProvider,
   PlanProviderUser,
-} from "@langwatch/entitlements-contract";
+} from "@langwatch/entitlement-contract";
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
 /**

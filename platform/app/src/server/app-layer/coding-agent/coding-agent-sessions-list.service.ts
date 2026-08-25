@@ -1,7 +1,12 @@
 import { createLogger } from "@langwatch/observability";
+import { GithubCompositionAdapter } from "@langwatch/github-server";
+import { env } from "~/env.mjs";
 
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { normalizeGithubHost } from "../github/githubHost";
+const normalizeGithubHost = (host: string) =>
+  GithubCompositionAdapter.normalizeGithubHost(host, {
+    host: env.GITHUB_LANGY_HOST,
+  });
 import type {
   GithubPullRequestLookup,
   PullRequestBranchKey,

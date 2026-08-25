@@ -32,9 +32,8 @@
  * once overwritten.
  */
 
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { prisma } from "~/server/db";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import {
   credentialWriteLog,
   decideCredentialWrite,
@@ -319,18 +318,15 @@ async function main() {
     process.stderr.write(`[seed-audio] created default policy ${policy.id}\n`);
   }
 
-  const workspaceSvc = new PersonalWorkspaceService(prisma);
-  const workspace = await workspaceSvc.ensure({
+  const app = initializeDefaultApp({ processRole: "web" });
+  const workspace = await app.organizations.ensurePersonalWorkspace({
     userId: user.id,
     organizationId: org.id,
     displayName: user.name ?? null,
     displayEmail: user.email ?? args.email,
   });
 
-  const vkSvc = PersonalVirtualKeyService.create(prisma, {
-    gatewayBaseUrl: process.env.LW_GATEWAY_BASE_URL ?? "http://localhost:5563",
-  });
-  const issued = await vkSvc.issue({
+  const issued = await app.governance.personalVirtualKeys.issue({
     userId: user.id,
     organizationId: org.id,
     personalProjectId: workspace.project.id,

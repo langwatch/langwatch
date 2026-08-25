@@ -3,7 +3,7 @@ import {
   WebhookDeliveryService,
   WebhookEndpointAdapter,
   WebhookEndpointPolicyService,
-  WebhookEntitlementAdapter,
+  WebhookAccessService,
   WebhookEnvelopeService,
   WebhookEventsClickHouseRepository,
   type DeliverPayload,
@@ -12,35 +12,38 @@ import {
   type WebhookDeliveryProcessDeps,
   type WebhookEndpointRuntime,
   type WebhookEndpointServiceOptions,
-  type WebhookEntitlementService,
   type WebhookEventsCursor,
   type WebhookSpendEventRow,
-} from "@langwatch/enterprise-webhooks-server";
+} from "@langwatch/enterprise-webhook-server";
+import type { EntitlementService } from "@langwatch/entitlement-contract";
 
-export * from "@langwatch/enterprise-webhooks-server";
+export * from "@langwatch/enterprise-webhook-server";
 
-export class AppWebhookEntitlementRuntime {
-  private static adapter: WebhookEntitlementAdapter | undefined;
+export class AppWebhookAccessRuntime {
+  private static service: WebhookAccessService | undefined;
 
-  static install(service: WebhookEntitlementService): void {
-    AppWebhookEntitlementRuntime.adapter = WebhookEntitlementAdapter.create(service);
+  static install(entitlements: EntitlementService): void {
+    AppWebhookAccessRuntime.service =
+      WebhookAccessService.create(entitlements);
   }
 
   static clear(): void {
-    AppWebhookEntitlementRuntime.adapter = undefined;
+    AppWebhookAccessRuntime.service = undefined;
   }
 
   static async assertEntitled(organizationId: string): Promise<void> {
-    if (!AppWebhookEntitlementRuntime.adapter) {
+    if (!AppWebhookAccessRuntime.service) {
       throw new Error("AppWebhookEntitlementRuntime has not been installed");
     }
-    await AppWebhookEntitlementRuntime.adapter.assertEntitled(organizationId);
+    await AppWebhookAccessRuntime.service.assertEndpointsAvailable(
+      organizationId,
+    );
   }
 }
 
 export const assertWebhookEndpointsEntitled = (
   organizationId: string,
-): Promise<void> => AppWebhookEntitlementRuntime.assertEntitled(organizationId);
+): Promise<void> => AppWebhookAccessRuntime.assertEntitled(organizationId);
 
 export const createWebhookEndpointService = (
   options: WebhookEndpointServiceOptions,

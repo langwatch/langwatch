@@ -9,7 +9,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import type { RoleService } from "~/server/role/role.service";
+import type { RoleService } from "@langwatch/role-contract";
 import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();

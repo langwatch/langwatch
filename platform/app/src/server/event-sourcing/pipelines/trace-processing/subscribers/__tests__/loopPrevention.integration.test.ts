@@ -44,12 +44,7 @@ import {
   definePipeline,
 } from "@langwatch/eventing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
-import type {
-  MonitorRepository,
-  MonitorSummary,
-  MonitorWithEvaluator,
-} from "~/server/app-layer/monitors/repositories/monitor.repository";
+import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -106,7 +101,7 @@ class TestRecordSpanCommand extends RecordSpanCommand {
   }
 }
 
-function makeFakeMonitorRepository(): MonitorRepository {
+function makeFakeMonitorService() {
   const monitor: MonitorSummary = {
     id: "monitor_test_loop_prevention",
     checkType: "workflow",
@@ -114,29 +109,9 @@ function makeFakeMonitorRepository(): MonitorRepository {
     threadIdleTimeout: null,
     evaluator: { name: "test/evaluator" },
   };
-  const fullMonitor: MonitorWithEvaluator = {
-    id: monitor.id,
-    checkType: monitor.checkType,
-    sample: 1.0,
-    preconditions: null,
-    parameters: null,
-    mappings: null,
-    level: null,
-    evaluator: {
-      config: {},
-      type: "workflow",
-      workflowId: "wf_test",
-    },
-  };
   return {
     async getEnabledOnMessageMonitors() {
       return [monitor];
-    },
-    async getMonitorById() {
-      return fullMonitor;
-    },
-    async findAllByIds() {
-      return [];
     },
   };
 }
@@ -278,7 +253,7 @@ describe.skipIf(!hasTestcontainers)(
       // GroupQueueProcessor actually fires it when spans land.
       // Override `delay` to 0 — production default is 30s, which is
       // a deliberate dedup window but unhelpful for tests.
-      const monitorService = new MonitorService(makeFakeMonitorRepository());
+      const monitorService = makeFakeMonitorService();
       dispatcher = makeCapturingEvaluationDispatcher();
       const realSubscriber = createEvaluationTriggerSubscriber({
         monitors: monitorService,

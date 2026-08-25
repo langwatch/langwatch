@@ -7,9 +7,11 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import type { SeriesInputType } from "~/server/analytics/registry";
-import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
-import { ClickHouseLegacyAnalyticsShim } from "~/server/app-layer/analytics/repositories/legacy.shim";
+import {
+  buildSeriesName,
+  type AnalyticsSeries,
+} from "@langwatch/analytics-contract";
+import { AnalyticsAdapter as AnalyticsServerAdapter } from "@langwatch/analytics-server";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HALF_DAY_MS = 12 * 60 * 60 * 1000;
@@ -308,7 +310,7 @@ const analyticsPageSeries = ({
 }: {
   evaluatorId: string;
   metric: AnalyticsPageMetric;
-}): SeriesInputType => ({
+}): AnalyticsSeries => ({
   metric,
   aggregation: "avg",
   key: evaluatorId,
@@ -339,7 +341,9 @@ export const readAnalyticsPageNumbers = async ({
   currentStartMs: number;
   endMs: number;
 }) => {
-  const shim = new ClickHouseLegacyAnalyticsShim(async () => client);
+  const analytics = AnalyticsServerAdapter.create({
+    resolveClient: async () => client,
+  });
   const series = analyticsPageSeries({ evaluatorId, metric });
   const baseInput = {
     projectId: tenantId,
@@ -350,8 +354,8 @@ export const readAnalyticsPageNumbers = async ({
     timeZone: "UTC",
   };
   const [daily, full] = await Promise.all([
-    shim.run({ ...baseInput, timeScale: 24 * 60 }),
-    shim.run({ ...baseInput, timeScale: "full" }),
+    analytics.getTimeseries({ ...baseInput, timeScale: 24 * 60 }),
+    analytics.getTimeseries({ ...baseInput, timeScale: "full" }),
   ]);
   const key = buildSeriesName(series, 0);
 

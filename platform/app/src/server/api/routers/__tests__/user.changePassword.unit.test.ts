@@ -31,7 +31,8 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
-vi.mock("~/runtime/app/features/sso", () => ({
+vi.mock("~/runtime/app/features/sso", async (importOriginal) => ({
+  ...(await importOriginal()),
   resolveAuthProvider: resolveAuthProviderMock,
 }));
 
@@ -50,6 +51,7 @@ describe("userRouter.changePassword", () => {
         sessionId: "sess-1",
         expires: "2099-01-01",
       },
+      app: {} as never,
     });
     (ctx as any).prisma = { account: { findFirst: accountFindFirst } };
     return userRouter.createCaller(ctx);

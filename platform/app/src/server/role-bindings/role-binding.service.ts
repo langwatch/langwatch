@@ -19,8 +19,8 @@ import {
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
-import type { RoleService } from "~/server/role/role.service";
+import { LiteMemberViewerOnlyError } from "@langwatch/organization-contract";
+import type { RoleService } from "@langwatch/role-contract";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isBindingRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
 import {
@@ -209,7 +209,7 @@ export class RoleBindingService {
       organizationId,
       customRoleIds: [...new Set(customBindings.map((b) => b.customRoleId))],
     });
-    await this.roleService.assertNoOrgExclusivePermissionsBelowOrgScope({
+    await this.roleService.assertNoOrganizationExclusivePermissionsBelowOrganizationScope({
       organizationId,
       customBindings,
     });
@@ -227,7 +227,7 @@ export class RoleBindingService {
     customRoleIds: string[];
   }): Promise<void> {
     const assignable = new Set(
-      await this.roleService.filterAssignableRoleIds({
+      await this.roleService.filterAssignable({
         roleIds: customRoleIds,
         organizationId,
       }),

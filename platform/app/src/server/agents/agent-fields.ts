@@ -1,8 +1,9 @@
-import type {
-  AgentConfig as AgentComponentConfig,
-  AgentFields as ContractAgentFields,
-  AgentType,
-  AgentWithFields as ContractAgentWithFields,
+import {
+  linkedWorkflowId as getLinkedWorkflowId,
+  type AgentConfig as AgentComponentConfig,
+  type AgentFields as ContractAgentFields,
+  type AgentType,
+  type AgentWithFields as ContractAgentWithFields,
 } from "@langwatch/agent-contract";
 import type { Field, Workflow } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
@@ -27,20 +28,12 @@ export type AgentFields = ContractAgentFields;
 export type AgentWithFields = ContractAgentWithFields;
 
 /**
- * The Studio workflow a workflow agent points at.
- *
- * The `workflowId` column is authoritative, but agents created before it
- * existed only carry `workflow_id` inside their DSL config, and the two
- * drawers that read this already disagreed about which to try first.
+ * Compatibility export for app-only callers. The canonical fallback logic
+ * lives in the portable Agents contract so server and browser consumers agree.
+ * The `workflowId` column is authoritative, with a legacy `workflow_id`
+ * config fallback for agents created before the column existed.
  */
-export const linkedWorkflowId = (agent: {
-  workflowId?: string | null;
-  config: AgentComponentConfig;
-}): string | undefined => {
-  if (agent.workflowId) return agent.workflowId;
-  const config = agent.config as { workflow_id?: string };
-  return config.workflow_id;
-};
+export const linkedWorkflowId = getLinkedWorkflowId;
 
 /**
  * A workflow's inputs are its entry node's mapping surface, and its outputs

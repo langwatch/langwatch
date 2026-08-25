@@ -39,7 +39,7 @@ import {
   serializeResponseBody,
   withIdempotency,
 } from "~/server/api/idempotency";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
@@ -331,7 +331,7 @@ async function seedUserWithRole(args: {
       scopeId: args.bindingScope.id,
     },
   });
-  const created = await ApiKeyService.create(prisma).create({
+  const created = await getApp().apiKeys.create({
     name: `gwrest-${args.userId}`,
     userId: args.userId,
     createdByUserId: args.userId,

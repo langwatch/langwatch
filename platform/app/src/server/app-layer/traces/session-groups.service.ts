@@ -154,7 +154,7 @@ interface SessionGroupsParams {
  * hand in a plain object.
  */
 export interface CodingAgentSessionLookup {
-  getBySessionId(args: {
+  tryGetBySessionId(args: {
     projectId: string;
     sessionId: string;
     startedAtMs?: number;
@@ -306,7 +306,7 @@ export class SessionGroupsService {
       const settled = await Promise.all(
         chunk.map((row) =>
           this.codingAgentSessions
-            .getBySessionId({
+            .tryGetBySessionId({
               projectId: tenantId,
               sessionId: row.conversationId,
               startedAtMs: row.startedAtMs,

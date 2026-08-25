@@ -30,8 +30,8 @@ import {
 import {
   CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
   defaultCliKeyPermissions,
-} from "~/server/api-key/cli-key-defaults";
-import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
+} from "@langwatch/api-key-contract";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -663,7 +663,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       // landed — the interleaving the race produces. Excluding only its own
       // key is not enough; without the createdBefore bound it would revoke
       // the key the second exchange just handed to the CLI.
-      await CliLoginKeyService.create(prisma).revokeLoginKeysForDevice({
+      await getApp().apiKeys.revokeCliLoginKeysForDevice({
         userId: MEMBER_ID,
         organizationId: ORG_ID,
         deviceLabel: HOSTNAME,

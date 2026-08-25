@@ -22,7 +22,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
@@ -88,7 +88,7 @@ export async function seedManagementOrg({
     },
   });
 
-  const created = await ApiKeyService.create(prisma).create({
+  const created = await getApp().apiKeys.create({
     name: `mgmt-admin-key-${nanoid(6)}`,
     userId: admin.id,
     createdByUserId: admin.id,

@@ -31,7 +31,8 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
+import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
@@ -131,18 +132,49 @@ describe("enterprise feature guards", () => {
   beforeEach(async () => {
     await resetApp();
     mockGetActivePlan = vi.fn();
+    const planProvider = PlanProviderService.create({
+      getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
+    });
+    const base = createTestApp({ planProvider });
+    const canonicalOrganizations = AppOrganizationRuntime.create({
+      database: prisma,
+      authz: base.permissions,
+      grants: base.authzGrants,
+    }).build();
     globalForApp.__langwatch_app = createTestApp({
-      planProvider: PlanProviderService.create({
-        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
+      planProvider,
       // organization.updateMemberRole delegates its orchestration to
       // getApp().organizations, which needs the Prisma-backed repository:
       // createTestApp's default organizations service sits on the null
       // repository and refuses those operations.
       organizations: new OrganizationService(
-        new PrismaOrganizationRepository(prisma),
-        new PromptTagRepository(prisma),
+        new PrismaOrganizationRepository(prisma, base.authzGrants),
+        base.prompts,
+        canonicalOrganizations,
+        createLicenseEnforcementService(prisma, planProvider),
       ),
+    });
+
+    // Each scenario starts from the same authoritative team membership. The
+    // router now reads membership from AuthZ bindings, not the legacy TeamUser
+    // compatibility row, and preceding mutation scenarios must not leak their
+    // role changes into the next guard assertion.
+    await prisma.roleBinding.deleteMany({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        organizationId,
+        userId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
     });
   });
 

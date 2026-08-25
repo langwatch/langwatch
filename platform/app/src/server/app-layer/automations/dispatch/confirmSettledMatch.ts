@@ -1,5 +1,5 @@
 import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {
   evaluateQueryInMemory,
   queryNeeds,
@@ -15,7 +15,7 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 
 export interface ConfirmSettledMatchDeps {
-  evaluationRuns: EvaluationRunService;
+  evaluationRuns: EvaluationService;
   deriveEvents: (params: {
     tenantId: string;
     traceId: string;
@@ -47,7 +47,10 @@ export async function confirmSettledMatch({
   if (trigger.filterQuery != null) {
     const needs = queryNeeds(trigger.filterQuery);
     const evaluations = needs.has("evaluations")
-      ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
+      ? await deps.evaluationRuns.findRunsByTraceId({
+          tenantId: projectId,
+          traceId,
+        })
       : null;
     const events = needs.has("events")
       ? await deps.deriveEvents({
@@ -88,10 +91,10 @@ export async function confirmSettledMatch({
   }
 
   if (hasEvaluationFilters) {
-    const allEvaluations = await deps.evaluationRuns.findByTraceId(
-      projectId,
+    const allEvaluations = await deps.evaluationRuns.findRunsByTraceId({
+      tenantId: projectId,
       traceId,
-    );
+    });
     if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
       return false;
     }

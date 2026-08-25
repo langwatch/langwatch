@@ -1,4 +1,5 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ApiErrorEnvelope } from "~/app/api/shared/canonical-error";
 import type { Project } from "~/generated/prisma/client";
@@ -6,8 +7,6 @@ import {
   requireApiKeyPermission as createRequireApiKeyPermission,
   createUnifiedAuthMiddleware,
 } from "~/server/api-key/auth-middleware";
-import type { ResolvedToken } from "~/server/api-key/token-resolver";
-import { prisma } from "~/server/db";
 
 /**
  * Variables set by the auth middleware.
@@ -34,9 +33,7 @@ export type AuthMiddlewareVariables = {
  *   - Bearer Legacy: sk-lw-...
  *   - X-Auth-Token: legacy header
  */
-export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
-  prisma,
-});
+export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({});
 
 /**
  * The same authentication, refusing in the canonical error envelope.
@@ -46,7 +43,7 @@ export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
  * canonically here rather than as the flat legacy body.
  */
 export const canonicalAuthMiddleware: MiddlewareHandler =
-  createUnifiedAuthMiddleware({ prisma, errorEnvelope: "canonical" });
+  createUnifiedAuthMiddleware({ errorEnvelope: "canonical" });
 
 /**
  * Per-endpoint RBAC middleware. Legacy project keys always pass through;

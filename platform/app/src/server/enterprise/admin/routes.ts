@@ -27,10 +27,9 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
-import { UserService } from "~/server/users/user.service";
 import {
   auditLog,
-  impersonationService,
+  opsService,
   isAdmin,
   mapUserToBackofficeRow,
   ORGANIZATION_SAFE_SELECT,
@@ -160,7 +159,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const sessionId = rawBetterAuth.session.id;
 
   if (method === "DELETE") {
-    await impersonationService.stop({ sessionId });
+    await opsService.stopImpersonation({ sessionId });
     return c.json({ message: "Impersonation ended" });
   }
 
@@ -191,7 +190,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   // which serialises the whole payload. Catching it here to re-emit
   // `{ message }` threw away the code, the meta and the trace id — leaving
   // the client with a sentence it is not allowed to render.
-  await impersonationService.start({
+  await opsService.startImpersonation({
     sessionId,
     impersonatorUserId: user.id,
     userIdToImpersonate,
@@ -449,7 +448,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   ) {
     const userId = String(body.params.id);
     const data = body.params.data as Record<string, unknown>;
-    const userService = UserService.create(prisma);
+    const userService = c.var.langwatchApp.users;
     let handledSideEffect = false;
     const sideEffectAudit: Array<{
       action: string;

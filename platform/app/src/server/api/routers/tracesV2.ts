@@ -2117,12 +2117,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
-      const app = getApp();
+    .query(async ({ ctx, input }) => {
       // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
       // session row — which already spans every trace of the run, so no
       // conversation-membership fan-out is needed here anymore.
-      return app.codingAgents.sessions.getSessionForTrace({
+      return ctx.app.codingAgents.sessions.tryGetSessionForTrace({
         projectId: input.projectId,
         traceId: input.traceId,
       });

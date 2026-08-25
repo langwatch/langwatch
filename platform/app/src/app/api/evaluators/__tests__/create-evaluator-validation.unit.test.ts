@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { handleError } from "~/app/api/middleware/error-handler";
 import { validator as zValidator } from "~/server/api/validation";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
+import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import { createEvaluatorInputSchema } from "../[[...route]]/schemas";
 
 const app = new Hono();

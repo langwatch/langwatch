@@ -31,7 +31,6 @@ import { createManagementService } from "~/server/api/management/managed-service
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { prisma } from "~/server/db";
-import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { optimisticBindingWire } from "./read-back";
 
@@ -287,11 +286,11 @@ const deleteBindingHandler = async (c: RoleBindingsContext) => {
 
 export const app = service
   .provide({
-    roleBindings: () =>
+    roleBindings: (_base, context) =>
       new RoleBindingService({
         prisma,
         repo: new PrismaRoleBindingRepository(prisma),
-        roleService: new RoleService(prisma),
+        roleService: context.get("langwatchApp").roles,
       }),
   })
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, listBindingsHandler, (b) =>

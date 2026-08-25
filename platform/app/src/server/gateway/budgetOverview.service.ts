@@ -25,10 +25,11 @@
  * Spec: specs/ai-gateway/budget-overview.feature
  */
 
-import type { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import type {
+  GovernancePersonalUsageService,
+  GovernancePersonalVirtualKeyService,
+} from "@langwatch/enterprise-governance-contract";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   GatewayBudget,
   GatewayBudgetScopeType,
@@ -117,18 +118,28 @@ export type BudgetOverviewForUser = {
 };
 
 export class BudgetOverviewService {
-  constructor(
+  private constructor(
     private readonly prisma: PrismaClient,
+    private readonly organizations: OrganizationService,
+    private readonly personalVirtualKeys: GovernancePersonalVirtualKeyService,
+    private readonly personalUsage: GovernancePersonalUsageService,
     private readonly chRepo?: GatewayBudgetClickHouseRepository,
-    private readonly personalUsageRepo?: PersonalUsageClickHouseRepository,
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    chRepo?: GatewayBudgetClickHouseRepository,
-    personalUsageRepo?: PersonalUsageClickHouseRepository,
-  ): BudgetOverviewService {
-    return new BudgetOverviewService(prisma, chRepo, personalUsageRepo);
+  static create(options: {
+    database: PrismaClient;
+    organizations: OrganizationService;
+    personalVirtualKeys: GovernancePersonalVirtualKeyService;
+    personalUsage: GovernancePersonalUsageService;
+    budgetRepository?: GatewayBudgetClickHouseRepository;
+  }): BudgetOverviewService {
+    return new BudgetOverviewService(
+      options.database,
+      options.organizations,
+      options.personalVirtualKeys,
+      options.personalUsage,
+      options.budgetRepository,
+    );
   }
 
   /**
@@ -167,11 +178,11 @@ export class BudgetOverviewService {
     // The gates above stay sequential so the service still fails closed
     // before it reads any data.
     const [workspace, personalVks] = await Promise.all([
-      new PersonalWorkspaceService(this.prisma).findExisting({
+      this.organizations.tryFindPersonalWorkspace({
         userId: input.userId,
         organizationId: input.organizationId,
       }),
-      PersonalVirtualKeyService.create(this.prisma).list({
+      this.personalVirtualKeys.list({
         userId: input.userId,
         organizationId: input.organizationId,
       }),
@@ -303,9 +314,7 @@ export class BudgetOverviewService {
   }): Promise<Array<{ model: string; spentUsd: number }>> {
     if (!input.personalProjectId) return [];
     try {
-      const breakdown = await PersonalUsageService.create(
-        this.personalUsageRepo,
-      ).breakdownByModel(
+      const breakdown = await this.personalUsage.breakdownByModel(
         { personalProjectId: input.personalProjectId, userId: input.userId },
         3,
       );

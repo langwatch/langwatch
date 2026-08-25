@@ -81,11 +81,6 @@ export const UNPUBLISHED = [
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
   },
   {
-    match: "/api/admin",
-    category: "internal",
-    why: "LangWatch staff back-office, including impersonation; publishing it would advertise a surface no customer may call",
-  },
-  {
     match: "/api/ops",
     category: "internal",
     why: "operator debugging (ClickHouse EXPLAIN), reachable only with ops credentials",
@@ -109,11 +104,6 @@ export const UNPUBLISHED = [
     match: "/api/webhooks/stripe",
     category: "internal",
     why: "inbound Stripe webhook; the schema is Stripe's and the signature check makes us the only valid caller",
-  },
-  {
-    match: "/api/webhooks/auth0-scim",
-    category: "internal",
-    why: "inbound Auth0 provisioning webhook, addressed by Auth0 and no one else",
   },
   {
     match: "/api/elevenlabs/webhook",
@@ -216,6 +206,11 @@ export const UNPUBLISHED = [
     match: "/api/evaluations/v3",
     category: "alias",
     why: "deprecated alias that rewrites onto /api/experiments/...; documenting it would publish the path we are moving clients off",
+  },
+  {
+    match: "/api/secrets",
+    category: "alias",
+    why: "deprecated unversioned REST compatibility family; new clients use the documented /api/secrets/{version}/secrets.* RPC operations",
   },
   {
     match: "GET /api/thread/{id}",

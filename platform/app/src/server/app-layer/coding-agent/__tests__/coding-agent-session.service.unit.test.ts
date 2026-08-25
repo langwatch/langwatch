@@ -377,7 +377,7 @@ describe("CodingAgentSessionService", () => {
         mapping: { sessionId: SESSION, occurredAtMs: row.startedAtMs },
       });
 
-      const session = await service.getSessionForTrace({
+      const session = await service.tryGetSessionForTrace({
         projectId: PROJECT,
         traceId: TRACE,
       });
@@ -419,7 +419,7 @@ describe("CodingAgentSessionService", () => {
           sessionEvents: new NullCodingAgentSessionEventsRepository(),
         });
 
-        const session = await service.getBySessionId({
+        const session = await service.tryGetBySessionId({
           projectId: PROJECT,
           sessionId: SESSION,
           startedAtMs: row.startedAtMs,
@@ -438,7 +438,7 @@ describe("CodingAgentSessionService", () => {
     it("returns null without touching the session table", async () => {
       const service = makeService({ row: makeRow(), mapping: null });
 
-      const session = await service.getSessionForTrace({
+      const session = await service.tryGetSessionForTrace({
         projectId: PROJECT,
         traceId: TRACE,
       });
@@ -506,7 +506,7 @@ describe("CodingAgentSessionService", () => {
         ],
       });
 
-      const session = await service.getBySessionId({
+      const session = await service.tryGetBySessionId({
         projectId: PROJECT,
         sessionId: SESSION,
       });

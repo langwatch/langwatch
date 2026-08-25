@@ -1,6 +1,12 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { isMappableGithubHost } from "~/server/app-layer/github/githubHost";
+import { GithubCompositionAdapter } from "@langwatch/github-server";
+import { env } from "~/env.mjs";
+
+const isMappableGithubHost = (host: string) =>
+  GithubCompositionAdapter.isMappableGithubHost(host, {
+    host: env.GITHUB_LANGY_HOST,
+  });
 import type { CodingAgentSessionState } from "../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../schemas/events";
 

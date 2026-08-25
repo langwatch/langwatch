@@ -74,7 +74,7 @@ const { mockPrisma, mockRedis, runtime, SESSION } = vi.hoisted(() => {
       teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
       project: {
         // Two callers hit project.findUnique: resolveProjectPermission selects
-        // the team→org graph; ProjectService.getById fetches the project row.
+        // the team→org graph; ProjectService.tryGetById fetches the project row.
         findUnique: vi.fn(({ select }: { select?: { team?: unknown } }) =>
           select?.team
             ? Promise.resolve({

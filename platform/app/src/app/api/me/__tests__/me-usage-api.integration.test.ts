@@ -9,7 +9,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
@@ -307,7 +307,7 @@ describe("Feature: Personal usage REST API", () => {
       },
     });
     callerUserToken = (
-      await ApiKeyService.create(prisma).create({
+      await getApp().apiKeys.create({
         name: `me-usage-caller-${nanoid(6)}`,
         userId,
         createdByUserId: userId,

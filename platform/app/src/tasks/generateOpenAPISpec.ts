@@ -278,7 +278,10 @@ export default async function execute() {
   // the document.
   const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
-  const secretsSpec = await generateSpecs(secretsApp);
+  const secretsSpec = await generateFrameworkSpecs(
+    secretsApp,
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building simulation runs spec...");
@@ -364,7 +367,11 @@ export default async function execute() {
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
-    JSON.stringify(withoutEmptyPaths(mergedSpec), null, 2),
+    JSON.stringify(
+      withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(mergedSpec)),
+      null,
+      2,
+    ),
   );
 }
 
@@ -527,4 +534,27 @@ function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(
       ),
     ),
   };
+}
+
+/**
+ * Zod 4 emits local JSON Schema `$defs` alongside the component references it
+ * has already resolved. OpenAPI 3.0 does not define `$defs`; leaving it in a
+ * schema makes client generators treat it as a required data property. The
+ * local definitions are redundant here—all emitted references already point
+ * at `#/components/schemas/*`—so remove them from the published document.
+ */
+function withoutEmbeddedJsonSchemaDefinitions<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(withoutEmbeddedJsonSchemaDefinitions) as T;
+  }
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "$defs")
+      .map(([key, item]) => [
+        key,
+        withoutEmbeddedJsonSchemaDefinitions(item),
+      ]),
+  ) as T;
 }

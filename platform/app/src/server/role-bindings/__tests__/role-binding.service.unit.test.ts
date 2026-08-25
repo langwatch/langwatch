@@ -15,7 +15,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { RoleService } from "~/server/role/role.service";
+import type { RoleService } from "@langwatch/role-contract";
 import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();
@@ -106,13 +106,57 @@ beforeEach(() => {
   transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) =>
     cb(prisma),
   );
-  // A real RoleService over the same mocked client: the org-exclusive scope
-  // guard lives there and reads `customRole.findMany`, so a hand-written
-  // double would pin the delegation rather than the rule.
-  const roleService = new RoleService(prisma);
-  vi.spyOn(roleService, "filterAssignableRoleIds").mockImplementation(
-    filterAssignableRoleIds as unknown as RoleService["filterAssignableRoleIds"],
-  );
+  // RoleBindingService consumes the canonical Role capability. Keep the
+  // policy test's mocked role rows behind that capability rather than
+  // constructing the removed legacy Prisma-backed RoleService here.
+  const roleService = {
+    filterAssignable: filterAssignableRoleIds,
+    assertNoOrganizationExclusivePermissionsBelowOrganizationScope: async ({
+      customBindings,
+    }: {
+      customBindings: Array<{
+        customRoleId: string;
+        scopeType: RoleBindingScopeType;
+      }>;
+    }) => {
+      if (
+        customBindings.every(
+          (binding) => binding.scopeType === "ORGANIZATION",
+        )
+      ) {
+        return;
+      }
+      const roles = await customRoleFindMany();
+      for (const binding of customBindings) {
+        const role = roles.find(
+          (candidate) => candidate.id === binding.customRoleId,
+        );
+        const permission = role?.permissions.find((candidate: string) =>
+          [
+            "organization",
+            "governance",
+            "ingestionSources",
+            "anomalyRules",
+            "complianceExport",
+            "activityMonitor",
+            "aiTools",
+            "webhookEndpoints",
+            "gatewaySpend",
+          ].includes(candidate.split(":")[0]),
+        );
+        if (permission) {
+          const error = Object.assign(
+            new Error(`${permission} can only be granted at organization scope`),
+            {
+              code: "org_exclusive_permission_scope",
+              meta: { permission, scopeType: binding.scopeType },
+            },
+          );
+          throw error;
+        }
+      }
+    },
+  } as unknown as RoleService;
   service = new RoleBindingService({
     prisma,
     repo: repository,

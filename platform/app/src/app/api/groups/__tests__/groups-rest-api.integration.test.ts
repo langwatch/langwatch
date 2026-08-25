@@ -8,8 +8,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
@@ -120,7 +119,7 @@ describe("Feature: Groups REST API", () => {
       },
     });
 
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     const created = await apiKeyService.create({
       name: `groups-key-${nanoid(6)}`,
       userId,

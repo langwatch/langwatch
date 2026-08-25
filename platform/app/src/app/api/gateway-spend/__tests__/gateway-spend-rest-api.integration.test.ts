@@ -17,7 +17,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -303,7 +303,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         scopeId: organization.id,
       },
     });
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     const created = await apiKeyService.create({
       name: `billing-key-${nanoid(6)}`,
       userId,

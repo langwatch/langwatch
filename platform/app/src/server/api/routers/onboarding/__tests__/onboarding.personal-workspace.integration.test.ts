@@ -22,12 +22,11 @@
 import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
 import { onboardingRouter } from "../onboarding.router";
@@ -89,10 +88,10 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
         {
-          seedForOrg: async () => {
+          seedTagsForOrganization: async () => {
             /* noop */
           },
-        } as unknown as PromptTagRepository,
+        },
       ),
     });
   });
@@ -191,10 +190,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
 
     /** @scenario The personal workspace stays separate from the shared workspace */
     it("is idempotent, so a later CLI login adds no second workspace", async () => {
-      const { PersonalWorkspaceService } = await import(
-        "@ee/governance/services/personalWorkspace.service"
-      );
-      const again = await new PersonalWorkspaceService(prisma).ensure({
+      const again = await getApp().organizations.ensurePersonalWorkspace({
         userId,
         organizationId,
       });

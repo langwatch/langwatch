@@ -9,6 +9,8 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 import { z } from "zod";
 import type { Trace } from "~/server/tracer/types";
 
@@ -34,12 +36,6 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
 
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({ resolve: mockResolve, markUsed: mockMarkUsed })),
-  },
-}));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   const actual =
@@ -74,6 +70,10 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: mockMarkUsed,
+    },
     share: { createShare: vi.fn(), unshare: vi.fn() },
   })),
 }));
@@ -90,6 +90,7 @@ vi.mock("~/server/api/routers/traces.schemas", () => ({
 const { app: legacyApp } = await import("../traces-legacy");
 
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", legacyApp);
 
 const sampleThreadTrace: Partial<Trace> = {

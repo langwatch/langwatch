@@ -6,12 +6,14 @@ import {
 } from "@langwatch/evaluator-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-class AppEvaluatorAuditLogPort implements EvaluatorAuditLogPort {
+class AppEvaluatorAuditLogPort extends EvaluatorAuditLogPort {
   static create(database: PrismaClient): AppEvaluatorAuditLogPort {
     return new AppEvaluatorAuditLogPort(database);
   }
 
-  private constructor(private readonly database: PrismaClient) {}
+  private constructor(private readonly database: PrismaClient) {
+    super();
+  }
 
   async history(input: {
     evaluatorId: string;

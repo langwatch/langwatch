@@ -24,7 +24,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -48,7 +48,7 @@ describe("Feature: API keys management REST API", () => {
   let serviceManagerToken: string;
   let serviceAdminToken: string;
 
-  const apiKeyService = ApiKeyService.create(prisma);
+  const apiKeyService = getApp().apiKeys;
 
   const headersFor = (token: string) => ({
     Authorization: `Bearer ${token}`,

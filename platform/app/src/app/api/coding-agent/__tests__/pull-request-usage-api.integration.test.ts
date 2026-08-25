@@ -24,8 +24,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { CodingAgentSessionService } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import { CodingAgentSessionsListService } from "~/server/app-layer/coding-agent/coding-agent-sessions-list.service";
 import { PullRequestUsageService } from "~/server/app-layer/coding-agent/pull-request-usage.service";
@@ -231,7 +230,7 @@ beforeAll(async () => {
     },
   });
   callerToken = (
-    await ApiKeyService.create(prisma).create({
+    await getApp().apiKeys.create({
       name: `pr-usage-caller-${ns}`,
       userId: callerUserId,
       createdByUserId: callerUserId,

@@ -15,7 +15,7 @@ import {
   getTeamRolePermissions,
   type Permission,
 } from "../../../api/rbac";
-import { PERMISSION_CATEGORIES } from "../../../api-key/permission-categories";
+import { PERMISSION_CATEGORIES } from "@langwatch/api-key-contract";
 
 describe("authz registry", () => {
   describe("given the legacy vocabulary", () => {

@@ -13,9 +13,9 @@
  */
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
@@ -139,8 +139,8 @@ async function main() {
     throw new Error(`no device_code for user_code ${userCode}`);
   }
 
-  const { prisma } = await import("~/server/db");
-  const service = PersonalVirtualKeyService.create(prisma);
+  const service = initializeDefaultApp({ processRole: "web" }).governance
+    .personalVirtualKeys;
 
   // Try ensureDefault first; if the user already has a default personal VK
   // (the secret was minted in a prior login + only the hash is stored,

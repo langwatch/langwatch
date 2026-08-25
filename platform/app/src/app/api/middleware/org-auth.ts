@@ -7,7 +7,7 @@ import {
 } from "~/app/api/shared/canonical-error";
 import type { Organization } from "~/generated/prisma/client";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
-import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
+import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
 import { remediation } from "~/server/app-layer/error-remediation";
 import { prisma } from "~/server/db";
 import { appFromContext } from "./app-context";

@@ -7,7 +7,10 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Agent } from "@langwatch/agent-contract";
-import type { Evaluator } from "@langwatch/evaluator-contract";
+import type {
+  Evaluator,
+  EvaluatorService,
+} from "@langwatch/evaluator-contract";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { AgentsFeature } from "~/runtime/app/features/agents";
@@ -318,12 +321,18 @@ export type ExecutionDataInputs = {
   parameters?: Record<string, string | number | boolean>;
 };
 
+/** Canonical feature services used only for the resources this load needs. */
+export type ExecutionDataServices = {
+  evaluators?: EvaluatorService;
+};
+
 export const loadExecutionData = async (
   projectId: string,
   dataset: DatasetInput,
   targets: TargetForLoading[],
   evaluators: EvaluatorForLoading[],
   inputs?: ExecutionDataInputs,
+  services: ExecutionDataServices = {},
 ): Promise<LoadedExecutionData | { error: string; status: number }> => {
   // Resolve the base rows + columns: inline data, a saved dataset id, or the
   // attached dataset reference, in that precedence.
@@ -535,8 +544,13 @@ export const loadExecutionData = async (
   }
 
   // Load all evaluators
+  if (evaluatorIdsToLoad.size > 0 && !services.evaluators) {
+    throw new Error(
+      "ExecutionDataServices.evaluators is required when an execution references an evaluator",
+    );
+  }
   for (const evaluatorId of evaluatorIdsToLoad) {
-    const dbEvaluator = await getApp().evaluators.tryGetById({
+    const dbEvaluator = await services.evaluators?.tryGetById({
       id: evaluatorId,
       projectId,
     });

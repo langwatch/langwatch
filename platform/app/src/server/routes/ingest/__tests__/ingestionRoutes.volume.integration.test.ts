@@ -61,7 +61,7 @@
  */
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";

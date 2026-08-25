@@ -31,8 +31,6 @@
  *      OCSF read projection (SIEM export) on top of the unified store.
  */
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import {
   enforceApiKeyIdOnLogRequest,
   enforceApiKeyIdOnMetricRequest,
@@ -342,8 +340,8 @@ async function authIngestionSource(c: IngestContext) {
   if (!header) return null;
   const match = /^Bearer\s+(lw_is_[A-Za-z0-9_\-]+)$/.exec(header.trim());
   if (!match) return null;
-  const service = IngestionSourceService.create(prisma);
-  return await service.findByIngestSecret(match[1]!);
+  const service = c.var.langwatchApp.governance.ingestionSources;
+  return await service.tryFindByIngestSecret(match[1]!);
 }
 
 /**
@@ -445,10 +443,10 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
         // governance entity created it (per master directive); receiver
         // pulls it back here for trace-pipeline tenancy. Helper is
         // idempotent so a race-created Project resolves cleanly.
-        const govProject = await ensureHiddenGovernanceProject(
-          prisma,
-          source.organizationId,
-        );
+        const govProject = await c.var.langwatchApp.projects.ensureInternal({
+          organizationId: source.organizationId,
+          kind: "internal_governance",
+        });
         stampOriginAttrs(parsed.request, source);
         // These endpoints authenticate with an ingestion-source bearer
         // secret, so there is no ApiKey row to attribute the payload to.
@@ -477,7 +475,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
     );
   }
 
-  const service = IngestionSourceService.create(prisma);
+  const service = c.var.langwatchApp.governance.ingestionSources;
   await service.recordEventReceived(source.id);
   logger.info(
     {
@@ -562,10 +560,10 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: IngestContext) =
     envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     if (bodyBytes > 0) {
-      const govProject = await ensureHiddenGovernanceProject(
-        prisma,
-        source.organizationId,
-      );
+      const govProject = await c.var.langwatchApp.projects.ensureInternal({
+        organizationId: source.organizationId,
+        kind: "internal_governance",
+      });
       const logRequest = buildWebhookLogRequest(raw, source);
       await c.var.langwatchApp.traces.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
@@ -582,7 +580,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: IngestContext) =
     );
   }
 
-  const service = IngestionSourceService.create(prisma);
+  const service = c.var.langwatchApp.governance.ingestionSources;
   await service.recordEventReceived(source.id);
   logger.info(
     {
@@ -667,10 +665,10 @@ secured
         // off the log attributes, mirroring the trace path and the
         // webhook receiver.
         if (logRecordCount > 0) {
-          const govProject = await ensureHiddenGovernanceProject(
-            prisma,
-            source.organizationId,
-          );
+          const govProject = await c.var.langwatchApp.projects.ensureInternal({
+            organizationId: source.organizationId,
+            kind: "internal_governance",
+          });
           stampLogOriginAttrs(parsed.request, source);
           enforceApiKeyIdOnLogRequest(
             parsed.request as unknown as Parameters<
@@ -872,7 +870,7 @@ secured
       );
     }
 
-    const service = IngestionSourceService.create(prisma);
+    const service = c.var.langwatchApp.governance.ingestionSources;
     await service.recordEventReceived(source.id);
     logger.info(
       {
@@ -960,10 +958,10 @@ secured
           // deliberately not recorded: the collector re-sends this same
           // request, so counting it now double-counts it.
           try {
-            const govProject = await ensureHiddenGovernanceProject(
-              prisma,
-              source.organizationId,
-            );
+            const govProject = await c.var.langwatchApp.projects.ensureInternal({
+              organizationId: source.organizationId,
+              kind: "internal_governance",
+            });
             stampMetricOriginAttrs({ request: parsed.request, source });
             enforceApiKeyIdOnMetricRequest(
               parsed.request as unknown as Parameters<
@@ -1003,7 +1001,7 @@ secured
       parseHint = String(err);
     }
 
-    const service = IngestionSourceService.create(prisma);
+    const service = c.var.langwatchApp.governance.ingestionSources;
     await service.recordEventReceived(source.id);
     logger.info(
       {

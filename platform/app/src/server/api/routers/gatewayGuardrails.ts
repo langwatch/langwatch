@@ -8,7 +8,7 @@
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
 
-import { z } from "zod";
+import { z } from "zod/v4";
 import {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
@@ -26,7 +26,10 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+      );
       return await service.list(input.projectId);
     }),
 
@@ -34,7 +37,10 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+      );
       return await service.get(input.id, input.projectId);
     }),
 
@@ -51,7 +57,10 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     )
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+      );
       return await service.create({
         projectId: input.projectId,
         name: input.name,
@@ -77,7 +86,10 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     )
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+      );
       return await service.update({
         id: input.id,
         projectId: input.projectId,
@@ -94,7 +106,10 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+      );
       await service.archive({
         id: input.id,
         projectId: input.projectId,

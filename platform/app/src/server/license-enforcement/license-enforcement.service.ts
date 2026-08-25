@@ -2,6 +2,11 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "./errors";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
+import {
+  assertMemberTypeLimitNotExceeded,
+  type MemberTypeLimits,
+} from "./license-limit-guard";
+import type { RoleChangeType } from "./member-classification";
 import type { LimitCheckResult, LimitType, limitTypes } from "./types";
 
 /**
@@ -146,6 +151,19 @@ export class LicenseEnforcementService {
     user?: MinimalUser;
   }): Promise<void> {
     return this.enforceLimit(organizationId, limitType, user);
+  }
+
+  assertMemberTypeChangeAllowed(input: {
+    changeType: RoleChangeType;
+    organizationId: string;
+    limits: MemberTypeLimits;
+  }): Promise<void> {
+    return assertMemberTypeLimitNotExceeded(
+      input.changeType,
+      input.organizationId,
+      this.repository,
+      input.limits,
+    );
   }
 
   /**

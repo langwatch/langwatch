@@ -103,7 +103,7 @@ function lookupReturning(
   calls: string[] = [],
 ): CodingAgentSessionLookup {
   return {
-    async getBySessionId({ sessionId }) {
+    async tryGetBySessionId({ sessionId }) {
       calls.push(sessionId);
       return bySessionId[sessionId] ?? null;
     },
@@ -245,7 +245,7 @@ describe("SessionGroupsService", () => {
       const service = new SessionGroupsService({
         repository: new FakeRepository([makeRow()]),
         codingAgentSessions: {
-          async getBySessionId() {
+          async tryGetBySessionId() {
             throw new Error("clickhouse hiccup");
           },
         },

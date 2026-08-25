@@ -24,22 +24,22 @@
  */
 
 import { auditLog } from "~/runtime/app/features/audit-log";
+import {
+  GithubNotConnectedError,
+  type GithubService,
+} from "@langwatch/github-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PermissionMiddleware } from "~/server/api/rbac";
-import { getApp } from "~/server/app-layer";
-import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
-import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
-import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
-import { getGithubWebBase } from "~/server/app-layer/github/githubHost";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function ensureOrganizationMember(
   userId: string,
   organizationId: string,
+  service: GithubService,
 ): Promise<void> {
-  const isMember = await getApp().github.installations.isOrganizationMember({
+  const isMember = await service.isOrganizationMember({
     userId,
     organizationId,
   });
@@ -61,7 +61,11 @@ async function ensureOrganizationMember(
 const enforceOrganizationMembership: PermissionMiddleware<{
   organizationId: string;
 }> = async ({ ctx, input, next }) => {
-  await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
+  await ensureOrganizationMember(
+    ctx.session.user.id,
+    input.organizationId,
+    ctx.app.github,
+  );
   return next();
 };
 
@@ -71,8 +75,7 @@ function uninstallUrl(installation: {
   accountLogin: string;
   accountType: string;
   installationId: string;
-}): string {
-  const webBase = getGithubWebBase();
+}, webBase: string): string {
   if (installation.accountType === "Organization") {
     return `${webBase}/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
   }
@@ -89,8 +92,11 @@ function uninstallUrl(installation: {
  * way hands the customer a button whose only possible outcome is the route's
  * 503.
  */
-function installUrl(organizationId: string): string | null {
-  if (!getGithubAppConfig().configured) return null;
+function installUrl(
+  organizationId: string,
+  service: GithubService,
+): string | null {
+  if (!service.getAppConfig().configured) return null;
   return `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
@@ -99,8 +105,8 @@ export const githubRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .use(enforceOrganizationMembership)
-    .query(async ({ input }) => {
-      const service = getApp().github.installations;
+    .query(async ({ input, ctx }) => {
+      const service = ctx.app.github;
       const installations = await service.getAllForOrganization(
         input.organizationId,
       );
@@ -110,7 +116,7 @@ export const githubRouter = createTRPCRouter({
         // was available on an instance with no slug, while both install
         // actions were disabled, which is the state this contradiction
         // produced on the settings page.
-        configured: getGithubAppConfig().configured,
+        configured: service.getAppConfig().configured,
         connected: installations.length > 0,
         installations: installations.map((i) => ({
           installationId: i.installationId,
@@ -123,9 +129,9 @@ export const githubRouter = createTRPCRouter({
               ? (i.repositories?.length ?? 0)
               : null,
           suspended: i.suspendedAt != null,
-          uninstallUrl: uninstallUrl(i),
+          uninstallUrl: uninstallUrl(i, service.getWebBase()),
         })),
-        installUrl: installUrl(input.organizationId),
+        installUrl: installUrl(input.organizationId, service),
       };
     }),
 
@@ -133,8 +139,8 @@ export const githubRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:manage")
     .use(enforceOrganizationMembership)
-    .query(async ({ input }) => {
-      return getApp().github.installations.listRepositoriesForOrganization(
+    .query(async ({ input, ctx }) => {
+      return ctx.app.github.listRepositoriesForOrganization(
         input.organizationId,
       );
     }),
@@ -161,15 +167,15 @@ export const githubRouter = createTRPCRouter({
               prNumber: z.number().int().positive(),
             }),
           )
-          .max(MAX_STATUS_REFS),
+          .max(50),
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) return { statuses: [] };
       const statuses =
-        await getApp().github.pullRequests.status.getLiveStatuses({
+        await ctx.app.github.getLivePullRequestStatuses({
           organizationId,
           refs: input.refs,
         });
@@ -182,7 +188,7 @@ export const githubRouter = createTRPCRouter({
     .use(enforceOrganizationMembership)
     .mutation(async ({ ctx, input }) => {
       const installation =
-        await getApp().github.installations.getByInstallationId(
+        await ctx.app.github.tryGetByInstallationId(
           input.installationId,
         );
       // Cross-tenant guard: the installation must belong to this org. One owned
@@ -202,6 +208,8 @@ export const githubRouter = createTRPCRouter({
       });
       // We can't uninstall via the API — hand back the deep link; the webhook
       // removes the local row once GitHub confirms the uninstall.
-      return { uninstallUrl: uninstallUrl(installation) };
+      return {
+        uninstallUrl: uninstallUrl(installation, ctx.app.github.getWebBase()),
+      };
     }),
 });

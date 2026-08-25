@@ -28,9 +28,9 @@ import { OrganizationService } from "../../../app-layer/organizations/organizati
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
 
 export type SeatChangeFixture = Awaited<
   ReturnType<typeof createSeatChangeFixture>
@@ -255,6 +255,21 @@ async function seedOrganization({
  */
 async function installTestApp({ prisma }: { prisma: PrismaClient }) {
   await resetApp();
+  const base = createTestApp({
+    planProvider: PlanProviderService.create({
+      getActivePlan: vi.fn().mockResolvedValue({
+        ...FREE_PLAN,
+        overrideAddingLimitations: false,
+        maxMembers: 100,
+        maxMembersLite: 100,
+      }),
+    }),
+  });
+  const canonicalOrganizations = AppOrganizationRuntime.create({
+    database: prisma,
+    authz: base.permissions,
+    grants: base.authzGrants,
+  }).build();
   globalForApp.__langwatch_app = createTestApp({
     // FREE_PLAN gives away no Lite Member seats, so without this a seat change
     // is refused for the allowance rather than for anything these suites are
@@ -269,7 +284,8 @@ async function installTestApp({ prisma }: { prisma: PrismaClient }) {
     }),
     organizations: new OrganizationService(
       new PrismaOrganizationRepository(prisma),
-      new PromptTagRepository(prisma),
+      createTestApp().prompts,
+      canonicalOrganizations,
     ),
     usageLimits: {
       notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),

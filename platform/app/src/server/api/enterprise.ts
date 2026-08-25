@@ -1,11 +1,17 @@
 import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
-import { getApp } from "~/server/app-layer/app";
 import { remediation } from "~/server/app-layer/error-remediation";
-import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
+import type {
+  PlanProvider,
+  PlanProviderUser,
+} from "~/server/app-layer/subscription/plan-provider";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 
 type EnterpriseGateMiddlewareParams = {
-  ctx: { session?: { user?: PlanProviderUser } | null };
+  ctx: {
+    app: RequestAppServices;
+    session?: { user?: PlanProviderUser } | null;
+  };
   input: { organizationId: string };
   next: () => any;
 };
@@ -72,15 +78,17 @@ export function assertEnterprisePlanType({
 }
 
 export async function assertEnterprisePlan({
+  planProvider,
   organizationId,
   user,
   errorMessage,
 }: {
+  planProvider: PlanProvider;
   organizationId: string;
   user?: PlanProviderUser;
   errorMessage: string;
 }): Promise<void> {
-  const plan = await getApp().planProvider.getActivePlan({
+  const plan = await planProvider.getActivePlan({
     organizationId,
     user,
   });
@@ -105,6 +113,7 @@ export const requireEnterprisePlan =
   (errorMessage: string) =>
   async ({ ctx, input, next }: EnterpriseGateMiddlewareParams) => {
     await assertEnterprisePlan({
+      planProvider: ctx.app.planProvider,
       organizationId: input.organizationId,
       user: ctx.session?.user,
       errorMessage,

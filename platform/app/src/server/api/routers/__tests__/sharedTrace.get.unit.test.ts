@@ -59,7 +59,7 @@ vi.mock("~/server/app-layer/app", () => ({
       get: async () => null,
       set: async () => undefined,
     },
-    projects: { getById: mockProjectsGetById },
+    projects: { tryGetById: mockProjectsGetById },
     traces: {
       summary: { getByTraceId: mockSummaryGetByTraceId },
       spans: {

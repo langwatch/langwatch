@@ -78,7 +78,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   };
 });
 
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -150,7 +150,7 @@ describe("end-user spend on the composed router", () => {
         scopeId: ORG_ID,
       },
     });
-    const created = await ApiKeyService.create(prisma).create({
+    const created = await getApp().apiKeys.create({
       name: `eusr-${suffix}`,
       userId: USER_ID,
       createdByUserId: USER_ID,

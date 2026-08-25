@@ -1,12 +1,11 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { ValidationError } from "@langwatch/handled-error";
+import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
-import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
-import { getGithubHost } from "~/server/app-layer/github/githubHost";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -343,8 +342,7 @@ const usageQuerySchema = z.object({
    */
   host: z
     .string()
-    .min(1)
-    .default(() => getGithubHost()),
+    .min(1),
 });
 
 // GET /pull-request-usage: what one pull request cost in assistant usage,
@@ -412,7 +410,9 @@ secured.access(requires("traces:view")).get(
     const query = usageQuerySchema.safeParse({
       repository: c.req.query("repository"),
       pullRequest: c.req.query("pullRequest"),
-      host: c.req.query("host"),
+      host:
+        c.req.query("host") ??
+        new URL(c.app.github.getWebBase()).hostname,
     });
     if (!query.success) throw ValidationError.fromZodError(query.error);
 

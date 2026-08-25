@@ -14,8 +14,7 @@ import {
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
-  RoutingPolicyService,
-} from "@ee/governance/services/routingPolicy.service";
+} from "@langwatch/enterprise-governance-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoutingPolicyScopeType } from "~/generated/prisma/client";
@@ -80,8 +79,7 @@ export const routingPoliciesRouter = createTRPCRouter({
     )
     .permission("routingPolicies:view")
     .query(async ({ ctx, input }) => {
-      const service = new RoutingPolicyService(ctx.prisma);
-      return await service.list({
+      return await ctx.app.governance.routingPolicies.list({
         organizationId: input.organizationId,
         selectableForScope: input.selectableForScope,
       });
@@ -92,14 +90,10 @@ export const routingPoliciesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("routingPolicies:view")
     .query(async ({ ctx, input }) => {
-      const policy = await ctx.prisma.routingPolicy.findUnique({
-        where: { id: input.id },
-        include: { scopes: true },
+      return ctx.app.governance.routingPolicies.getById({
+        id: input.id,
+        organizationId: input.organizationId,
       });
-      if (!policy || policy.organizationId !== input.organizationId) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      return policy;
     }),
 
   /**
@@ -144,9 +138,8 @@ export const routingPoliciesRouter = createTRPCRouter({
     )
     .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = new RoutingPolicyService(ctx.prisma);
       try {
-        return await service.create({
+        return await ctx.app.governance.routingPolicies.create({
           organizationId: input.organizationId,
           scopes: input.scopes,
           name: input.name,
@@ -184,9 +177,8 @@ export const routingPoliciesRouter = createTRPCRouter({
     )
     .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = new RoutingPolicyService(ctx.prisma);
       try {
-        return await service.update({
+        return await ctx.app.governance.routingPolicies.update({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -206,8 +198,7 @@ export const routingPoliciesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = new RoutingPolicyService(ctx.prisma);
-      return await service.setDefault({
+      return await ctx.app.governance.routingPolicies.setDefault({
         id: input.id,
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
@@ -218,8 +209,7 @@ export const routingPoliciesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = new RoutingPolicyService(ctx.prisma);
-      await service.delete({
+      await ctx.app.governance.routingPolicies.delete({
         id: input.id,
         organizationId: input.organizationId,
       });

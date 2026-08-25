@@ -14,15 +14,10 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import {
-  createGovernanceKpisSyncHandler,
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
-  isGovernanceKpiTrace,
-} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
-import {
-  createGovernanceOcsfEventsSyncHandler,
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
-  isGovernanceOcsfTrace,
-} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
+} from "@langwatch/enterprise-governance-server";
+import { AppGovernanceSubscriberAdapter } from "~/runtime/app/features/governance/governance-subscriber.adapter";
 import { createBillingMeterDispatchSubscriber } from "../../registration/global/billingMeterDispatch.subscriber";
 import {
   type CodingAgentProcessingPipelineDeps,
@@ -32,8 +27,6 @@ import { createPullRequestMappingHandler } from "../coding-agent-processing/subs
 import { buildTraceDeps } from "../trace-processing/__tests__/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "../trace-processing/pipeline";
 
-const anyDeps = {} as never;
-
 /** The policy only ever reads `options`, so the generic parameters do not matter. */
 type AnySubscriber = SubscriberDispatchDefinition<never, never>;
 
@@ -42,25 +35,32 @@ type AnySubscriber = SubscriberDispatchDefinition<never, never>;
  * lives on the pipeline declaration, so reading it anywhere else would pin a
  * copy rather than the policy.
  */
+const governanceSubscribers = AppGovernanceSubscriberAdapter.create();
+const governanceKpis = governanceSubscribers.kpis({
+  insertContribution: async () => {},
+});
+const governanceOcsf = governanceSubscribers.ocsf({
+  insertEvent: async () => {},
+});
 const tracePipeline = createTraceProcessingPipeline(
   buildTraceDeps({
     governanceKpisSync: {
       fold: "traceSummary",
-      when: isGovernanceKpiTrace,
+      when: (event, context) => governanceKpis.when(event, context),
       ...throttledWindow({
         makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
         windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
       }),
-      handler: createGovernanceKpisSyncHandler(anyDeps),
+      handler: (event, context) => governanceKpis.handle(event, context),
     },
     governanceOcsfEventsSync: {
       fold: "traceSummary",
-      when: isGovernanceOcsfTrace,
+      when: (event, context) => governanceOcsf.when(event, context),
       ...throttledWindow({
         makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
         windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
       }),
-      handler: createGovernanceOcsfEventsSyncHandler(anyDeps),
+      handler: (event, context) => governanceOcsf.handle(event, context),
     },
   }),
 );

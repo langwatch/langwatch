@@ -23,8 +23,7 @@ import {
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -133,7 +132,7 @@ describe("Feature: Governance REST API", () => {
       },
     });
 
-    const apiKeyResult = await ApiKeyService.create(prisma).create({
+    const apiKeyResult = await getApp().apiKeys.create({
       name: `gov-pat-${suffix}`,
       userId: testUser.id,
       organizationId: testOrganization.id,

@@ -11,7 +11,7 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
   runtimeParametersSchema,
-} from "~/prompts/schemas";
+} from "@langwatch/prompt-contract";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { hoistSystemMessage } from "@langwatch/prompt-contract";
 import { PromptTagValidationError } from "@langwatch/prompt-contract";

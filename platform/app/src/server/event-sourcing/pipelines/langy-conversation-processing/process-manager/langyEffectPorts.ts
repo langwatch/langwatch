@@ -12,7 +12,7 @@ import {
 import type {
   LangyTurnHandoff,
   LangyTurnHandoffStore,
-} from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+} from "@langwatch/langy-server";
 import type { LangyFailTurnCommandPort } from "@langwatch/langy-server";
 
 import type {

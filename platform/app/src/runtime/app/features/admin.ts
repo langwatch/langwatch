@@ -1,37 +1,15 @@
-import {
-  AdminAccess,
-  type AdminIdentity,
-} from "@langwatch/enterprise-admin-contract";
+import type { AdminIdentity } from "@langwatch/ops-contract";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import {
   AdminAuditSink,
-  AdminAccessService,
-  PostgresAdminAdapter,
-} from "@langwatch/enterprise-admin-server";
+  PostgresOpsAdapter,
+} from "@langwatch/ops-server";
 export {
   type UserWithBackofficeIncludes,
-} from "@langwatch/enterprise-admin-contract";
+} from "@langwatch/ops-contract";
 import { prisma } from "~/server/db";
 
-export const adminEmailList = (): string[] =>
-  AdminAccessService.parseEmails(process.env.ADMIN_EMAILS ?? "");
-
 export { auditLog };
-
-export const isAdmin = (identity: AdminIdentity): boolean => {
-  if (!identity.email) return false;
-  return adminEmailList().includes(identity.email.trim().toLowerCase());
-};
-
-class AppAdminAccess extends AdminAccess {
-  isAdmin(identity: AdminIdentity): boolean {
-    return isAdmin(identity);
-  }
-
-  emails(): readonly string[] {
-    return adminEmailList();
-  }
-}
 
 class AppAdminAuditSink extends AdminAuditSink {
   async record(entry: {
@@ -44,18 +22,19 @@ class AppAdminAuditSink extends AdminAuditSink {
   }
 }
 
-const adminServer = PostgresAdminAdapter.create({
+export const opsService = PostgresOpsAdapter.create({
   database: prisma,
-  adminEmails: [],
-  access: new AppAdminAccess(),
+  adminEmails: process.env.ADMIN_EMAILS ?? "",
   audit: new AppAdminAuditSink(),
 }).build();
 
-export const impersonationService = adminServer.impersonation;
+export const adminEmailList = (): readonly string[] => opsService.adminEmails();
+export const isAdmin = (identity: AdminIdentity): boolean =>
+  opsService.isAdmin(identity);
 export const mapUserToBackofficeRow =
-  PostgresAdminAdapter.mapUserToBackofficeRow;
+  PostgresOpsAdapter.mapUserToBackofficeRow;
 export const ORGANIZATION_SAFE_SELECT =
-  PostgresAdminAdapter.organizationSafeSelect;
-export const PROJECT_SAFE_SELECT = PostgresAdminAdapter.projectSafeSelect;
+  PostgresOpsAdapter.organizationSafeSelect;
+export const PROJECT_SAFE_SELECT = PostgresOpsAdapter.projectSafeSelect;
 export const USER_BACKOFFICE_INCLUDE =
-  PostgresAdminAdapter.userBackofficeInclude;
+  PostgresOpsAdapter.userBackofficeInclude;

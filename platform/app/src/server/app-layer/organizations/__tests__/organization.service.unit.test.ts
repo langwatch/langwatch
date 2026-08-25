@@ -5,7 +5,7 @@ import {
   type PrismaClient,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import type { PromptService } from "@langwatch/prompt-contract";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 
@@ -72,9 +72,9 @@ describe("OrganizationService", () => {
     getAuditLogs: vi.fn(),
   };
 
-  const mockPromptTagRepo = {
-    seedForOrg: vi.fn(),
-  } as unknown as PromptTagRepository;
+  const mockPrompts = {
+    seedTagsForOrganization: vi.fn(),
+  } as Pick<PromptService, "seedTagsForOrganization">;
 
   let service: OrganizationService;
 
@@ -85,7 +85,7 @@ describe("OrganizationService", () => {
     vi.mocked(mockRepo.getClient!).mockReturnValue(
       {} as unknown as PrismaClient,
     );
-    service = new OrganizationService(mockRepo, mockPromptTagRepo);
+    service = new OrganizationService(mockRepo, mockPrompts);
   });
 
   describe("getOrganizationIdByTeamId", () => {

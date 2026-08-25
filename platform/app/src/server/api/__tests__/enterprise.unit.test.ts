@@ -10,16 +10,7 @@ import {
 } from "../enterprise";
 
 const mockGetActivePlan = vi.fn();
-
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    planProvider: {
-      getActivePlan: mockGetActivePlan,
-    },
-  }),
-}));
+const planProvider = { getActivePlan: mockGetActivePlan };
 
 describe("enterprise", () => {
   describe("isEnterpriseTier", () => {
@@ -107,6 +98,7 @@ describe("enterprise", () => {
 
         await expect(
           assertEnterprisePlan({
+            planProvider,
             organizationId: "org-1",
             errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
           }),
@@ -129,6 +121,7 @@ describe("enterprise", () => {
 
         await expect(
           assertEnterprisePlan({
+            planProvider,
             organizationId: "org-1",
             errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
           }),
@@ -146,6 +139,7 @@ describe("enterprise", () => {
 
         await expect(
           assertEnterprisePlan({
+            planProvider,
             organizationId: "org-1",
             errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
           }),
@@ -165,6 +159,7 @@ describe("enterprise", () => {
 
         await expect(
           assertEnterprisePlan({
+            planProvider,
             organizationId: "org-123",
             errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
           }),
@@ -181,6 +176,7 @@ describe("enterprise", () => {
 
       const user = { id: "user-1", email: "test@example.com", name: "Test" };
       await assertEnterprisePlan({
+        planProvider,
         organizationId: "org-1",
         user,
         errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,

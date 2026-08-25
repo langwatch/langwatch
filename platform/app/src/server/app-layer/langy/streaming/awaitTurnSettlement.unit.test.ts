@@ -28,11 +28,13 @@ vi.mock("~/server/app-layer/app", () => ({
 const mockReadTail = vi.fn();
 const mockFollow = vi.fn();
 
-vi.mock("./langyTokenBuffer", () => ({
-  createLangyTokenBuffer: vi.fn(() => ({
+vi.mock("@langwatch/langy-server", () => ({
+  LangyTokenBuffer: {
+    create: vi.fn(() => ({
     readTail: mockReadTail,
     follow: mockFollow,
-  })),
+    })),
+  },
 }));
 
 const { awaitTurnSettlement } = await import("./awaitTurnSettlement");

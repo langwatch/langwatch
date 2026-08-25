@@ -18,7 +18,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -114,7 +114,7 @@ describe("Feature: Webhook endpoints REST API", () => {
         scopeId: organization.id,
       },
     });
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     const created = await apiKeyService.create({
       name: `webhooks-key-${nanoid(6)}`,
       userId,

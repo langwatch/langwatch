@@ -78,7 +78,7 @@ export type SchedulerHandler = (fire: ScheduledJobFire) => Promise<void>;
  * multitenancy guard (`dbMultiTenancyProtection`) is satisfied and no write
  * can touch the wrong tenant's row.
  */
-export interface ScheduledJobRepository {
+export interface ScheduledJobStore {
   /** Due-scan: active rows whose `nextRunAt <= now`, soonest first. */
   findDue(params: { now: Date; limit: number }): Promise<ScheduledJobRecord[]>;
 

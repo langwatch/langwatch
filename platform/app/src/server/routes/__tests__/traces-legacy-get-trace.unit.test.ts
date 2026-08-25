@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 import type { Trace } from "~/server/tracer/types";
 
 // ─── TraceService spy ─────────────────────────────────────────────────────────
@@ -41,22 +43,10 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
 }));
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
-// The legacy route creates a module-scope tokenResolver = TokenResolver.create(prisma).
-// authenticateRequest() calls tokenResolver.resolve({token, projectId}) and
-// tokenResolver.markUsed({apiKeyId}). Mock the class so the module-scope
-// singleton uses a controllable mock.
+// The legacy route resolves credentials through the process App service.
 
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({
-      resolve: mockResolve,
-      markUsed: mockMarkUsed,
-    })),
-  },
-}));
 
 // extractCredentials reads request headers; mock it to return a usable credential.
 // enforceApiKeyCeiling enforces RBAC ceiling; mock it to be a no-op.
@@ -100,6 +90,10 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: mockMarkUsed,
+    },
     share: {
       createShare: vi.fn(),
       unshare: vi.fn(),
@@ -120,14 +114,14 @@ vi.mock("~/server/api/routers/traces.schemas", () => ({
 }));
 
 // ─── App under test ───────────────────────────────────────────────────────────
-// Import AFTER all mocks so the module-scope `tokenResolver = TokenResolver.create(prisma)`
-// picks up the mocked TokenResolver, and mockCreate is wired before any route runs.
+// Import after the process App and transport dependencies are mocked.
 
 const { app: legacyApp } = await import("../traces-legacy");
 
 // The legacy app is mounted at basePath "/api" so requests must hit /api/trace/:id.
 // Wrap in a thin Hono to allow test requests without a real HTTP server.
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", legacyApp);
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -141,8 +135,7 @@ const sampleTrace: Partial<Trace> = {
   spans: [],
 };
 
-// The project object returned by tokenResolver.resolve — must match what
-// authenticateRequest reads (resolved.project, resolved.type, resolved.apiKeyId).
+// The project returned by the process App API Key service.
 const fakeProject = {
   id: "project-123",
   apiKey: "test-token",
@@ -172,7 +165,7 @@ describe("legacy GET /api/trace/:id (singular)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Wire TokenResolver mock to return a valid legacyProjectKey resolution.
+    // Resolve a valid legacy project key through the process App service.
     mockResolve.mockResolvedValue({
       type: "legacyProjectKey",
       project: fakeProject,

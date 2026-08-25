@@ -6,6 +6,13 @@ import type {
 } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
+import {
+  CannotRemoveSelfAsLastAdminError,
+  LiteMemberViewerOnlyError,
+  TeamLastAdminRequiredError,
+  TeamMembershipNotFoundError,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
@@ -31,13 +38,6 @@ import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import { isCustomRole } from "../../../api/enterprise";
 import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
-import {
-  CannotRemoveSelfAsLastAdminError,
-  LiteMemberViewerOnlyError,
-  TeamLastAdminRequiredError,
-  TeamMembershipNotFoundError,
-  TeamNotFoundError,
-} from "../../teams/team.service";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import {
   SecretLimitReachedError,
   SecretNotFoundError,
@@ -30,26 +31,12 @@ const legacyDeprecationWarning: MiddlewareHandler = async (context, next) => {
   await next();
 };
 
-async function legacySecretActorId(context: Context): Promise<string> {
+function legacySecretActorId(context: Context): string {
   const apiKeyUserId: unknown = context.get("apiKeyUserId");
   if (typeof apiKeyUserId === "string" && apiKeyUserId.length > 0) {
     return apiKeyUserId;
   }
-
-  const project = context.get("project");
-  const organizationId = await context.app.organizations.getOrganizationIdByTeamId(
-    project.teamId,
-  );
-  if (!organizationId) {
-    return "system";
-  }
-  const bindings = await context.app.permissions.listScopeBindings({
-    organizationId,
-    scopeType: "TEAM",
-    scopeIds: [project.teamId],
-  });
-  const userId = bindings.find((binding) => binding.userId)?.userId;
-  return userId ?? "system";
+  throw new AuthenticatedActorRequiredError();
 }
 
 const legacy = createProjectApp({ basePath: "/api/secrets" });
@@ -97,7 +84,7 @@ legacy.access(requires("secrets:manage")).post(
     const input = context.req.valid("json");
     const secret = await context.app.secrets.create({
       projectId: project.id,
-      actorId: await legacySecretActorId(context),
+      actorId: legacySecretActorId(context),
       ...input,
     });
     return context.json(toSecretPublic(secret), 201);
@@ -116,7 +103,7 @@ legacy.access(requires("secrets:manage")).put(
       projectId: project.id,
       id: context.req.param("id"),
       value: context.req.valid("json").value,
-      actorId: await legacySecretActorId(context),
+      actorId: legacySecretActorId(context),
     });
     return context.json(toSecretPublic(secret));
   },

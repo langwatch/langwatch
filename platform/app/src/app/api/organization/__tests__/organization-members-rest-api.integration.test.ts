@@ -25,9 +25,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -464,7 +463,7 @@ describe("Feature: Organization members and invites REST API", () => {
       // and the acting credential is a service key: it acts as nobody, so the
       // self guard cannot be what refuses here, only the storage guard can.
       lastAdminOrg = await seedManagementOrg({ prisma, ns: `lastadmin-${ns}` });
-      const serviceKey = await ApiKeyService.create(prisma).create({
+      const serviceKey = await getApp().apiKeys.create({
         name: `mgmt-service-key-lastadmin-${ns}`,
         userId: null,
         createdByUserId: lastAdminOrg.adminUserId,

@@ -24,14 +24,12 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:annotations");
-const tokenResolver = TokenResolver.create(prisma);
-
 const AUTH_REASON =
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling";
+  "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling";
 
 // One policy per GRAIN, not one per file. A single shared policy would report
 // the same requirement for a read and a delete, which is worse than reporting
@@ -70,7 +68,8 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: message, status: 401 as const, body: { message } };
   }
 
-  const resolved = await tokenResolver.resolve({
+  const apiKeys = appFromContext(c).apiKeys;
+  const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -92,7 +91,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
 
   const markUsed = () => {
     if (resolved.type === "apiKey") {
-      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 

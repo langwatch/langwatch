@@ -15,13 +15,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "~/utils/testUtils";
-import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
+import { PrismaScheduledJobStore } from "../scheduled-job.repository";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
 import type { ScheduledJobFire } from "../scheduler.types";
 
 const logger = createLogger("test:scheduler-integration");
-const repo = new PrismaScheduledJobRepository(prisma);
+const repo = new PrismaScheduledJobStore(prisma);
 
 let projectId: string;
 

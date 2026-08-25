@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
+import { PrismaScheduledJobStore } from "../scheduled-job.repository";
 
 // Mirror the repository's naive-UTC timestamp rendering so we can assert the
 // exact literals interpolated into the raw claim/settle.
@@ -17,7 +17,7 @@ const toPg = (d: Date): string =>
  * and map affected-rows → won/lost. (The real Postgres race is exercised
  * end-to-end in the integration suite.)
  */
-describe("PrismaScheduledJobRepository.claim (lease)", () => {
+describe("PrismaScheduledJobStore.claim (lease)", () => {
   describe("given the row still carries the expected nextRunAt", () => {
     describe("when leasing the slot", () => {
       it("runs a raw conditional UPDATE that only moves nextRunAt to the lease and reports the lease won", async () => {
@@ -25,7 +25,7 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
         const prisma = {
           $executeRaw: executeRaw,
         } as unknown as PrismaClient;
-        const repo = new PrismaScheduledJobRepository(prisma);
+        const repo = new PrismaScheduledJobStore(prisma);
 
         const expected = new Date("2026-07-06T09:00:00.000Z"); // the WHERE guard
         // The catch-up slot we actually fire — DISTINCT from the guard, so we can
@@ -62,7 +62,7 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
         const prisma = {
           $executeRaw: executeRaw,
         } as unknown as PrismaClient;
-        const repo = new PrismaScheduledJobRepository(prisma);
+        const repo = new PrismaScheduledJobStore(prisma);
 
         const won = await repo.claim({
           id: "job-1",
@@ -78,7 +78,7 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
   });
 });
 
-describe("PrismaScheduledJobRepository.settleClaim", () => {
+describe("PrismaScheduledJobStore.settleClaim", () => {
   describe("given a delivered fire keyed on the held lease", () => {
     describe("when settling the claim", () => {
       it("runs a raw conditional UPDATE carrying the lease guard, the advance, the delivered slot and cleared retry state", async () => {
@@ -86,7 +86,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
         const prisma = {
           $executeRaw: executeRaw,
         } as unknown as PrismaClient;
-        const repo = new PrismaScheduledJobRepository(prisma);
+        const repo = new PrismaScheduledJobStore(prisma);
 
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
         const nextRunAt = new Date("2026-07-20T09:00:00.000Z");
@@ -122,7 +122,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
         const prisma = {
           $executeRaw: executeRaw,
         } as unknown as PrismaClient;
-        const repo = new PrismaScheduledJobRepository(prisma);
+        const repo = new PrismaScheduledJobStore(prisma);
 
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
         const retryAt = new Date("2026-07-13T09:01:00.000Z");
@@ -158,7 +158,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
         const prisma = {
           $executeRaw: executeRaw,
         } as unknown as PrismaClient;
-        const repo = new PrismaScheduledJobRepository(prisma);
+        const repo = new PrismaScheduledJobStore(prisma);
 
         const settled = await repo.settleClaim({
           id: "job-1",

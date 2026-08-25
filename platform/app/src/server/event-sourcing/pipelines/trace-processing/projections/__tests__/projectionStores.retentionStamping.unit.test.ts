@@ -1,8 +1,7 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
+import type { EvaluationService, EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -105,19 +104,21 @@ describe("trace-pipeline projection stores retention stamping", () => {
     it("stamps evaluation_runs with the platform default", async () => {
       const upsert = vi.fn().mockResolvedValue(undefined);
       const store = new EvaluationRunStore({
-        upsert,
-      } as unknown as EvaluationRunRepository);
+        upsertRun: upsert,
+        upsertRuns: vi.fn(),
+        tryGetRunByEvaluationId: vi.fn(),
+      } as unknown as EvaluationService);
 
       await store.store(
         { evaluationId: "eval_1" } as EvaluationRunData,
         nullPolicyContext,
       );
 
-      expect(upsert).toHaveBeenCalledWith(
-        expect.anything(),
-        String(tenantId),
-        PLATFORM_DEFAULT_RETENTION_DAYS,
-      );
+      expect(upsert).toHaveBeenCalledWith({
+        data: expect.anything(),
+        tenantId: String(tenantId),
+        retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
     });
   });
 });

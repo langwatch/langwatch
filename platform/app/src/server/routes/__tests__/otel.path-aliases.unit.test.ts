@@ -6,6 +6,8 @@
 
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 const mockCheckLimit = vi.fn();
 const mockHandleTraces = vi.fn();
@@ -19,23 +21,24 @@ const mockWarn = vi.fn();
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: mockMarkUsed,
+    },
     usage: { checkLimit: mockCheckLimit },
     planProvider: {
       getActivePlan: vi.fn().mockResolvedValue({ name: "free" }),
     },
     usageLimits: { notifyPlanLimitReached: vi.fn() },
+    governance: {
+      policy: { resolveSourceNonBillable: vi.fn().mockResolvedValue(false) },
+    },
     traces: {
       collection: { handleOtlpTraceRequest: mockHandleTraces },
       logCollection: { handleOtlpLogRequest: mockHandleLogs },
       metricCollection: { handleOtlpMetricRequest: mockHandleMetrics },
     },
   })),
-}));
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({ resolve: mockResolve, markUsed: mockMarkUsed })),
-  },
 }));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
@@ -73,6 +76,7 @@ const { stampCorrectedPath } = await import(
 
 // Mount order mirrors api-router.ts: the canonical routes get first refusal.
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", otelApp);
 testApp.route("/", otelPathAliasApp);
 

@@ -19,9 +19,8 @@ import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app
 import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -69,7 +68,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       label: "view-only",
       hasOrgBinding: true,
     });
-    const memberKey = await ApiKeyService.create(prisma).create({
+    const memberKey = await getApp().apiKeys.create({
       name: `mgmt-gate-member-key-${nanoid(6)}`,
       userId: member.userId,
       createdByUserId: member.userId,

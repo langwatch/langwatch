@@ -1,4 +1,3 @@
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -11,15 +10,12 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
-import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { trackServerEvent } from "~/server/posthog";
-import { RoleService } from "~/server/role/role.service";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
@@ -128,7 +124,7 @@ export const organizationRouter = createTRPCRouter({
         "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
     })
     .mutation(async ({ input, ctx }) => {
-      const result = await getApp().organizations.createAndAssign({
+      const result = await ctx.app.organizations.createAndAssign({
         userId: ctx.session.user.id,
         orgName: input.orgName,
         phoneNumber: input.phoneNumber,
@@ -151,7 +147,7 @@ export const organizationRouter = createTRPCRouter({
       // The self-removal guard lives in the service now; it refuses with
       // `cannot_remove_self`, which the handled-error middleware puts on the
       // wire for the client's code-keyed copy.
-      await getApp().organizations.deleteMember({
+      await ctx.app.organizations.deleteMember({
         organizationId: input.organizationId,
         userId: input.userId,
         actingUserId: ctx.session.user.id,
@@ -175,7 +171,7 @@ export const organizationRouter = createTRPCRouter({
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       try {
-        await getApp().organizations.setMemberDisabled({
+        await ctx.app.organizations.setMemberDisabled({
           organizationId: input.organizationId,
           userId: input.userId,
           disabled: input.disabled,
@@ -219,7 +215,7 @@ export const organizationRouter = createTRPCRouter({
       const demoProjectUserId = isDemo ? env.DEMO_PROJECT_USER_ID : "";
       const demoProjectId = isDemo ? env.DEMO_PROJECT_ID : "";
 
-      const organizations = (await getApp().organizations.getAllForUser({
+      const organizations = (await ctx.app.organizations.getAllForUser({
         userId,
         isDemo,
         demoProjectUserId,
@@ -231,9 +227,10 @@ export const organizationRouter = createTRPCRouter({
       const orgIds = organizations.map((o) => o.id);
       const userRoleBindings =
         orgIds.length > 0
-          ? await new PrismaRoleBindingRepository(
-              ctx.prisma,
-            ).listForOrganizationsAndUser({ orgIds, userId })
+          ? await ctx.app.permissions.listBindingsForSynthesis({
+              orgIds,
+              userId,
+            })
           : [];
 
       // The plaintext S3 secret access key is only needed by the org/project
@@ -388,7 +385,7 @@ export const organizationRouter = createTRPCRouter({
           // the frontend hasPermission and backend resolveTeamPermission.
           //
           // NOTE: imported as a standalone function (not a service method) because
-          // getApp().organizations is wrapped by traced() which would turn this
+          // The App's organization service is wrapped by traced(), which would turn this
           // sync call into a Promise and silently drop team.members.
           const enriched = enrichTeamWithRoleBindings(
             team,
@@ -470,7 +467,7 @@ export const organizationRouter = createTRPCRouter({
       // explicit here. `s3Bucket` keeps its historical leave-alone-if-absent
       // behavior. The ADR-057 trace-sharing disable cascade (revoke every
       // existing trace link across the org) lives in the service.
-      await getApp().organizations.updateSettings({
+      await ctx.app.organizations.updateSettings({
         organizationId: input.organizationId,
         name: input.name,
         s3Endpoint: input.s3Endpoint ?? null,
@@ -501,7 +498,7 @@ export const organizationRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const organization =
-        await getApp().organizations.getOrganizationWithMembers({
+        await ctx.app.organizations.getOrganizationWithMembers({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
           includeDeactivated: input.includeDeactivated ?? false,
@@ -559,7 +556,7 @@ export const organizationRouter = createTRPCRouter({
     // currently depend on member-role access to this procedure.
     .permission("organization:manage")
     .query(async ({ input, ctx }) => {
-      const member = await getApp().organizations.getMemberById({
+      const member = await ctx.app.organizations.getMemberById({
         organizationId: input.organizationId,
         userId: input.userId,
         currentUserId: ctx.session.user.id,
@@ -606,6 +603,7 @@ export const organizationRouter = createTRPCRouter({
       );
       if (hasCustomRoleInvite) {
         await assertEnterprisePlan({
+          planProvider: ctx.app.planProvider,
           organizationId: input.organizationId,
           user: ctx.session.user,
           errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
@@ -633,8 +631,8 @@ export const organizationRouter = createTRPCRouter({
           });
         }
         if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
+          void ctx.app.usageLimits
+            .notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,
@@ -736,6 +734,7 @@ export const organizationRouter = createTRPCRouter({
       );
       if (hasCustomRoleInvite) {
         await assertEnterprisePlan({
+          planProvider: ctx.app.planProvider,
           organizationId: input.organizationId,
           user: ctx.session.user,
           errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
@@ -899,8 +898,8 @@ export const organizationRouter = createTRPCRouter({
         return results;
       } catch (error) {
         if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
+          void ctx.app.usageLimits
+            .notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,
@@ -971,8 +970,8 @@ export const organizationRouter = createTRPCRouter({
           });
         }
         if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
+          void ctx.app.usageLimits
+            .notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,
@@ -1070,8 +1069,7 @@ export const organizationRouter = createTRPCRouter({
       // next login will retry via the lazy backfill in
       // `user.personalContext`.
       try {
-        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
-        await personalWorkspaceService.ensure({
+        await ctx.app.organizations.ensurePersonalWorkspace({
           userId: session.user.id,
           organizationId: invite.organizationId,
           displayName: session.user.name,
@@ -1092,8 +1090,8 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      void getApp()
-        .notifications.sendSlackSignupEvent({
+      void ctx.app.notifications
+        .sendSlackSignupEvent({
           userName: session.user.name,
           userEmail: session.user.email,
           organizationName: invite.organization.name,
@@ -1173,6 +1171,7 @@ export const organizationRouter = createTRPCRouter({
           });
         }
         await assertEnterprisePlan({
+          planProvider: ctx.app.planProvider,
           organizationId: teamForPlanCheck.organizationId,
           user: ctx.session.user,
           errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
@@ -1212,8 +1211,7 @@ export const organizationRouter = createTRPCRouter({
             });
           }
 
-          const roleService = new RoleService(prisma);
-          const currentBinding = await roleService.getUserCustomRoleBinding({
+          const currentBinding = await ctx.app.roles.tryGetUserBinding({
             userId: input.userId,
             organizationId: team.organizationId,
             teamId: input.teamId,
@@ -1221,9 +1219,7 @@ export const organizationRouter = createTRPCRouter({
 
           const oldPermissions = currentBinding?.customRoleId
             ? await (async () => {
-                const role = await roleService.getRoleByIdOrNull(
-                  currentBinding.customRoleId!,
-                );
+                const role = await ctx.app.roles.tryGet({ roleId: currentBinding.customRoleId });
                 return role?.permissions as string[] | undefined;
               })()
             : undefined;
@@ -1235,7 +1231,7 @@ export const organizationRouter = createTRPCRouter({
             undefined,
           );
 
-          const subscriptionLimits = await getApp().planProvider.getActivePlan({
+          const subscriptionLimits = await ctx.app.planProvider.getActivePlan({
             organizationId: team.organizationId,
             user: ctx.session.user,
           });
@@ -1249,7 +1245,7 @@ export const organizationRouter = createTRPCRouter({
         }
       }
 
-      await getApp().organizations.updateTeamMemberRole({
+      await ctx.app.organizations.updateTeamMemberRole({
         teamId: input.teamId,
         userId: input.userId,
         role: input.role,
@@ -1271,8 +1267,8 @@ export const organizationRouter = createTRPCRouter({
     // UX that needs member names knows to use a basic-view variant
     // rather than re-loosening the permission.
     .permission("organization:manage")
-    .query(async ({ input }) => {
-      return getApp().organizations.getAllMembers(input.organizationId);
+    .query(async ({ input, ctx }) => {
+      return ctx.app.organizations.getAllMembers(input.organizationId);
     }),
   updateMemberRole: protectedProcedure
     .input(
@@ -1298,7 +1294,7 @@ export const organizationRouter = createTRPCRouter({
       // scoping, seat classification, Enterprise gate for custom roles)
       // lives in the service so the REST surface runs the same rules.
       const { teamsLeftWithoutAdmin } =
-        await getApp().organizations.changeMemberRole({
+        await ctx.app.organizations.changeMemberRole({
           organizationId: input.organizationId,
           userId: input.userId,
           role: input.role,
@@ -1335,12 +1331,13 @@ export const organizationRouter = createTRPCRouter({
     .use(checkAuditLogPermission())
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
+        planProvider: ctx.app.planProvider,
         organizationId: input.organizationId,
         user: ctx.session.user,
         errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
       });
 
-      return getApp().organizations.getAuditLogs({
+      return ctx.app.organizations.getAuditLogs({
         organizationId: input.organizationId,
         projectId: input.projectId,
         userId: input.userId,

@@ -21,16 +21,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import {
-  LangyFrameDedupStore,
-  LangyResourceLinksStore,
-  LangyTurnHandoffStore,
-} from "@langwatch/langy-server";
+import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { tryGetApp } from "~/server/app-layer/app";
-import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
-import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
 import { verifyLangyInternalSecret } from "./langy-internal";
 
@@ -62,7 +54,7 @@ interface RelayTally {
 secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   // No Redis ⇒ no live buffer and no dedup set; refuse rather than silently
   // dropping the turn's live edge.
-  const connection = tryGetApp()?.redis ?? null;
+  const connection = c.app.redis;
   if (!connection) {
     logger.error("relay called with no Redis connection");
     return c.json({ error: "streaming unavailable" }, 503);
@@ -70,34 +62,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
-  const handoffStore = LangyTurnHandoffStore.create({ redis: connection });
-  const frameDedup = LangyFrameDedupStore.create({ redis: connection });
-  const relay = new LangyTurnRelay({
-    conversations: c.app.langy,
-    buffer: createLangyTokenBuffer({ redis: connection }),
-    reserveFrameNonce: frameDedup.reserveFrameNonce.bind(frameDedup),
-    // Authenticate frames against the synchronous per-turn handoff token first
-    // (the exact one the worker signs with), so a first turn whose RunToken
-    // projection is still landing isn't dropped as no-run-token. Empty token
-    // (legacy conversation) falls through to the projection.
-    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
-      const handoff = await handoffStore.read({ conversationId, turnId });
-      // The handoff key is conversation+turn scoped, but conversation identity
-      // is project-scoped (`@@unique([projectId, ConversationId])`). Refuse a
-      // handoff stashed under a different project so a colliding conversation
-      // id can never hand this stream another tenant's runToken.
-      if (!handoff || handoff.projectId !== projectId) return null;
-      return handoff.runToken || null;
-    },
-    resourceLinks: LangyResourceLinksStore.create({ redis: connection }),
-    resolveResourceUrl: (input) =>
-      resolveNavigateFallbackUrl({
-        ...input,
-        agents: c.app.agents,
-        evaluators: c.app.evaluators,
-      }),
-    logger,
-  });
+  const relay = c.app.langy.openRelayConnection();
 
   const tally: RelayTally = {
     applied: 0,
@@ -150,7 +115,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
 });
 
 async function applyLine(
-  relay: LangyTurnRelay,
+  relay: LangyRelayConnection,
   line: string,
   tally: RelayTally,
 ): Promise<void> {

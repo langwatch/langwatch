@@ -8,8 +8,6 @@
  * agent-authored.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
 vi.mock("~/env.mjs", () => ({
   env: { BASE_HOST: "https://app.langwatch.ai" },
@@ -37,25 +35,6 @@ const {
   tryGetMonitorById: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    simulations: { tryGetScenarioRunData: getScenarioRunData },
-    projects: { tryGetById: getProjectById },
-    experiments: { findById: findExperimentById },
-    prompts: { tryGetPromptByIdOrHandle },
-    dataset: { getBySlugOrId: getDatasetBySlugOrId },
-    monitors: { tryGetMonitorById },
-  }),
-}));
-
-vi.mock("~/server/db", () => ({
-  prisma: {
-    workflow: { findFirst: workflowFindFirst },
-  },
-}));
-
 import { resolveNavigateFallbackUrl } from "../langyNavigateFallback";
 
 const RUN_ID = "scenariorun_0002Gu9QAAAABBBBCCCCDDDDEEE";
@@ -63,12 +42,25 @@ const DRAWER_URL =
   "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail" +
   `&drawer.scenarioRunId=${RUN_ID}`;
 
+const app = {
+  simulations: { tryGetScenarioRunData: getScenarioRunData },
+  projects: { tryGetById: getProjectById },
+  experiments: { findById: findExperimentById },
+  prompts: { tryGetPromptByIdOrHandle },
+  dataset: { getBySlugOrId: getDatasetBySlugOrId },
+  monitors: { tryGetMonitorById },
+  workflows: {
+    getById: workflowFindFirst.mockImplementation(async () => null),
+  },
+  agents: { getById: getAgentByIdOrThrow },
+  evaluators: { tryGetById: getEvaluatorById },
+};
+
 const resolve = (resourceId: string) =>
   resolveNavigateFallbackUrl({
+    app: app as never,
     projectId: "proj_1",
     resourceId,
-    agents: { getById: getAgentByIdOrThrow } as unknown as AgentService,
-    evaluators: { tryGetById: getEvaluatorById } as unknown as EvaluatorService,
   });
 
 beforeEach(() => {
@@ -153,8 +145,9 @@ describe("resolveNavigateFallbackUrl", () => {
         "https://app.langwatch.ai/acme/studio/workflow_1",
       );
       expect(workflowFindFirst).toHaveBeenCalledWith({
-        where: { id: "workflow_1", projectId: "proj_1", archivedAt: null },
-        select: { id: true },
+        id: "workflow_1",
+        projectId: "proj_1",
+        includeVersion: false,
       });
     });
 

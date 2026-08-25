@@ -7,7 +7,7 @@ import { computeCatchUp, computeNextRunAt } from "./nextRunAt";
 import type { SchedulerRegistry } from "./scheduler.registry";
 import type {
   ScheduledJobRecord,
-  ScheduledJobRepository,
+  ScheduledJobStore,
 } from "./scheduler.types";
 
 /**
@@ -65,7 +65,7 @@ const BACKOFF_BASE_MS = 60_000; // 1 min — matches the ADR-044 60s calendar gr
 const BACKOFF_CAP_MS = 30 * 60_000; // 30 min — an upper bound if MAX_ATTEMPTS grows
 
 export interface SchedulerServiceDeps {
-  repo: ScheduledJobRepository;
+  repo: ScheduledJobStore;
   registry: SchedulerRegistry;
   processRole: ProcessRole | undefined;
   logger: Logger;
@@ -114,7 +114,7 @@ export interface SchedulerServiceDeps {
  * 100% Postgres and `wake()` only interrupts THIS process's sleep.
  */
 export class SchedulerService {
-  private readonly repo: ScheduledJobRepository;
+  private readonly repo: ScheduledJobStore;
   private readonly registry: SchedulerRegistry;
   private readonly processRole: ProcessRole | undefined;
   private readonly logger: Logger;

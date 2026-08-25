@@ -4,7 +4,7 @@
  * Leaf module (no imports) so both the secrets router AND the Langy service
  * that writes these rows can depend on it without a cycle — the router must
  * not pull in the Langy app layer just to learn a name. Same shape and reason
- * as `~/server/api-key/reserved-names`.
+ * as the API-key contract's reserved-name vocabulary.
  */
 
 /**

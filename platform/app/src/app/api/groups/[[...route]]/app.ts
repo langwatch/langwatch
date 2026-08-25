@@ -1,22 +1,11 @@
 import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { organizationGroupBindingInputSchema } from "@langwatch/organization-contract";
+import { z } from "zod/v4";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import {
-  type Organization,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  BindingNotFoundError,
-  GroupNotFoundError,
-} from "~/server/app-layer/groups/errors";
-import type { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { requireEnterprisePlanRest } from "../../middleware/enterprise-gate";
-import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
-import { groupServiceMiddleware } from "../../middleware/group-service";
 import { handleGroupError } from "./error-handler";
 
 patchZodOpenapi();
@@ -28,16 +17,7 @@ const paginationQuerySchema = z.object({
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(1, "name is required").max(100),
-  bindings: z
-    .array(
-      z.object({
-        role: z.nativeEnum(TeamUserRole),
-        customRoleId: z.string().optional(),
-        scopeType: z.nativeEnum(RoleBindingScopeType),
-        scopeId: z.string().min(1, "scopeId is required"),
-      }),
-    )
-    .optional(),
+  bindings: z.array(organizationGroupBindingInputSchema).optional(),
   memberIds: z.array(z.string()).optional(),
 });
 
@@ -49,14 +29,9 @@ const addMemberSchema = z.object({
   userId: z.string().min(1, "userId is required"),
 });
 
-const addBindingSchema = z.object({
-  role: z.nativeEnum(TeamUserRole),
-  customRoleId: z.string().optional(),
-  scopeType: z.nativeEnum(RoleBindingScopeType),
-  scopeId: z.string().min(1, "scopeId is required"),
-});
+const addBindingSchema = organizationGroupBindingInputSchema;
 
-const secured = createOrgApp<GroupServiceMiddlewareVariables>({
+const secured = createOrgApp({
   basePath: "/api/groups",
 });
 
@@ -78,15 +53,14 @@ secured
   .get(
     "/",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "List all groups for the organization" }),
     zValidator("query", paginationQuerySchema),
     async (c) => {
-      const organization = c.get("organization") as Organization;
+      const organization = c.get("organization");
       const { page, limit } = c.req.valid("query");
-      const service = c.get("groupService") as GroupRestService;
+      const service = c.var.langwatchApp.organizations;
 
-      const result = await service.listByOrganization({
+      const result = await service.listGroups({
         organizationId: organization.id,
         page,
         limit,
@@ -99,12 +73,12 @@ secured
           slug: g.slug,
           externalId: g.externalId,
           scimSource: g.scimSource,
-          memberCount: g._count.members,
-          bindings: g.roleBindings.map((b) => ({
+          memberCount: g.memberCount,
+          bindings: g.bindings.map((b) => ({
             id: b.id,
             role: b.role,
             customRoleId: b.customRoleId,
-            customRoleName: b.customRole?.name ?? null,
+            customRoleName: b.customRoleName,
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           })),
@@ -122,15 +96,14 @@ secured
   .post(
     "/",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Create a new group" }),
     zValidator("json", createGroupSchema),
     async (c) => {
-      const organization = c.get("organization") as Organization;
+      const organization = c.get("organization");
       const body = c.req.valid("json");
-      const service = c.get("groupService") as GroupRestService;
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.create({
+      const group = await service.createGroup({
         organizationId: organization.id,
         name: body.name,
         bindings: body.bindings,
@@ -158,18 +131,16 @@ secured
   .get(
     "/:id",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Get a group with members and bindings" }),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.getById({
-        id,
+      const group = await service.getGroup({
+        groupId: id,
         organizationId: organization.id,
       });
-      if (!group) throw new GroupNotFoundError(id);
 
       return c.json({
         id: group.id,
@@ -179,14 +150,14 @@ secured
         scimSource: group.scimSource,
         members: group.members.map((m) => ({
           userId: m.userId,
-          name: m.user.name,
-          email: m.user.email,
+          name: m.name,
+          email: m.email,
         })),
-        bindings: group.roleBindings.map((b) => ({
+        bindings: group.bindings.map((b) => ({
           id: b.id,
           role: b.role,
           customRoleId: b.customRoleId,
-          customRoleName: b.customRole?.name ?? null,
+          customRoleName: b.customRoleName,
           scopeType: b.scopeType,
           scopeId: b.scopeId,
         })),
@@ -201,17 +172,16 @@ secured
   .patch(
     "/:id",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Rename a group" }),
     zValidator("json", updateGroupSchema),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
+      const organization = c.get("organization");
       const body = c.req.valid("json");
-      const service = c.get("groupService") as GroupRestService;
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.rename({
-        id,
+      const group = await service.renameGroup({
+        groupId: id,
         organizationId: organization.id,
         name: body.name,
       });
@@ -230,15 +200,14 @@ secured
   .delete(
     "/:id",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Delete a group" }),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      await service.delete({
-        id,
+      await service.deleteGroup({
+        groupId: id,
         organizationId: organization.id,
         actor: orgRequestLedgerActor(c),
       });
@@ -254,25 +223,22 @@ secured
   .get(
     "/:id/members",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "List members of a group" }),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.getById({
-        id,
+      const group = await service.getGroup({
+        groupId: id,
         organizationId: organization.id,
       });
-      if (!group) throw new GroupNotFoundError(id);
 
-      const members = await service.getMembers({ groupId: id });
       return c.json({
-        data: members.map((m) => ({
+        data: group.members.map((m) => ({
           userId: m.userId,
-          name: m.user.name,
-          email: m.user.email,
+          name: m.name,
+          email: m.email,
         })),
       });
     },
@@ -283,16 +249,15 @@ secured
   .post(
     "/:id/members",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Add a member to a group" }),
     zValidator("json", addMemberSchema),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
+      const organization = c.get("organization");
       const body = c.req.valid("json");
-      const service = c.get("groupService") as GroupRestService;
+      const service = c.var.langwatchApp.organizations;
 
-      await service.addMember({
+      await service.addGroupMember({
         groupId: id,
         organizationId: organization.id,
         userId: body.userId,
@@ -307,14 +272,13 @@ secured
   .delete(
     "/:id/members/:userId",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Remove a member from a group" }),
     async (c) => {
       const { id, userId } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      await service.removeMember({
+      await service.removeGroupMember({
         groupId: id,
         organizationId: organization.id,
         userId,
@@ -331,20 +295,13 @@ secured
   .get(
     "/:id/bindings",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "List role bindings for a group" }),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.getById({
-        id,
-        organizationId: organization.id,
-      });
-      if (!group) throw new GroupNotFoundError(id);
-
-      const bindings = await service.getBindings({
+      const bindings = await service.listGroupBindings({
         organizationId: organization.id,
         groupId: id,
       });
@@ -353,7 +310,7 @@ secured
           id: b.id,
           role: b.role,
           customRoleId: b.customRoleId,
-          customRoleName: b.customRole?.name ?? null,
+          customRoleName: b.customRoleName,
           scopeType: b.scopeType,
           scopeId: b.scopeId,
         })),
@@ -366,22 +323,18 @@ secured
   .post(
     "/:id/bindings",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Add a role binding to a group" }),
     zValidator("json", addBindingSchema),
     async (c) => {
       const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
+      const organization = c.get("organization");
       const body = c.req.valid("json");
-      const service = c.get("groupService") as GroupRestService;
+      const service = c.var.langwatchApp.organizations;
 
-      const binding = await service.addBinding({
+      const binding = await service.addGroupBinding({
         groupId: id,
         organizationId: organization.id,
-        role: body.role,
-        customRoleId: body.customRoleId,
-        scopeType: body.scopeType,
-        scopeId: body.scopeId,
+        binding: body,
         actor: orgRequestLedgerActor(c),
       });
       return c.json(
@@ -401,27 +354,14 @@ secured
   .delete(
     "/:id/bindings/:bindingId",
     enterpriseGate,
-    groupServiceMiddleware,
     describeRoute({ description: "Remove a role binding from a group" }),
     async (c) => {
       const { id, bindingId } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("groupService") as GroupRestService;
+      const organization = c.get("organization");
+      const service = c.var.langwatchApp.organizations;
 
-      const group = await service.getById({
-        id,
-        organizationId: organization.id,
-      });
-      if (!group) throw new GroupNotFoundError(id);
-
-      const bindingBelongsToGroup = group.roleBindings.some(
-        (b) => b.id === bindingId,
-      );
-      if (!bindingBelongsToGroup) {
-        throw new BindingNotFoundError(bindingId);
-      }
-
-      await service.removeBinding({
+      await service.removeGroupBinding({
+        groupId: id,
         bindingId,
         organizationId: organization.id,
         actor: orgRequestLedgerActor(c),

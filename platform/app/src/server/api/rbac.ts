@@ -3,6 +3,7 @@ import type {
   AuthzService,
   EnforcedScopeFields,
 } from "@langwatch/authz-contract";
+import { ROLE_KIND } from "@langwatch/role-contract";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
@@ -20,7 +21,6 @@ import {
 import type { Session } from "~/server/auth";
 import { type Resource, Resources } from "~/utils/rbacVocabulary";
 import { isAdmin } from "~/runtime/app/features/admin";
-import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -853,7 +853,7 @@ async function resolveBindingPermission({
       where: {
         id: binding.customRoleId,
         organizationId,
-        kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY },
+        kind: { not: ROLE_KIND.SYSTEM_API_KEY },
       },
     });
     if (customRole) {
@@ -1473,7 +1473,7 @@ async function loadScopeResolution(
           where: {
             id: { in: customRoleIds },
             organizationId: args.organizationId,
-            kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY },
+            kind: { not: ROLE_KIND.SYSTEM_API_KEY },
           },
           select: { id: true, permissions: true },
         })

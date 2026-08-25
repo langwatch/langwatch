@@ -50,17 +50,16 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
+import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
-import { globalForApp, resetApp } from "../../../app-layer/app";
+import { getApp, globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
 import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -86,7 +85,7 @@ let personalTeamId: string;
 let personalProjectId: string;
 let personalTeamName: string;
 
-let workspaceService: PersonalWorkspaceService;
+let workspaceService: OrganizationServiceContract;
 
 const callerAsOwner = () =>
   appRouter.createCaller(
@@ -104,7 +103,7 @@ const callerAsOwner = () =>
  * through here, so they exercise the same lookup the app does.
  */
 const ensureWorkspace = () =>
-  workspaceService.ensure({
+  workspaceService.ensurePersonalWorkspace({
     userId: ownerUserId,
     organizationId,
     displayName: "Workspace Owner",
@@ -198,7 +197,7 @@ async function createFixture(): Promise<void> {
     },
   });
 
-  workspaceService = new PersonalWorkspaceService(prisma);
+  workspaceService = getApp().organizations;
   const workspace = await ensureWorkspace();
   personalTeamId = workspace.team.id;
   personalTeamName = workspace.team.name;
@@ -829,7 +828,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       },
     });
 
-    const workspace = await workspaceService.ensure({
+    const workspace = await workspaceService.ensurePersonalWorkspace({
       userId: seatUserId,
       organizationId,
       displayName: "Seat User",
@@ -860,7 +859,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       }),
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        new PromptTagRepository(prisma),
+        createTestApp().prompts,
       ),
       usageLimits: {
         notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -926,7 +925,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
 
     await expect(
-      workspaceService.ensure({
+      workspaceService.ensurePersonalWorkspace({
         userId: seatUserId,
         organizationId,
         displayName: "Seat User",

@@ -110,8 +110,8 @@ function createContext(
 
 function createMockProjectService() {
   return {
-    getById: vi.fn(),
-    getWithTeam: vi.fn(),
+    tryGetById: vi.fn(),
+    tryGetWithTeam: vi.fn(),
     updateMetadata: vi.fn(),
     isFeatureEnabled: vi.fn(),
     resolveOrgAdmin: vi.fn().mockResolvedValue({
@@ -140,7 +140,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when project has not received first message", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -235,7 +235,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is python", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -262,7 +262,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is typescript", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -289,7 +289,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when sdk.language is not recognized", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -316,7 +316,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when project is already fully integrated", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: true,
@@ -347,7 +347,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when project is not found", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue(null);
+      mockProjects.tryGetById.mockResolvedValue(null);
     });
 
     it("does not update the project", async () => {
@@ -363,7 +363,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when platform is optimization_studio", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -406,7 +406,7 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("when updateMetadata throws", () => {
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -442,7 +442,7 @@ describe("createProjectMetadataHandler()", () => {
     let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
@@ -491,7 +491,7 @@ describe("createProjectMetadataHandler()", () => {
         // established project returned early, so a project that lost its
         // schedule never got it back from ingest. Bootstrap is level-triggered
         // now, so every real trace re-asserts it.
-        mockProjects.getById.mockResolvedValue({
+        mockProjects.tryGetById.mockResolvedValue({
           id: tenantId,
           firstMessage: true,
           integrated: true,
@@ -567,7 +567,7 @@ describe("createProjectMetadataHandler()", () => {
     beforeEach(() => {
       // Not yet integrated, so the subscriber still writes metadata. The
       // bootstrap is no longer gated on the first-message transition.
-      mockProjects.getById.mockResolvedValue({
+      mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: false,
@@ -617,7 +617,7 @@ describe("createProjectMetadataHandler()", () => {
     describe("when a trace arrives", () => {
       it("does not bootstrap clustering", async () => {
         const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
-        mockProjects.getById.mockResolvedValue(null);
+      mockProjects.tryGetById.mockResolvedValue(null);
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
           bootstrapTopicClustering: bootstrapTopicClustering as any,

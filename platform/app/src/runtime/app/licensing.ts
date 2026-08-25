@@ -29,6 +29,23 @@ class PrismaLicenseRepository extends LicenseRepository {
     this.counts = new LicenseEnforcementRepository(prismaClient);
   }
 
+  async findOrganizationsWithLicense() {
+    const organizations = await this.prismaClient.organization.findMany({
+      where: { license: { not: null } },
+      select: { id: true, license: true },
+    });
+    return organizations.flatMap((organization) =>
+      organization.license
+        ? [
+            {
+              organizationId: organization.id,
+              licenseKey: organization.license,
+            },
+          ]
+        : [],
+    );
+  }
+
   async readLicense(organizationId: string): Promise<string | null> {
     const organization = await this.prismaClient.organization.findUnique({
       where: { id: organizationId },

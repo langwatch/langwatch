@@ -12,10 +12,10 @@ import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import {
   PersonalVirtualKeyAlreadyExistsError,
-  PersonalVirtualKeyService,
-} from "@ee/governance/services/personalVirtualKey.service";
+} from "@langwatch/enterprise-governance-contract";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { prisma } from "~/server/db";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
 
 const CONTROL_PLANE =
@@ -111,7 +111,8 @@ async function main() {
   // Mint a personal VK + approve the device-code, mirroring the
   // /api/auth/cli/approve handler. This invokes the SAME service code
   // path the magic-link browser approval would.
-  const service = PersonalVirtualKeyService.create(prisma);
+  const service = initializeDefaultApp({ processRole: "web" }).governance
+    .personalVirtualKeys;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   let issued;
   try {

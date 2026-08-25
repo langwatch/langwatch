@@ -2,7 +2,7 @@ import {
   enforceApiKeyIdOnTraceRequest,
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "@ee/governance/services/ingestKeyProvenance.utils";
+} from "~/server/routes/ingest/ingest-key-provenance.utils";
 import { type Command, createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {

@@ -20,8 +20,8 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import { getApp } from "~/server/app-layer/app";
+import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -42,7 +42,7 @@ describe("Feature: API keys management REST API", () => {
   let adminToken: string;
   let managerToken: string;
 
-  const apiKeyService = ApiKeyService.create(prisma);
+  const apiKeyService = getApp().apiKeys;
 
   const headersFor = (token: string) => ({
     Authorization: `Bearer ${token}`,

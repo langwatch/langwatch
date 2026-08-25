@@ -29,7 +29,6 @@ import { PrismaOrganizationRepository } from "../../../app-layer/organizations/r
 import { createTestApp } from "../../../app-layer/presets";
 import { traced } from "../../../app-layer/tracing";
 import { prisma } from "../../../db";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -114,7 +113,7 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
       organizations: traced(
         new OrganizationService(
           new PrismaOrganizationRepository(prisma),
-          new PromptTagRepository(prisma),
+          createTestApp().prompts,
         ),
         "OrganizationService",
       ),

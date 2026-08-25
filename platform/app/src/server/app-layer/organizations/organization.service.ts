@@ -1,6 +1,52 @@
 import { generate } from "@langwatch/ksuid";
+import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import {
+  OrganizationService as OrganizationServiceContract,
+  type AddOrganizationGroupBindingInput,
+  type ClaimOrganizationBillingCustomerInput,
+  type AddOrganizationTeamMemberInput,
+  type ApplyOrganizationGroupEditsInput,
+  type ChangeOrganizationGroupMemberInput,
+  type CreateOrganizationGroupInput,
+  type CreateOrganizationTeamInput,
+  type CreateOrganizationTeamWithMembersInput,
+  type DeleteOrganizationGroupInput,
+  type GetOldestTeamInput,
+  type GetOrganizationGroupInput,
+  type GetOrganizationTeamInput,
+  type GetOrganizationTeamByIdInput,
+  type GetOrganizationTeamBySlugForMemberInput,
+  type GetOrganizationTeamWithMembersInput,
+  type GetOrganizationBillingProfileInput,
+  type ListMemberOrganizationGroupsInput,
+  type ListOrganizationGroupsInput,
+  type ListOrganizationTeamsInput,
+  type ListOrganizationTeamsWithMembersInput,
+  type ListOrganizationTeamAccessInput,
+  type OrganizationGroup,
+  type OrganizationGroupBinding,
+  type OrganizationGroupDetails,
+  type OrganizationGroupPage,
+  type OrganizationGroupSummary,
+  type OrganizationTeam,
+  type OrganizationTeamAccess,
+  type OrganizationTeamPage,
+  type OrganizationTeamWithMembers,
+  type EnsuredPersonalWorkspace,
+  type FindPersonalWorkspaceInput,
+  type PersonalFeatures,
+  type PersonalWorkspace,
+  type PersonalWorkspaceFeaturesInput,
+  type PersonalWorkspaceInput,
+  type RemoveOrganizationGroupBindingInput,
+  type RemoveOrganizationTeamMemberInput,
+  type RenameOrganizationGroupInput,
+  type UpdateOrganizationTeamInput,
+  type UpdateOrganizationTeamWithMembersInput,
+} from "@langwatch/organization-contract";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient, User } from "~/generated/prisma/client";
+import type { PromptService } from "@langwatch/prompt-contract";
 import {
   type OrganizationIntent,
   type OrganizationUserRole,
@@ -8,13 +54,9 @@ import {
   RoleBindingScopeType,
   type TeamUserRole,
 } from "~/generated/prisma/client";
-import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import type { LicenseEnforcementService } from "~/server/license-enforcement";
 import type { MinimalUser } from "~/server/license-enforcement/license-enforcement.service";
-import { assertMemberTypeLimitNotExceeded } from "~/server/license-enforcement/license-limit-guard";
 import { getRoleChangeType } from "~/server/license-enforcement/member-classification";
-import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import {
   assertNoPersonalTeamScope,
   findSharedTeamIds,
@@ -87,7 +129,7 @@ export function enrichTeamWithRoleBindings<
 >(
   team: T,
   userId: string,
-  userRoleBindings: RoleBindingForSynthesis[],
+  userRoleBindings: AuthzBindingForSynthesis[],
   organizationId: string,
 ): T {
   const teamProjectIds = new Set(team.projects.map((p) => p.id));
@@ -194,7 +236,7 @@ async function collectCustomRolePermissions({
  * assignments.
  */
 async function assertPlanPermitsRoleChange({
-  prisma,
+  licenseEnforcement,
   organizationId,
   currentRole,
   userPermissions,
@@ -202,7 +244,7 @@ async function assertPlanPermitsRoleChange({
   teamRoleUpdates,
   planUser,
 }: {
-  prisma: PrismaClient;
+  licenseEnforcement: LicenseEnforcementService;
   organizationId: string;
   currentRole: OrganizationUserRole;
   userPermissions: string[] | undefined;
@@ -221,13 +263,11 @@ async function assertPlanPermitsRoleChange({
     organizationId,
     user: planUser,
   });
-  const licenseRepo = new LicenseEnforcementRepository(prisma);
-  await assertMemberTypeLimitNotExceeded(
+  await licenseEnforcement.assertMemberTypeChangeAllowed({
     changeType,
     organizationId,
-    licenseRepo,
-    subscriptionLimits,
-  );
+    limits: subscriptionLimits,
+  });
 
   // Both forms of a custom-role assignment count: the `custom:{roleId}` role
   // string, and a builtin role string carrying a `customRoleId`, which the
@@ -249,11 +289,215 @@ async function assertPlanPermitsRoleChange({
  * Organization-level queries and mutations delegated from the tRPC router.
  * License checks remain in the router layer (they require request-scoped user context).
  */
-export class OrganizationService {
+export class OrganizationService extends OrganizationServiceContract {
   constructor(
     private readonly repo: OrganizationRepository,
-    private readonly promptTagRepo: PromptTagRepository,
-  ) {}
+    private readonly prompts: Pick<PromptService, "seedTagsForOrganization">,
+    private readonly canonical?: OrganizationServiceContract,
+    private readonly licenseEnforcement?: LicenseEnforcementService,
+  ) {
+    super();
+  }
+
+  isMember(input: {
+    organizationId: string;
+    userId: string;
+    includeDeactivated?: boolean;
+  }): Promise<boolean> {
+    return this.repo
+      .findMembership({
+        organizationId: input.organizationId,
+        userId: input.userId,
+      })
+      .then((membership) =>
+        membership !== null &&
+        (input.includeDeactivated === true || membership.disabledAt == null),
+      );
+  }
+
+  getOldestTeamId(input: GetOldestTeamInput): Promise<string> {
+    return this.getCanonicalService().getOldestTeamId(input);
+  }
+
+  getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.getCanonicalService().getTeam(input);
+  }
+
+  listTeams(
+    input: ListOrganizationTeamsInput,
+  ): Promise<OrganizationTeamPage> {
+    return this.getCanonicalService().listTeams(input);
+  }
+
+  createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.getCanonicalService().createTeam(input);
+  }
+
+  updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.getCanonicalService().updateTeam(input);
+  }
+
+  archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.getCanonicalService().archiveTeam(input);
+  }
+
+  addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void> {
+    return this.getCanonicalService().addTeamMember(input);
+  }
+
+  removeTeamMember(input: RemoveOrganizationTeamMemberInput): Promise<void> {
+    return this.getCanonicalService().removeTeamMember(input);
+  }
+
+  getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam> {
+    return this.getCanonicalService().getTeamById(input);
+  }
+
+  getTeamBySlugForMember(
+    input: GetOrganizationTeamBySlugForMemberInput,
+  ): Promise<OrganizationTeam> {
+    return this.getCanonicalService().getTeamBySlugForMember(input);
+  }
+
+  getTeamWithMembers(
+    input: GetOrganizationTeamWithMembersInput,
+  ): Promise<OrganizationTeamWithMembers> {
+    return this.getCanonicalService().getTeamWithMembers(input);
+  }
+
+  listTeamsWithMembers(
+    input: ListOrganizationTeamsWithMembersInput,
+  ): Promise<OrganizationTeamWithMembers[]> {
+    return this.getCanonicalService().listTeamsWithMembers(input);
+  }
+
+  createTeamWithMembers(
+    input: CreateOrganizationTeamWithMembersInput,
+  ): Promise<OrganizationTeam> {
+    return this.getCanonicalService().createTeamWithMembers(input);
+  }
+
+  updateTeamWithMembers(
+    input: UpdateOrganizationTeamWithMembersInput,
+  ): Promise<void> {
+    return this.getCanonicalService().updateTeamWithMembers(input);
+  }
+
+  listTeamAccess(
+    input: ListOrganizationTeamAccessInput,
+  ): Promise<OrganizationTeamAccess[]> {
+    return this.getCanonicalService().listTeamAccess(input);
+  }
+
+  getGroup(input: GetOrganizationGroupInput): Promise<OrganizationGroupDetails> {
+    return this.getCanonicalService().getGroup(input);
+  }
+
+  listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
+    return this.getCanonicalService().listGroups(input);
+  }
+
+  listGroupsForMember(
+    input: ListMemberOrganizationGroupsInput,
+  ): Promise<OrganizationGroupSummary[]> {
+    return this.getCanonicalService().listGroupsForMember(input);
+  }
+
+  createGroup(input: CreateOrganizationGroupInput): Promise<OrganizationGroup> {
+    return this.getCanonicalService().createGroup(input);
+  }
+
+  renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup> {
+    return this.getCanonicalService().renameGroup(input);
+  }
+
+  deleteGroup(input: DeleteOrganizationGroupInput): Promise<void> {
+    return this.getCanonicalService().deleteGroup(input);
+  }
+
+  addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
+    return this.getCanonicalService().addGroupMember(input);
+  }
+
+  removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
+    return this.getCanonicalService().removeGroupMember(input);
+  }
+
+  listGroupBindings(
+    input: GetOrganizationGroupInput,
+  ): Promise<OrganizationGroupBinding[]> {
+    return this.getCanonicalService().listGroupBindings(input);
+  }
+
+  addGroupBinding(
+    input: AddOrganizationGroupBindingInput,
+  ): Promise<OrganizationGroupBinding> {
+    return this.getCanonicalService().addGroupBinding(input);
+  }
+
+  removeGroupBinding(input: RemoveOrganizationGroupBindingInput): Promise<void> {
+    return this.getCanonicalService().removeGroupBinding(input);
+  }
+
+  applyGroupEdits(input: ApplyOrganizationGroupEditsInput): Promise<void> {
+    return this.getCanonicalService().applyGroupEdits(input);
+  }
+
+  getBillingProfile(
+    input: GetOrganizationBillingProfileInput,
+  ) {
+    return this.getCanonicalService().getBillingProfile(input);
+  }
+
+  claimBillingCustomerId(
+    input: ClaimOrganizationBillingCustomerInput,
+  ) {
+    return this.getCanonicalService().claimBillingCustomerId(input);
+  }
+
+  ensurePersonalWorkspace(
+    input: PersonalWorkspaceInput,
+  ): Promise<EnsuredPersonalWorkspace> {
+    return this.getCanonicalService().ensurePersonalWorkspace(input);
+  }
+
+  tryFindPersonalWorkspace(
+    input: FindPersonalWorkspaceInput,
+  ): Promise<PersonalWorkspace | null> {
+    return this.getCanonicalService().tryFindPersonalWorkspace(input);
+  }
+
+  getPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    return this.getCanonicalService().getPersonalWorkspaceFeatures(input);
+  }
+
+  enableAllPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    return this.getCanonicalService().enableAllPersonalWorkspaceFeatures(input);
+  }
+
+  disableAllPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    return this.getCanonicalService().disableAllPersonalWorkspaceFeatures(input);
+  }
+
+  private getCanonicalService(): OrganizationServiceContract {
+    if (!this.canonical) {
+      throw new Error("Canonical OrganizationService is not configured");
+    }
+    return this.canonical;
+  }
+
+  private getLicenseEnforcementService(): LicenseEnforcementService {
+    if (!this.licenseEnforcement) {
+      throw new Error("LicenseEnforcementService is not configured");
+    }
+    return this.licenseEnforcement;
+  }
 
   async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
     return this.repo.getOrganizationIdByTeamId(teamId);
@@ -357,7 +601,7 @@ export class OrganizationService {
       pricingModel: PricingModel.SEAT_EVENT,
     });
 
-    await this.promptTagRepo.seedForOrg({
+    await this.prompts.seedTagsForOrganization({
       organizationId: result.organization.id,
     });
 
@@ -408,7 +652,7 @@ export class OrganizationService {
     });
 
     try {
-      await this.promptTagRepo.seedForOrg({
+      await this.prompts.seedTagsForOrganization({
         organizationId: result.organization.id,
       });
     } catch (error) {
@@ -666,9 +910,7 @@ export class OrganizationService {
     }
 
     if (!disabled) {
-      const enforcement = createLicenseEnforcementService(
-        clientFromRepo(this.repo),
-      );
+      const enforcement = this.getLicenseEnforcementService();
       const result = await enforcement.checkLimit(
         organizationId,
         "members",
@@ -767,7 +1009,7 @@ export class OrganizationService {
     });
 
     await assertPlanPermitsRoleChange({
-      prisma,
+      licenseEnforcement: this.getLicenseEnforcementService(),
       organizationId,
       currentRole: currentMember.role,
       userPermissions,

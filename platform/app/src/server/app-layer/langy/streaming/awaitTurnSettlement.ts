@@ -31,8 +31,8 @@ import {
   extractLangyTextFromParts,
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
+import { LangyTokenBuffer } from "@langwatch/langy-server";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
-import { createLangyTokenBuffer } from "./langyTokenBuffer";
 
 /**
  * Settled state of one turn, decided ONCE from the fold event that carries it.
@@ -209,7 +209,7 @@ function isTerminalFrame(entry: { type: string }): boolean {
  * way).
  */
 async function watchBufferForTerminal(
-  buffer: ReturnType<typeof createLangyTokenBuffer>,
+  buffer: LangyTokenBuffer,
   {
     conversationId,
     turnId,
@@ -254,7 +254,7 @@ function armBufferWatch({
     };
   }
   const blocking = (redis as { duplicate(): unknown }).duplicate();
-  const buffer = createLangyTokenBuffer({ redis, blockingRedis: blocking });
+  const buffer = LangyTokenBuffer.create({ redis, blockingRedis: blocking });
   return {
     terminalSeen: watchBufferForTerminal(buffer, {
       conversationId,

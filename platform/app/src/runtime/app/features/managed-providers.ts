@@ -1,1 +1,1 @@
-export * from "@langwatch/enterprise-managed-providers-server";
+export * from "@langwatch/enterprise-managed-provider-server";

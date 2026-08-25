@@ -22,9 +22,9 @@
  * and real per-request costs are routinely this shape.
  */
 import {
-  AppGatewayDebitsProcessRuntime,
   type WriteGatewayDebitsPayload,
-} from "@ee/governance/process-manager/gatewayDebits.process";
+} from "@langwatch/enterprise-governance-server";
+import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
@@ -252,10 +252,10 @@ beforeAll(async () => {
     return client;
   });
   service = GatewayBudgetService.create(prisma, chRepo);
-  const debitRuntime = AppGatewayDebitsProcessRuntime.create({
+  const debitRuntime = AppGatewayDebitAdapter.create({
     prisma,
     budgetCHRepository: chRepo,
-  });
+  }).build();
   writeDebits = (payload) => debitRuntime.write(payload);
 }, 180_000);
 

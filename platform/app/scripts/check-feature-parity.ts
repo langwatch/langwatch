@@ -420,7 +420,7 @@ const LEGACY_INERT: string[] = [
   // The reduced Stored Objects package foundation ships before runtime binding.
   // Remove this entry with the first app binding, drop the feature-level
   // @unimplemented tag, and park only any remaining rollout scenarios.
-  "packages/features/stored-objects/specs/stored-objects.feature",
+  "packages/features/stored-object/specs/stored-objects.feature",
   "packages/group-queue/specs/payload-envelope.feature",
   "packages/group-queue/specs/work-conserving-fair-dispatch.feature",
   "specs/automations/dispatch-error-contract.feature",

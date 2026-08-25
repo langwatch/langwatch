@@ -1,16 +1,8 @@
-import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer/app";
 import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
-import { prisma } from "~/server/db";
-import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
-import { resolveOrganizationForScope as resolveOrganizationForScopeOrNull } from "~/server/scopes/resolveOrganizationForScope";
 import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
-import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -20,24 +12,6 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * the tenancy anchor: a custom cost can only ever be scoped within one org,
  * so a forged scope pointing at another org's team or project is refused.
  */
-async function resolveOrganizationForScope(
-  client: PrismaClient,
-  scopeType: ScopeTier,
-  scopeId: string,
-): Promise<string> {
-  const organizationId = await resolveOrganizationForScopeOrNull(client, {
-    scopeType,
-    scopeId,
-  });
-  if (!organizationId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Scope target not found.",
-    });
-  }
-  return organizationId;
-}
-
 export const llmModelCostsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(
@@ -46,8 +20,8 @@ export const llmModelCostsRouter = createTRPCRouter({
       }),
     )
     .permission("project:view")
-    .query(async ({ input }) => {
-      return await getLLMModelCosts(input);
+    .query(async ({ input, ctx }) => {
+      return await ctx.app.modelProviders.listCosts(input);
     }),
 
   createOrUpdate: protectedProcedure
@@ -97,70 +71,11 @@ export const llmModelCostsRouter = createTRPCRouter({
       // The caller must hold manage on the scope they are writing to
       // (organization:manage / team:manage / project:manage), and the scope
       // must resolve to a single organization the cost is then anchored to.
-      await assertCanManageScope(
-        { prisma: ctx.prisma, session: ctx.session },
-        { scopeType, scopeId },
-      );
-      const organizationId = await resolveOrganizationForScope(
-        ctx.prisma,
-        scopeType,
-        scopeId,
-      );
-
-      // Keep the legacy projectId column populated only for PROJECT-tier rows
-      // (one-release read compat). Org/team rows leave it null.
-      const legacyProjectId = scopeType === "PROJECT" ? scopeId : null;
-
-      if (!id) {
-        return prisma.customLLMModelCost.create({
-          data: {
-            id: `llmcost_${nanoid()}`,
-            organizationId,
-            scopeType,
-            scopeId,
-            projectId: legacyProjectId,
-            model,
-            inputCostPerToken,
-            outputCostPerToken,
-            cacheReadCostPerToken,
-            cacheCreationCostPerToken,
-            cacheCreation1hCostPerToken,
-            regex,
-          },
-        });
-      }
-
-      // Updating an existing row: the caller must also hold manage on the row's
-      // CURRENT scope, not just the destination scope above. Without this a
-      // caller who manages only scope X could pass another tenant's row id and
-      // re-anchor it into X. Mirrors the delete handler's row-derived check.
-      const existing = await ctx.prisma.customLLMModelCost.findUnique({
-        where: { id },
-        select: { scopeType: true, scopeId: true },
-      });
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      await assertCanManageScope(
-        { prisma: ctx.prisma, session: ctx.session },
-        { scopeType: existing.scopeType, scopeId: existing.scopeId },
-      );
-
-      return prisma.customLLMModelCost.update({
-        where: { id },
-        data: {
-          organizationId,
-          scopeType,
-          scopeId,
-          projectId: legacyProjectId,
-          model,
-          inputCostPerToken,
-          outputCostPerToken,
-          cacheReadCostPerToken,
-          cacheCreationCostPerToken,
-          cacheCreation1hCostPerToken,
-          regex,
-        },
+      return await ctx.app.modelProviders.upsertCost({
+        id, projectId, scopeType, scopeId, model, regex,
+        actorId: ctx.session?.user?.id,
+        inputCostPerToken, outputCostPerToken, cacheReadCostPerToken,
+        cacheCreationCostPerToken, cacheCreation1hCostPerToken,
       });
     }),
 
@@ -175,20 +90,7 @@ export const llmModelCostsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // Derive the scope from the row itself, then authorize manage on that
       // scope. Never trust a caller-supplied scope for a delete.
-      const existing = await ctx.prisma.customLLMModelCost.findUnique({
-        where: { id: input.id },
-        select: { scopeType: true, scopeId: true },
-      });
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      await assertCanManageScope(
-        { prisma: ctx.prisma, session: ctx.session },
-        { scopeType: existing.scopeType, scopeId: existing.scopeId },
-      );
-      return await ctx.prisma.customLLMModelCost.delete({
-        where: { id: input.id },
-      });
+      return await ctx.app.modelProviders.deleteCost({ ...input, actorId: ctx.session?.user?.id });
     }),
 
   /**
@@ -229,7 +131,7 @@ export const llmModelCostsRouter = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) =>
-      previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
+    .query(async ({ input, ctx }) =>
+      previewCostRuleMatchingSpans({ spans: ctx.app.traces.spans, input }),
     ),
 });

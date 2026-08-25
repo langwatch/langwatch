@@ -11,7 +11,7 @@
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
 
-import { AppGovernanceSignalsService } from "@ee/governance/services/governanceSignals.service";
+import { AppGovernanceSignalsService } from "~/runtime/app/features/governance/governance-signals.adapter";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";

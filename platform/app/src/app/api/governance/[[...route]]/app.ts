@@ -321,21 +321,9 @@ secured.access(apiKeyPermission("aiTools:view")).get(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const row = await c.var.langwatchApp.governance.ingestionTemplates.findByIdForOrg(
+    const row = await c.var.langwatchApp.governance.ingestionTemplates.getByIdForOrg(
       { id, organizationId },
     );
-    if (!row) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "ingestion_template_not_found",
-            message: "ingestion template not found",
-          },
-        },
-        404,
-      );
-    }
     return c.json({ ingestion_template: toTemplateDto(row) });
   },
 );

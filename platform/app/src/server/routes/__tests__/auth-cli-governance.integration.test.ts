@@ -20,11 +20,10 @@
  */
 
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
@@ -480,7 +479,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
       // The mint path resolves the caller's personal workspace and refuses to
       // allocate one — create it first, as a real login would.
-      await new PersonalWorkspaceService(prisma).ensure({
+      await getApp().organizations.ensurePersonalWorkspace({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
       });

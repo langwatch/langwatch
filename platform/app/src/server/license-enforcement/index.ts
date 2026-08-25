@@ -1,4 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { getApp } from "../app-layer/app";
 import { LicenseEnforcementRepository } from "./license-enforcement.repository";
 import { LicenseEnforcementService } from "./license-enforcement.service";
@@ -32,9 +33,12 @@ export { getOrganizationIdForProject } from "./utils";
  */
 export function createLicenseEnforcementService(
   prisma: PrismaClient,
+  planProvider: PlanProvider = {
+    getActivePlan: (input) => getApp().planProvider.getActivePlan(input),
+  },
 ): LicenseEnforcementService {
   return new LicenseEnforcementService(
     new LicenseEnforcementRepository(prisma),
-    getApp().planProvider,
+    planProvider,
   );
 }

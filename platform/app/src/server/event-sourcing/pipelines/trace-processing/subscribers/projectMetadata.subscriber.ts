@@ -1,6 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import { trackServerEvent } from "~/server/posthog";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -136,7 +136,7 @@ async function syncProjectMetadata(
   tenantId: string,
   foldState: TraceSummaryData,
 ): Promise<void> {
-  const project = await deps.projects.getById(tenantId);
+  const project = await deps.projects.tryGetById(tenantId);
 
   if (!project) {
     logger.warn({ tenantId }, "Project not found — skipping metadata update");

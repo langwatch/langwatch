@@ -3,7 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import { getApp } from "~/server/app-layer/app";

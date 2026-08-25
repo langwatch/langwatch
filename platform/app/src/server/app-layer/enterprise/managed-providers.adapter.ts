@@ -4,7 +4,7 @@ import {
   EnvironmentManagedProviderConfigurationAdapter,
   PostgresManagedProviderAdapter,
 } from "~/runtime/app/features/managed-providers";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 

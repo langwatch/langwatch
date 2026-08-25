@@ -18,15 +18,12 @@
  * lives in `wire.ts` and the handlers in `handlers.ts`.
  */
 import { z } from "zod";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
-import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { prisma } from "~/server/db";
 import { InviteService } from "~/server/invites/invite.service";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import {
   createInvitesHandler,
@@ -66,17 +63,13 @@ const { service, guard } = createManagementService({
 
 export const app = service
   .provide({
-    organizations: () =>
-      new OrganizationService(
-        new PrismaOrganizationRepository(prisma),
-        new PromptTagRepository(prisma),
-      ),
+    organizations: (_base, context) => appFromContext(context).organizations,
     invites: () => InviteService.create(prisma),
-    roleBindings: () =>
+    roleBindings: (_base, context) =>
       new RoleBindingService({
         prisma,
         repo: new PrismaRoleBindingRepository(prisma),
-        roleService: new RoleService(prisma),
+        roleService: appFromContext(context).roles,
       }),
   })
   // ── profile ────────────────────────────────────────────────────────────────

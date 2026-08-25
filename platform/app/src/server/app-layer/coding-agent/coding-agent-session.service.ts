@@ -183,7 +183,7 @@ export class CodingAgentSessionService {
    * a miss here only says a caller's own hint was stale, and the cost is one
    * slower read.
    */
-  async getBySessionId({
+  async tryGetBySessionId({
     projectId,
     sessionId,
     startedAtMs,
@@ -222,7 +222,7 @@ export class CodingAgentSessionService {
    * timestamp seeding the partition hint. Null for any trace that is not a
    * coding agent's — not an error.
    */
-  async getSessionForTrace({
+  async tryGetSessionForTrace({
     projectId,
     traceId,
   }: {
@@ -234,7 +234,7 @@ export class CodingAgentSessionService {
       traceId,
     });
     if (mapping === null) return null;
-    return this.getBySessionId({
+    return this.tryGetBySessionId({
       projectId,
       sessionId: mapping.sessionId,
       startedAtMs: mapping.occurredAtMs,

@@ -1,8 +1,7 @@
 import {
-  AppGovernanceEventsDeliveryRuntime,
+  GovernanceEventDeliveryProcess,
   GOVERNANCE_EVENTS_PROCESS_NAME,
-} from "@ee/governance/process-manager/governanceEventsDelivery.process";
-import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
+} from "@langwatch/enterprise-governance-server";
 import {
   defineAggregate,
   defineEvents,
@@ -22,7 +21,7 @@ import type { GovernanceEventsProcessingEvent } from "./schemas/events";
 export interface GovernanceEventsPipelineDeps {
   /** Same deps object as the spend delivery process; absent = no delivery
    *  consumer (events still append for a later replay-through). */
-  webhookDelivery?: WebhookDeliveryProcessDeps;
+  webhookDelivery?: GovernanceEventDeliveryProcess;
 }
 
 /**
@@ -47,9 +46,7 @@ export function createGovernanceEventsPipeline(
   if (deps.webhookDelivery) {
     pipeline = pipeline.withProcessManager(
       GOVERNANCE_EVENTS_PROCESS_NAME,
-      AppGovernanceEventsDeliveryRuntime.create(
-        deps.webhookDelivery,
-      ).processManager(),
+      deps.webhookDelivery.processManager(),
     );
   }
   return pipeline.build();

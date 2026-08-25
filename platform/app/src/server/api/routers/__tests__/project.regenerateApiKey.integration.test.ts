@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { TokenResolver } from "../../../api-key/token-resolver";
+import { getApp } from "../../../app-layer/app";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -217,11 +217,11 @@ describe("project.regenerateApiKey integration", () => {
       });
       const originalApiKey = before!.apiKey;
 
-      const resolver = TokenResolver.create(prisma);
+      const app = getApp();
 
       // Sanity: the original base key authenticates to this project via the
       // real legacy-key resolution path before rotation.
-      const resolvedBefore = await resolver.resolve({
+      const resolvedBefore = await app.apiKeys.tryResolveToken({
         token: originalApiKey,
       });
       expect(resolvedBefore?.type).toBe("legacyProjectKey");
@@ -232,11 +232,13 @@ describe("project.regenerateApiKey integration", () => {
       });
 
       // The previous raw key no longer resolves to anything.
-      const resolvedOld = await resolver.resolve({ token: originalApiKey });
+      const resolvedOld = await app.apiKeys.tryResolveToken({
+        token: originalApiKey,
+      });
       expect(resolvedOld).toBeNull();
 
       // The new key resolves, scoped to the same project.
-      const resolvedNew = await resolver.resolve({ token: newApiKey });
+      const resolvedNew = await app.apiKeys.tryResolveToken({ token: newApiKey });
       expect(resolvedNew?.type).toBe("legacyProjectKey");
       expect(resolvedNew?.project.id).toBe(projectId);
     });

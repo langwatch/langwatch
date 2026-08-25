@@ -4,13 +4,13 @@ import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 import type {
   ScheduledJobRecord,
-  ScheduledJobRepository,
+  ScheduledJobStore,
 } from "./scheduler.types";
 
 /**
  * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres
  * row is the source of truth; the service layer (SchedulerService) depends on
- * the `ScheduledJobRepository` interface, never on Prisma directly.
+ * the `ScheduledJobStore` interface, never on Prisma directly.
  *
  * The two READS are cross-tenant global scans (one scheduler serves every
  * project), so they use `$queryRaw` with the guard's sanctioned
@@ -18,7 +18,7 @@ import type {
  * project-scoped — each carries `projectId` — so the multitenancy guard
  * accepts them and no write can cross tenants.
  */
-export class PrismaScheduledJobRepository implements ScheduledJobRepository {
+export class PrismaScheduledJobStore implements ScheduledJobStore {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findDue({
@@ -425,7 +425,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
  * writes are no-ops, and `claim` never wins — nothing fires. Mirrors the
  * sibling `Null*` ops repositories so the null preset never touches Postgres.
  */
-export class NullScheduledJobRepository implements ScheduledJobRepository {
+export class NullScheduledJobStore implements ScheduledJobStore {
   async findDue(): Promise<ScheduledJobRecord[]> {
     return [];
   }

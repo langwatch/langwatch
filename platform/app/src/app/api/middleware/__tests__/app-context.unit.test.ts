@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import type { App } from "~/server/app-layer/app";
-import { appContextMiddlewareFor, appFromContext } from "../app-context";
+import {
+  appContextBindingsFor,
+  appContextMiddleware,
+  appContextMiddlewareFor,
+  appFromContext,
+} from "../app-context";
 
 describe("appContextMiddlewareFor", () => {
   it("installs the captured App without consulting the process singleton", async () => {
@@ -29,5 +34,21 @@ describe("appContextMiddlewareFor", () => {
 
     const response = await app.request("http://localhost/");
     expect(response.status).toBe(500);
+  });
+
+  it("carries the same App through an internal Hono re-dispatch", async () => {
+    const capturedApp = {} as App;
+    const app = new Hono();
+    app.use("*", appContextMiddleware);
+    app.get("/", (context) =>
+      context.json({ sameContextApp: context.app === capturedApp }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://localhost/"),
+      appContextBindingsFor(capturedApp),
+    );
+
+    expect(await response.json()).toEqual({ sameContextApp: true });
   });
 });

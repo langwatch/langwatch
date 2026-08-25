@@ -19,8 +19,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -84,7 +83,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
       },
     });
 
-    const created = await ApiKeyService.create(prisma).create({
+    const created = await getApp().apiKeys.create({
       name: `groups-gate-key-${nanoid(6)}`,
       userId,
       createdByUserId: userId,

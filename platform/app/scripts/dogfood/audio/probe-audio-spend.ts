@@ -39,9 +39,8 @@
  *   --allow-remote-db     opt out of the local-database guard
  */
 
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { prisma } from "~/server/db";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import {
   assertQuantityColumns,
   type ProbeScope,
@@ -162,7 +161,9 @@ async function resolveTenant(args: Args): Promise<Tenant> {
         "scripts/dogfood/audio/seed-audio-vk.ts first",
     );
   }
-  const workspace = await new PersonalWorkspaceService(prisma).ensure({
+  const workspace = await initializeDefaultApp({
+    processRole: "web",
+  }).organizations.ensurePersonalWorkspace({
     userId: user.id,
     organizationId: picked.id,
     displayName: null,
@@ -182,9 +183,8 @@ interface Probe extends ProbeScope {
 
 /** A virtual key and a budget of this run's own, so the delta is this run's. */
 async function provision(args: Args, tenant: Tenant): Promise<Probe> {
-  const issued = await PersonalVirtualKeyService.create(prisma, {
-    gatewayBaseUrl: args.gateway,
-  }).issue({
+  const issued = await initializeDefaultApp({ processRole: "web" }).governance
+    .personalVirtualKeys.issue({
     userId: tenant.userId,
     organizationId: tenant.organizationId,
     personalProjectId: tenant.projectId,

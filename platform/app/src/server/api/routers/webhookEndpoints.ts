@@ -13,7 +13,7 @@ import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
-import { WEBHOOK_EVENT_TYPES } from "@langwatch/enterprise-webhooks-contract";
+import { WEBHOOK_EVENT_TYPES } from "@langwatch/enterprise-webhook-contract";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,

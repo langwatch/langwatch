@@ -19,18 +19,17 @@
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
+import type { Role } from "@langwatch/role-contract";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import type { CustomRole, Organization } from "~/generated/prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import {
   isOrgExclusivePermission,
   type Permission,
 } from "~/server/api/rbac";
-import { prisma } from "~/server/db";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
-import { RoleService } from "~/server/role/role.service";
 import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 const { service, guard } = createManagementService({
@@ -40,7 +39,7 @@ const { service, guard } = createManagementService({
 });
 
 /** The handler context: the framework's variables plus the family's provider. */
-type RolesContext = ServiceContext<EndpointVariables & { roles: RoleService }>;
+type RolesContext = ServiceContext<EndpointVariables>;
 
 // ── wire schemas ─────────────────────────────────────────────────────────────
 
@@ -85,10 +84,7 @@ const permissionCatalogSchema = z.object({
 const idParamsSchema = z.object({ id: z.string().min(1) });
 
 const roleWire = (
-  role: Pick<
-    CustomRole,
-    "id" | "name" | "description" | "createdAt" | "updatedAt"
-  > & { permissions: string[] },
+  role: Pick<Role, "id" | "name" | "description" | "createdAt" | "updatedAt"> & { permissions: string[] },
 ): z.infer<typeof roleSchema> => ({
   id: role.id,
   name: role.name,
@@ -107,7 +103,7 @@ const paramsOf = <T>(c: RolesContext): T => c.get("params") as T;
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 const listRolesHandler = async (c: RolesContext) => {
-  const roles = await c.get("roles").getAllRoles(organizationOf(c).id);
+  const roles = await c.var.langwatchApp.roles.list({ organizationId: organizationOf(c).id });
   return { roles: roles.map(roleWire) };
 };
 
@@ -116,8 +112,8 @@ const createRoleHandler = async (
   input: z.infer<typeof createRoleSchema>,
 ) => {
   const organization = organizationOf(c);
-  const role = await c.get("roles").createRole({
-    params: {
+  const role = await c.var.langwatchApp.roles.create({
+    role: {
       organizationId: organization.id,
       name: input.name,
       description: input.description ?? null,
@@ -145,7 +141,7 @@ const permissionCatalogHandler = async () => {
 
 const getRoleHandler = async (c: RolesContext) => {
   const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
-  const role = await c.get("roles").getRoleForOrg({
+  const role = await c.var.langwatchApp.roles.getForOrganization({
     roleId: params.id,
     organizationId: organizationOf(c).id,
   });
@@ -158,10 +154,10 @@ const updateRoleHandler = async (
 ) => {
   const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  const role = await c.get("roles").updateRoleForOrg({
+  const role = await c.var.langwatchApp.roles.updateForOrganization({
     roleId: params.id,
     organizationId: organization.id,
-    params: {
+    changes: {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.description !== undefined
         ? { description: input.description }
@@ -178,7 +174,7 @@ const updateRoleHandler = async (
 const deleteRoleHandler = async (c: RolesContext) => {
   const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
-  await c.get("roles").deleteRoleForOrg({
+  await c.var.langwatchApp.roles.removeForOrganization({
     roleId: params.id,
     organizationId: organization.id,
     actor: orgRequestLedgerActor(c),
@@ -189,9 +185,6 @@ const deleteRoleHandler = async (c: RolesContext) => {
 // ── service wiring ───────────────────────────────────────────────────────────
 
 export const app = service
-  .provide({
-    roles: () => new RoleService(prisma),
-  })
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, listRolesHandler, (b) =>
     guard("organization:manage")(b)
       .withOutput(z.object({ roles: z.array(roleSchema) }))

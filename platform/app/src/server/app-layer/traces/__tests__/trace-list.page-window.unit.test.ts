@@ -17,7 +17,9 @@ import { TraceListService } from "../trace-list.service";
 function serviceWithRepository(findAll: ReturnType<typeof vi.fn>) {
   return new TraceListService(
     { findAll } as never,
-    { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    {
+      findSummariesByTraceIds: vi.fn().mockResolvedValue({}),
+    } as never,
     { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   );
 }

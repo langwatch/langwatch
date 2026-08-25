@@ -17,6 +17,7 @@ import type {
   GatewayGuardrailFailureMode,
   PrismaClient,
 } from "~/generated/prisma/client";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
@@ -51,11 +52,15 @@ export type ArchiveGuardrailInput = {
 export class GatewayGuardrailService {
   constructor(
     private readonly prisma: PrismaClient,
+    private readonly evaluators: EvaluatorService,
     private readonly auditLog = new GatewayAuditAdapter(prisma),
   ) {}
 
-  static create(prisma: PrismaClient): GatewayGuardrailService {
-    return new GatewayGuardrailService(prisma);
+  static create(
+    prisma: PrismaClient,
+    evaluators: EvaluatorService,
+  ): GatewayGuardrailService {
+    return new GatewayGuardrailService(prisma, evaluators);
   }
 
   async list(projectId: string): Promise<GatewayGuardrail[]> {
@@ -164,9 +169,9 @@ export class GatewayGuardrailService {
     evaluatorId: string,
     projectId: string,
   ): Promise<void> {
-    const evaluator = await this.prisma.evaluator.findFirst({
-      where: { id: evaluatorId, projectId, archivedAt: null },
-      select: { id: true },
+    const evaluator = await this.evaluators.tryGetById({
+      id: evaluatorId,
+      projectId,
     });
     if (!evaluator) {
       throw new TRPCError({

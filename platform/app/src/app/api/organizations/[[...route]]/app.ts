@@ -19,7 +19,9 @@
  * the returned key does everything else through the management APIs.
  */
 import { timingSafeEqual } from "node:crypto";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { auditLog } from "~/runtime/app/features/audit-log";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
@@ -27,12 +29,7 @@ import { z } from "zod";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { getApp } from "~/server/app-layer/app";
-import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
-import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { prisma } from "~/server/db";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   CREATE_ORGANIZATION,
@@ -94,7 +91,7 @@ function isAuthorized(
 export async function verifyInstanceAdminKey(c: Context, next: Next) {
   const configured = instanceAdminKey();
   if (!configured) return c.notFound();
-  if (getApp().config.isSaas) return c.notFound();
+  if (appFromContext(c).config.isSaas) return c.notFound();
 
   const authorization = c.req.header("authorization");
   if (!authorization?.startsWith("Bearer ")) {
@@ -121,11 +118,8 @@ const createOrganizationSchema = z.object({
   adminApiKeyName: z.string().trim().min(1).max(100).optional(),
 });
 
-const organizationService = () =>
-  new OrganizationService(
-    new PrismaOrganizationRepository(prisma),
-    new PromptTagRepository(prisma),
-  );
+const organizationService = (context: Context) =>
+  appFromContext(context).organizations;
 
 const secured = createServiceApp({
   basePath: "/api/organizations",
@@ -155,20 +149,20 @@ secured
     async (c) => {
       const body = c.req.valid("json");
 
-      const created = await organizationService().createForProvisioning({
+      const created = await organizationService(c).createForProvisioning({
         name: body.name,
         ...(body.slug !== undefined ? { slug: body.slug } : {}),
       });
 
       let adminKey: Awaited<ReturnType<ApiKeyService["create"]>>;
       let summary: Awaited<
-        ReturnType<OrganizationService["getProvisioningSummary"]>
+        ReturnType<ReturnType<typeof organizationService>["getProvisioningSummary"]>
       >;
       try {
         // The bootstrap credential: an org-scoped service key with an explicit
         // ORGANIZATION-ADMIN binding, so provisioning can continue through the
         // management APIs without a browser step.
-        adminKey = await ApiKeyService.create(prisma).create({
+        adminKey = await c.var.langwatchApp.apiKeys.create({
           name: body.adminApiKeyName ?? "Provisioning admin",
           userId: null,
           createdByUserId: null,
@@ -183,7 +177,7 @@ secured
           ],
         });
 
-        summary = await organizationService().getProvisioningSummary(
+        summary = await organizationService(c).getProvisioningSummary(
           created.organization.id,
         );
         if (!summary) {
@@ -200,7 +194,7 @@ secured
         // caller must see the original failure, so a failed compensation is
         // only reported.
         try {
-          await organizationService().deleteProvisionedOrganization({
+          await organizationService(c).deleteProvisionedOrganization({
             organizationId: created.organization.id,
           });
         } catch (compensationError) {
@@ -241,7 +235,7 @@ secured
   .access(instanceAdminPolicy())
   .get("/", describeRoute(LIST_ORGANIZATIONS), async (c) => {
     const organizations =
-      await organizationService().listProvisioningSummaries();
+      await organizationService(c).listProvisioningSummaries();
     return c.json({ organizations });
   });
 
@@ -249,7 +243,7 @@ secured
   .access(instanceAdminPolicy())
   .get("/:id", describeRoute(GET_ORGANIZATION), async (c) => {
     const { id } = c.req.param();
-    const organization = await organizationService().getProvisioningSummary(id);
+    const organization = await organizationService(c).getProvisioningSummary(id);
     if (!organization) {
       throw new NotFoundError("not_found", "Organization", id);
     }

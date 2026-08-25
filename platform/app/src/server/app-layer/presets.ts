@@ -84,6 +84,7 @@ import { env } from "~/env.mjs";
 import {
   LangyTurnAccessStore,
   LangyTurnHandoffStore,
+  LangyTokenBuffer,
 } from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 import {
@@ -109,6 +110,8 @@ import { sendRenderedSlackMessage } from "~/server/app-layer/automations/deliver
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
+import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
+import { resolveLangyCapabilityProgress } from "~/server/app-layer/langy/langy-capability-progress";
 import { createAppLangyCredentialComposition } from "~/server/app-layer/langy/langy-credential-adapters";
 import {
   mintLangySessionApiKey,
@@ -116,7 +119,6 @@ import {
 } from "~/server/app-layer/langy/langyApiKey";
 import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
-import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -287,19 +289,8 @@ import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/ev
 import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
-import {
-  runBranchRecheckPass,
-  runBranchRetentionPrune,
-} from "./github/github-branch-recheck.worker";
-import { GithubInstallationsService } from "./github/github-installations.service";
-import { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
-import { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
-import { getGithubAppConfig } from "./github/githubAppConfig";
-import { GithubAppTokenService, type RedisLike } from "./github/githubAppToken";
-import { PrismaGithubInstallationsRepository } from "./github/repositories/github-installations.prisma.repository";
-import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
-import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
-import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { GithubCompositionAdapter } from "@langwatch/github-server";
+import type { GithubService } from "@langwatch/github-contract";
 import { AppLangyRuntime } from "~/runtime/app/features/langy";
 import { AppDatasetRuntime } from "~/runtime/app/features/dataset";
 import { AppPromptRuntime } from "~/runtime/app/features/prompt";
@@ -397,7 +388,6 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
-import { NullGithubPullRequestLookup } from "./traces/session-groups.pull-request-link";
 import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
@@ -1047,7 +1037,7 @@ export function initializeDefaultApp(options?: {
     internalSecret: langyInternalSecret ?? "",
   });
   const langyHandoffStore = LangyTurnHandoffStore.create({ redis: redis! });
-  const langyTokenBuffer = createLangyTokenBuffer({ redis });
+  const langyTokenBuffer = redis ? LangyTokenBuffer.create({ redis }) : null;
   const langyTitleGenerator = createLangyConversationTitleGenerator({
     messages: langyPersistence.trustedMessages,
   });
@@ -1527,7 +1517,7 @@ export function initializeDefaultApp(options?: {
   // Redis and Prisma), so the registry is handed the callable proxy now and the
   // real implementation is wired once it exists.
   const requestBranchMapping = new Deferred<
-    GithubPullRequestMappingService["requestBranchMapping"]
+    GithubService["requestBranchMapping"]
   >("requestBranchMapping");
 
   // The fleet-wide linkage maintenance the scheduled process manager drives.
@@ -1662,31 +1652,13 @@ export function initializeDefaultApp(options?: {
   // reports `configured=false` and every read short-circuits to "GitHub
   // unavailable" without touching GitHub. The App private key is the only
   // credential and it lives here in the control plane, never near a worker.
-  const githubAppConfig = getGithubAppConfig();
-  const githubAppTokens = new GithubAppTokenService(
-    githubAppConfig.appId,
-    githubAppConfig.privateKey,
-    // ioredis Redis/Cluster satisfy the narrow RedisLike surface at runtime; the
-    // client's overloaded `set` signature just isn't structurally assignable.
-    (redis ?? null) as unknown as RedisLike | null,
-  );
-  // Set once the mapping service exists, below. The installation hook and the
-  // service form a cycle (the hook backfills through the service, the service
-  // resolves installations through the connection), and this is where it is
-  // broken: the hook only ever runs long after composition.
-  let githubPullRequestMapping: GithubPullRequestMappingService | null = null;
-  const githubInstallations = new GithubInstallationsService(
-    new PrismaGithubInstallationsRepository(prisma),
-    githubAppTokens,
-    // Connecting GitHub is the moment a whole history of folded sessions
-    // becomes mappable. Without this the organization would see nothing until
-    // someone ran a new session on each branch.
-    ({ organizationId }) =>
-      githubPullRequestMapping?.runBackfillForOrganization({ organizationId }),
-  );
+  let github: GithubService | null = null;
   const langyCredentialComposition = createAppLangyCredentialComposition({
     prisma,
-    github: githubInstallations,
+    github: () => {
+      if (!github) throw new Error("GitHub service has not been composed");
+      return github;
+    },
     workerCallbackUrl:
       env.LANGY_WORKER_CALLBACK_URL ??
       env.LANGWATCH_ENDPOINT ??
@@ -1703,9 +1675,25 @@ export function initializeDefaultApp(options?: {
   // worker port + turn stores are null when their infra is absent (no agent env /
   // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
   // as the route 503'd.
+  let processApp: App | null = null;
   const langyService = langyRuntime.build({
     commands: commands.langy,
     events: es.getEventStore<LangyConversationProcessingEvent>() ?? null,
+    relay: redis
+      ? {
+          redis,
+          baseHost: config.baseHost ?? env.BASE_HOST,
+          resolveCapabilityProgress: resolveLangyCapabilityProgress,
+          resolveResourceUrl: (input) => {
+            if (!processApp) return Promise.resolve(null);
+            return resolveNavigateFallbackUrl({
+              app: processApp,
+              ...input,
+            });
+          },
+          logger: createLogger("langwatch:langy:relay"),
+        }
+      : undefined,
     credentials: langyCredentialComposition,
     turns: (ports) =>
       LangyTurnService.create({
@@ -1846,55 +1834,29 @@ export function initializeDefaultApp(options?: {
     "CodingAgentSessionService",
   );
 
-  // Pull-request linkage. The mapping service is the write side (branch to
-  // pull requests, negative-cached), the status service the live read, and the
-  // usage service the organization-first rollup the Pull Requests page and the
-  // REST endpoint share.
-  const githubPullRequestsRepository = new PrismaGithubPullRequestsRepository(
-    prisma,
-  );
-  githubPullRequestMapping = new GithubPullRequestMappingService({
-    repository: githubPullRequestsRepository,
-    installations: githubInstallations,
-    appTokens: githubAppTokens,
-    resolveOrganizationId,
-    findProjectIds: async (organizationId) =>
-      (
-        await prisma.project.findMany({
-          where: { team: { organizationId }, archivedAt: null },
-          select: { id: true },
-        })
-      ).map((project) => project.id),
-    sessions: codingAgentSessions,
-    touchCodingAgentPullRequestSeen: (params) =>
-      projects.touchCodingAgentPullRequestSeen(params),
+  const githubService = GithubCompositionAdapter.create({
+    database: prisma,
+    config: {
+      appId: env.GITHUB_LANGY_APP_ID ?? "",
+      privateKey: env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+    },
+    redis: (redis ?? null) as never,
+    hostConfig: { host: env.GITHUB_LANGY_HOST },
+    organization: organizations,
+    project: projects,
+    codingAgent: codingAgentSessions,
   });
-  requestBranchMapping.resolve((params) =>
-    githubPullRequestMapping!.requestBranchMapping(params),
-  );
-  recheckDueBranches.resolve(() =>
-    runBranchRecheckPass({
-      repository: githubPullRequestsRepository,
-      mapping: githubPullRequestMapping!,
-    }),
-  );
-  pruneStaleBranchLinkage.resolve(() =>
-    runBranchRetentionPrune({ repository: githubPullRequestsRepository }),
-  );
-
-  const githubPullRequestStatus = new GithubPullRequestStatusService({
-    repository: githubPullRequestsRepository,
-    installations: githubInstallations,
-    appTokens: githubAppTokens,
-    redis: (redis ?? null) as unknown as RedisLike | null,
-  });
+  github = githubService;
+  requestBranchMapping.resolve((params) => githubService.requestBranchMapping(params));
+  recheckDueBranches.resolve(() => githubService.recheckDueBranches());
+  pruneStaleBranchLinkage.resolve(() => githubService.pruneStaleBranchLinkage());
 
   const pullRequestUsage = new PullRequestUsageService({
-    pullRequests: githubPullRequestsRepository,
+    pullRequests: githubService,
     sessions: repositories.codingAgentSession,
     personalSessions: codingAgentSessions,
     sessionEvents: repositories.codingAgentSessionEvents,
-    installations: githubInstallations,
+    installations: githubService,
     resolveOrganizationId,
     // The one place the bundled-plan policy is reached: the service takes the
     // answer as a dep so the read stays free of the enterprise module, and the
@@ -1909,10 +1871,7 @@ export function initializeDefaultApp(options?: {
   const codingAgentSessionsList = traced(
     new CodingAgentSessionsListService({
       sessions: codingAgentSessions,
-      pullRequests: {
-        findForBranches: (args) =>
-          githubPullRequestsRepository.findAllByBranchKeys(args),
-      },
+      pullRequests: githubService,
       resolveOrganizationId,
     }),
     "CodingAgentSessionsListService",
@@ -1924,10 +1883,7 @@ export function initializeDefaultApp(options?: {
         ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
         : new NullSessionGroupsRepository(),
       codingAgentSessions,
-      pullRequests: {
-        findForBranches: (args) =>
-          githubPullRequestsRepository.findAllByBranchKeys(args),
-      },
+      pullRequests: githubService,
       resolveOrganizationId,
     }),
     "SessionGroupsService",
@@ -2113,7 +2069,7 @@ export function initializeDefaultApp(options?: {
     "SuiteService",
   );
 
-  return initializeApp({
+  const app = initializeApp({
     config,
     agents,
     dataset,
@@ -2208,20 +2164,7 @@ export function initializeDefaultApp(options?: {
       sessionsList: codingAgentSessionsList,
       pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
     },
-    github: {
-      installations: traced(githubInstallations, "GithubInstallationsService"),
-      pullRequests: {
-        mapping: traced(
-          githubPullRequestMapping,
-          "GithubPullRequestMappingService",
-        ),
-        status: traced(
-          githubPullRequestStatus,
-          "GithubPullRequestStatusService",
-        ),
-        repository: githubPullRequestsRepository,
-      },
-    },
+    github: githubService,
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
         getAllClickHouseInstances,
@@ -2269,6 +2212,8 @@ export function initializeDefaultApp(options?: {
     _authzMigration: authzFeature.migration,
     _gracefulCloseables: gracefulCloseables,
   });
+  processApp = app;
+  return app;
 }
 
 /** Tests — noop commands, null-backed services. */
@@ -2423,26 +2368,20 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // Pull-request linkage against an unconfigured App and null stores: every
   // read answers empty, every write is a no-op, and no test can accidentally
   // reach github.com.
-  const testGithubAppTokens = new GithubAppTokenService("", "", null);
-  const testGithubInstallations = new GithubInstallationsService(
-    new NullGithubInstallationsRepository(),
-    testGithubAppTokens,
-  );
-  const testPullRequestsRepository = new NullGithubPullRequestsRepository();
-  const testGithubPullRequestMapping = new GithubPullRequestMappingService({
-    repository: testPullRequestsRepository,
-    installations: testGithubInstallations,
-    appTokens: testGithubAppTokens,
-    resolveOrganizationId: async () => undefined,
-    findProjectIds: async () => [],
-    sessions: testCodingAgentSessions,
+  const testGithub = GithubCompositionAdapter.create({
+    database: testPrisma,
+    config: { appId: "", privateKey: "" },
+    redis: null,
+    organization: nullOrganizations,
+    project: testProjects,
+    codingAgent: testCodingAgentSessions,
   });
   const testPullRequestUsage = new PullRequestUsageService({
-    pullRequests: testPullRequestsRepository,
+    pullRequests: testGithub,
     sessions: new NullCodingAgentSessionRepository(),
     personalSessions: testCodingAgentSessions,
     sessionEvents: new NullCodingAgentSessionEventsRepository(),
-    installations: testGithubInstallations,
+    installations: testGithub,
     resolveOrganizationId: async () => undefined,
     // No enterprise policy in the test app: everything reads as billed, the
     // conservative answer for a cost.
@@ -2450,7 +2389,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   });
   const testCodingAgentSessionsList = new CodingAgentSessionsListService({
     sessions: testCodingAgentSessions,
-    pullRequests: new NullGithubPullRequestLookup(),
+    pullRequests: testGithub,
     resolveOrganizationId: async () => undefined,
   });
   const testDataset = AppDatasetRuntime.create({
@@ -2720,19 +2659,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       sessionsList: testCodingAgentSessionsList,
       pullRequestUsage: testPullRequestUsage,
     },
-    github: {
-      installations: testGithubInstallations,
-      pullRequests: {
-        mapping: testGithubPullRequestMapping,
-        status: new GithubPullRequestStatusService({
-          repository: testPullRequestsRepository,
-          installations: testGithubInstallations,
-          appTokens: testGithubAppTokens,
-          redis: null,
-        }),
-        repository: testPullRequestsRepository,
-      },
-    },
+    github: testGithub,
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
         async () => [],
@@ -2790,7 +2717,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         }),
       credentials: createAppLangyCredentialComposition({
         prisma: testPrisma,
-        github: testGithubInstallations,
+        github: () => testGithub,
         workerCallbackUrl:
           env.LANGY_WORKER_CALLBACK_URL ??
           env.LANGWATCH_ENDPOINT ??

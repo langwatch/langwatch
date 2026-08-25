@@ -3,7 +3,7 @@ import type { Redis } from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
-import type { ScheduledJobRepository } from "../scheduler.types";
+import type { ScheduledJobStore } from "../scheduler.types";
 
 const logger = createLogger("test:scheduler-wake");
 
@@ -14,7 +14,7 @@ const logger = createLogger("test:scheduler-wake");
  * teardown disconnects. The exactly-once guarantee is proven separately against
  * real Postgres in the integration suite.
  */
-function makeRepo(): ScheduledJobRepository {
+function makeRepo(): ScheduledJobStore {
   return {
     findDue: vi.fn(async () => []),
     earliestActiveNextRunAt: vi.fn(async () => null),

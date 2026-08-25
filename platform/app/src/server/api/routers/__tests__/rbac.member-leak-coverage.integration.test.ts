@@ -40,6 +40,7 @@ import { PlanProviderService } from "../../../app-layer/subscription/plan-provid
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
 
 const { mockGetActivePlan } = vi.hoisted(() => ({
   mockGetActivePlan: vi.fn(),
@@ -99,17 +100,25 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       prices: { USD: 0, EUR: 0 },
       overrideAddingLimitations: false,
     });
+    const planProvider = PlanProviderService.create({
+      getActivePlan: mockGetActivePlan,
+    });
+    const base = createTestApp({ planProvider });
+    const canonicalOrganizations = AppOrganizationRuntime.create({
+      database: prisma,
+      authz: base.permissions,
+      grants: base.authzGrants,
+    }).build();
     globalForApp.__langwatch_app = createTestApp({
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        // OrganizationService needs a PromptTagRepository but it's not
+        // OrganizationService needs a Prompt service but it.s not
         // exercised by our tests — null-stub satisfies the constructor.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { seedForOrg: async () => {} } as any,
+        canonicalOrganizations,
       ),
-      planProvider: PlanProviderService.create({
-        getActivePlan: mockGetActivePlan,
-      }),
+      planProvider,
     });
 
     // Org + 2 users + 1 regular team + 2 personal-workspace teams.

@@ -4,7 +4,7 @@
  * Unit tests for the simulations onboarding check.
  *
  * Guards the retarget of getSimulationsCount onto the app-layer
- * `getApp().simulations.runs.getScenarioSetsData` (ES removal): the method
+ * `getApp().simulations.getScenarioSetsData` (ES removal): the method
  * swallows all errors and returns 0, so a mis-wire would silently report
  * "no simulations" forever with the suite green.
  */
@@ -34,9 +34,7 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
-    simulations: {
-      runs: { getScenarioSetsData: mockGetScenarioSetsData },
-    },
+    simulations: { getScenarioSetsData: mockGetScenarioSetsData },
   }),
 }));
 

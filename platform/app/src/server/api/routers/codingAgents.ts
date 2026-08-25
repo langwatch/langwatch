@@ -1,8 +1,6 @@
 import { z } from "zod";
+import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
-import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
 import {
   type CallerProjectScope,
   resolveCallerProjectScope,
@@ -10,6 +8,7 @@ import {
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { canReadCapturedContent } from "~/server/traces/protections";
 import { getUserProtectionsForProject } from "../utils";
+import { env } from "~/env.mjs";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -44,11 +43,10 @@ export const codingAgentsRouter = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
-      const app = getApp();
+    .query(async ({ ctx, input }) => {
       const toMs = input.toMs ?? Date.now();
       const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-      return app.codingAgents.sessions.getUsageTotals({
+      return ctx.app.codingAgents.sessions.getUsageTotals({
         projectId: input.projectId,
         fromMs,
         toMs,
@@ -70,11 +68,10 @@ export const codingAgentsRouter = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
-      const app = getApp();
+    .query(async ({ ctx, input }) => {
       const toMs = input.toMs ?? Date.now();
       const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-      return app.codingAgents.sessions.listRecent({
+      return ctx.app.codingAgents.sessions.listRecent({
         projectId: input.projectId,
         fromMs,
         toMs,
@@ -103,7 +100,7 @@ export const codingAgentsRouter = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const rows = await getApp().codingAgents.sessionsList.listForProject({
+      const rows = await ctx.app.codingAgents.sessionsList.listForProject({
         projectId: input.projectId,
       });
       return gateSessionListCost({
@@ -126,7 +123,7 @@ export const codingAgentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("traces:view")
     .query(async ({ ctx, input }) => {
-      const app = getApp();
+      const app = ctx.app;
       const scope = await scopeFor({
         userId: ctx.session.user.id,
         projectId: input.projectId,
@@ -136,7 +133,22 @@ export const codingAgentsRouter = createTRPCRouter({
           projectId: input.projectId,
           ...scope,
         });
-      return { ...usage, connection: await connectionFor(input.projectId) };
+      const organizationId = await resolveOrganizationId(input.projectId);
+      const installations = organizationId
+        ? await app.github.getAllForOrganization(organizationId)
+        : [];
+      return {
+        ...usage,
+        connection: {
+          connected: installations.length > 0,
+          installUrl:
+            organizationId &&
+            app.github.configured &&
+            Boolean(env.GITHUB_LANGY_APP_SLUG)
+              ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
+              : null,
+        },
+      };
     }),
 
   /**
@@ -173,7 +185,7 @@ export const codingAgentsRouter = createTRPCRouter({
         organizationId,
       });
       const detail =
-        await getApp().codingAgents.pullRequestUsage.getPullRequestDetail({
+        await ctx.app.codingAgents.pullRequestUsage.getPullRequestDetail({
           organizationId,
           repositoryHost: input.repositoryHost,
           repositoryFullName: input.repositoryFullName,
@@ -242,35 +254,4 @@ async function scopeFor({
     return { permittedProjectIds: [], costProjectIds: [], projects: {} };
   }
   return resolveCallerProjectScope({ userId, organizationId });
-}
-
-/**
- * Whether the project's organization has GitHub connected, and where to start
- * an install. Mirrors `github.getConnectionStatus`'s install link so a page
- * that has this answer never needs the organization-scoped query too.
- *
- * The link is null on an instance with no GitHub App configured: the install
- * route answers 503 there, and a link that cannot start its flow is worse than
- * no link at all. It is the only availability signal in this payload, so its
- * absence is what tells the page not to offer connecting.
- *
- * "Configured" is read the way the install route reads it, App slug included.
- * The token service answers a narrower question, whether it can mint, and an
- * instance holding an id and a key but no slug mints happily while the deep
- * link this builds has nowhere on github.com to point.
- */
-async function connectionFor(projectId: string): Promise<{
-  connected: boolean;
-  installUrl: string | null;
-}> {
-  const installations = getApp().github.installations;
-  const organizationId = await resolveOrganizationId(projectId);
-  if (!organizationId) return { connected: false, installUrl: null };
-  const existing = await installations.getAllForOrganization(organizationId);
-  return {
-    connected: existing.length > 0,
-    installUrl: getGithubAppConfig().configured
-      ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
-      : null,
-  };
 }

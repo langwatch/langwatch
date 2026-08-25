@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { SLOT_STALE_AFTER_MS } from "../../../shared/ops/schedulerControl";
 import type {
   ScheduledJobRecord,
-  ScheduledJobRepository,
+  ScheduledJobStore,
 } from "../scheduler/scheduler.types";
 import {
   ScheduleAlreadyInFlightError,
@@ -86,7 +86,7 @@ export interface SchedulerAuditEntryView {
  * UPDATE, which is what an operator had to do instead.
  */
 export class SchedulerOpsService {
-  private readonly repo: ScheduledJobRepository;
+  private readonly repo: ScheduledJobStore;
   private readonly audit: SchedulerAuditSink | null;
   /**
    * Best-effort poke so a manual run fires now rather than within one poll
@@ -99,7 +99,7 @@ export class SchedulerOpsService {
     | null;
 
   constructor(deps: {
-    repo: ScheduledJobRepository;
+    repo: ScheduledJobStore;
     audit?: SchedulerAuditSink | null;
     wake?: (() => void) | null;
     resolveProjectNames?:

@@ -6,7 +6,7 @@ import {
   describeAnnotationAnchor,
 } from "../annotations/annotationAnchorLabel";
 import { annotationSuggestedOutput } from "../annotations/annotationSuggestedOutput";
-import { datasetSpanSchema } from "../datasets/types";
+import { datasetSpanSchema } from "@langwatch/dataset-contract";
 import {
   type Trace as BaseTrace,
   type DatasetSpan,

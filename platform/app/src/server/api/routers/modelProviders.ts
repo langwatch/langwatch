@@ -8,33 +8,12 @@ import {
   type ScopeAssignment,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
-import { getApp } from "../../app-layer/app";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
 import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
-import {
-  featureByKey,
-  MODEL_ROLES,
-} from "../../modelProviders/featureRegistry";
-import {
-  getDefaultModelsSnapshot,
-  getInheritedValuesForScopes,
-  getResolvedDefaultForFeature,
-} from "../../modelProviders/modelDefaults.read";
-import {
-  assertCanWriteScope,
-  createConfig,
-  deleteConfig,
-  getScopeAttachmentsForConfig,
-  setFeatureAtScope,
-  setRoleAtScope,
-  updateConfig,
-} from "../../modelProviders/modelDefaults.service";
+import { MODEL_ROLES } from "../../modelProviders/featureRegistry";
 import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
-import {
-  ModelProviderService,
-  testConnectionInputSchema,
-} from "../../modelProviders/modelProvider.service";
+import { testConnectionInputSchema } from "../../modelProviders/modelProvider.service";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
@@ -45,13 +24,6 @@ import {
 } from "../../modelProviders/routingHandle";
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  getProjectModelProviders,
-  getProjectModelProvidersForFrontend,
-  listOrgModelProvidersForFrontend,
-  listProjectModelProvidersForFrontend,
-} from "./modelProviders.utils";
-
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
   getModelMetadataForFrontend,
@@ -61,6 +33,45 @@ export {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
+
+type CanonicalProvider = {
+  id: string;
+  provider: string;
+  enabled: boolean;
+  customKeys: Record<string, unknown> | null;
+  customModels: Array<{ id: string; label: string; type: string }>;
+  customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
+  models?: string[] | null;
+  embeddingsModels?: string[] | null;
+};
+
+function toLegacyProvider(provider: CanonicalProvider) {
+  return {
+    id: provider.id,
+    provider: provider.provider,
+    enabled: provider.enabled,
+    customKeys: provider.customKeys,
+    deploymentMapping: null,
+    models: provider.models ?? null,
+    embeddingsModels: provider.embeddingsModels ?? null,
+    customModels: provider.customModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "chat" as const })),
+    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "embedding" as const })),
+  };
+}
+
+function toLegacyProviderMap(providers: Record<string, CanonicalProvider>, _includeKeys: boolean) {
+  return Object.fromEntries(Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)]));
+}
+
+function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((model) => {
+    if (typeof model === "string") return [{ id: model, label: model, type }];
+    if (!model || typeof model !== "object") return [];
+    const item = model as { modelId?: unknown; displayName?: unknown };
+    return typeof item.modelId === "string" ? [{ id: item.modelId, label: typeof item.displayName === "string" ? item.displayName : item.modelId, type }] : [];
+  });
+}
 
 /**
  * Shared input shape for the provider write paths: name the tenant with
@@ -86,30 +97,6 @@ function requireTenantAnchor(
   }
 }
 
-// The declarations for the three hoisted custom permission middlewares
-// below. Consts here, above the router literal, so `.use()` can brand each
-// hoisted function inline (declareAuthzMiddleware returns the branded type
-// the pending builder's `.use()` requires; a bare function no longer
-// compiles there).
-const SCOPE_AWARE_WRITE_DECLARATION = {
-  kind: "custom",
-  reason:
-    "each scope in the write demands its own tier's manage permission, resolved from the input's scopeType",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-const SAVE_CONFIG_DECLARATION = {
-  kind: "custom",
-  reason:
-    "every desired and removed scope attachment is asserted writable before the config write",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-const DELETE_CONFIG_DECLARATION = {
-  kind: "custom",
-  reason:
-    "the config's current scope attachments are loaded by its id and each asserted writable before the delete",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-
 export const modelProviderRouter = createTRPCRouter({
   // tRPC responses land in the browser, so every query here must go
   // through the masking service method — decrypted customKeys are only
@@ -126,11 +113,8 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.getProjectModelProvidersForFrontend(
-        projectId,
-        hasSetupPermission,
-      );
+      const providers = await ctx.app.modelProviders.getForProject({ projectId });
+      return toLegacyProviderMap(providers, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -142,10 +126,7 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         "project:update",
       );
-      return await getProjectModelProvidersForFrontend(
-        projectId,
-        hasSetupPermission,
-      );
+      return toLegacyProviderMap(await ctx.app.modelProviders.getForProject({ projectId }), hasSetupPermission);
     }),
   /**
    * List shape: one entry per stored ModelProvider row, no collapsing
@@ -158,8 +139,8 @@ export const modelProviderRouter = createTRPCRouter({
   listAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
-    .query(async ({ input }) => {
-      return await listProjectModelProvidersForFrontend(input.projectId);
+    .query(async ({ input, ctx }) => {
+      return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(toLegacyProvider);
     }),
   /**
    * Org-wide variant: returns every ModelProvider attached anywhere
@@ -171,8 +152,8 @@ export const modelProviderRouter = createTRPCRouter({
   listAllForOrganizationForFrontend: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
-    .query(async ({ input }) => {
-      return await listOrgModelProvidersForFrontend(input.organizationId);
+    .query(async ({ input, ctx }) => {
+      return (await ctx.app.modelProviders.listForOrganization({ organizationId: input.organizationId })).map(toLegacyProvider);
     }),
   update: protectedProcedure
     .input(
@@ -235,8 +216,7 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
-      const service = ModelProviderService.create(ctx.prisma);
-      const result = await service.updateModelProvider(
+      const result = await ctx.app.modelProviders.upsert(
         {
           id: input.id,
           projectId: input.projectId,
@@ -248,14 +228,12 @@ export const modelProviderRouter = createTRPCRouter({
             | Record<string, unknown>
             | null
             | undefined,
-          customModels: input.customModels,
-          customEmbeddingsModels: input.customEmbeddingsModels,
+          customModels: toCanonicalModels(input.customModels, "chat"),
+          customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
           extraHeaders: input.extraHeaders,
           defaultModel: input.defaultModel,
           routingHandle: input.routingHandle,
-          scopes: input.scopes,
-          scopeType: input.scopeType,
-          scopeId: input.scopeId,
+          scopes: input.scopes ?? (input.scopeType && input.scopeId ? [{ scopeType: input.scopeType, scopeId: input.scopeId }] : undefined),
           rateLimitRpm: input.rateLimitRpm,
           rateLimitTpm: input.rateLimitTpm,
           rateLimitRpd: input.rateLimitRpd,
@@ -265,10 +243,9 @@ export const modelProviderRouter = createTRPCRouter({
             | null
             | undefined,
         },
-        { prisma: ctx.prisma, session: ctx.session },
       );
 
-      return result;
+      return toLegacyProvider(result);
     }),
 
   delete: protectedProcedure
@@ -283,11 +260,7 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectOrOrganizationPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.deleteModelProvider(input, {
-        prisma: ctx.prisma,
-        session: ctx.session,
-      });
+      return await ctx.app.modelProviders.delete(input);
     }),
 
   /**
@@ -340,11 +313,7 @@ export const modelProviderRouter = createTRPCRouter({
     .input(testConnectionInputSchema.superRefine(requireTenantAnchor))
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.testConnection({
-        input,
-        ctx: { prisma: ctx.prisma, session: ctx.session },
-      });
+      return await ctx.app.modelProviders.testConnection(input);
     }),
 
   /**
@@ -393,8 +362,7 @@ export const modelProviderRouter = createTRPCRouter({
         return { status: "pending" as const };
       }
 
-      const service = ModelProviderService.create(ctx.prisma);
-      const saved = await service.updateModelProvider(
+      const saved = await ctx.app.modelProviders.upsert(
         {
           projectId: input.projectId,
           provider: "openai_codex",
@@ -402,17 +370,9 @@ export const modelProviderRouter = createTRPCRouter({
           customKeys: poll.keys,
           scopes: input.scopes,
         },
-        { prisma: ctx.prisma, session: ctx.session },
       );
 
       if (input.setAsCodingDefaults) {
-        for (const scope of input.scopes) {
-          await assertCanWriteScope(
-            { prisma: ctx.prisma, session: ctx.session },
-            scope.scopeType,
-            scope.scopeId,
-          );
-        }
         // The widest selected scope carries the defaults; role values
         // cascade down from it. One scope is the norm (the sign-in surfaces
         // pick the widest manageable), so this is scopes[0] in practice.
@@ -422,16 +382,13 @@ export const modelProviderRouter = createTRPCRouter({
         // workflows) is deliberately untouched.
         const scope = input.scopes[0]!;
         for (const role of ["LANGY", "FAST"] as const) {
-          await setRoleAtScope(
-            { prisma: ctx.prisma },
-            {
-              scopeType: scope.scopeType,
-              scopeId: scope.scopeId,
-              role,
-              model: CODEX_DEFAULT_MODEL,
-              authorId: ctx.session?.user?.id ?? null,
-            },
-          );
+          await ctx.app.modelProviders.setDefault({
+            scope,
+            key: role,
+            model: CODEX_DEFAULT_MODEL,
+            authorId: ctx.session?.user?.id ?? null,
+            actorId: ctx.session?.user?.id,
+          });
         }
       }
 
@@ -474,25 +431,15 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
-      for (const scope of input.scopes) {
-        await assertCanWriteScope(
-          { prisma: ctx.prisma, session: ctx.session },
-          scope.scopeType,
-          scope.scopeId,
-        );
-      }
       const scope = input.scopes[0]!;
       for (const role of ["LANGY", "FAST"] as const) {
-        await setRoleAtScope(
-          { prisma: ctx.prisma },
-          {
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-            role,
-            model: CODEX_DEFAULT_MODEL,
-            authorId: ctx.session?.user?.id ?? null,
-          },
-        );
+        await ctx.app.modelProviders.setDefault({
+          scope,
+          key: role,
+          model: CODEX_DEFAULT_MODEL,
+          authorId: ctx.session?.user?.id ?? null,
+          actorId: ctx.session?.user?.id,
+        });
       }
       void auditLog({
         userId: ctx.session.user.id,
@@ -514,16 +461,8 @@ export const modelProviderRouter = createTRPCRouter({
   codexStatus: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
-    .query(async ({ input }) => {
-      const providers = await getProjectModelProviders(input.projectId);
-      const row = providers.openai_codex;
-      if (!row?.enabled) return { connected: false as const };
-      const keys = (row.customKeys ?? {}) as Partial<Record<string, string>>;
-      return {
-        connected: true as const,
-        providerId: row.id,
-        plan: keys.CODEX_PLAN ?? "",
-      };
+    .query(async ({ input, ctx }) => {
+      return ctx.app.modelProviders.getCodexStatus(input);
     }),
 
   isManagedProvider: protectedProcedure
@@ -534,12 +473,9 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .permission("organization:view")
-    .query(({ input }) => {
+    .query(({ input, ctx }) => {
       return {
-        managed: getApp().managedProviders.isManagedProvider(
-          input.organizationId,
-          input.provider,
-        ),
+        managed: ctx.app.modelProviders.isManagedProvider(input),
       };
     }),
 
@@ -568,7 +504,7 @@ export const modelProviderRouter = createTRPCRouter({
 
   // ────────────────────────────────────────────────────────────────────────
   // Role + feature-keyed default models (Area B3.2). Writes go through
-  // Mario's `modelDefaults.service` so they land in the new `ModelDefault`
+  // The canonical Model Provider service so they land in the new `ModelDefault`
   // table; the legacy Organization/Team/Project scalar columns become
   // read-only fallback during the compat window.
   // See specs/model-providers/role-based-default-models.feature.
@@ -606,7 +542,7 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return getResolvedDefaultForFeature(ctx, {
+      return ctx.app.modelProviders.tryGetResolvedDefault({
         projectId: input.projectId,
         featureKey: input.featureKey,
       });
@@ -616,13 +552,13 @@ export const modelProviderRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return getDefaultModelsSnapshot(ctx, { projectId: input.projectId });
+      return ctx.app.modelProviders.getDefaultSnapshot({ projectId: input.projectId, actorId: ctx.session?.user?.id });
     }),
 
   /**
    * Single-key writers used by the provider-create "Set as default"
    * flow and any tactical "change just this role at this scope" UI.
-   * Both go through modelDefaults.service which finds the (newest)
+   * Both go through the canonical Model Provider service which finds the (newest)
    * config attached at the scope and updates the matching key in
    * place, or creates a new config if none exists.
    *
@@ -639,23 +575,14 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SCOPE_AWARE_WRITE_DECLARATION,
-        scopeAwarePermissionMiddleware,
-      ),
-    )
     .mutation(async ({ input, ctx }) => {
-      await setRoleAtScope(
-        { prisma: ctx.prisma },
-        {
-          scopeType: input.scopeType,
-          scopeId: input.scopeId,
-          role: input.role,
-          model: input.model,
-          authorId: ctx.session?.user?.id ?? null,
-        },
-      );
+      await ctx.app.modelProviders.setDefault({
+        scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+        key: input.role,
+        model: input.model,
+        authorId: ctx.session?.user?.id ?? null,
+        actorId: ctx.session?.user?.id,
+      });
       return { ok: true };
     }),
 
@@ -668,26 +595,14 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SCOPE_AWARE_WRITE_DECLARATION,
-        scopeAwarePermissionMiddleware,
-      ),
-    )
     .mutation(async ({ input, ctx }) => {
-      if (!featureByKey(input.featureKey)) {
-        throw new Error(`Unknown feature key: "${input.featureKey}".`);
-      }
-      await setFeatureAtScope(
-        { prisma: ctx.prisma },
-        {
-          scopeType: input.scopeType,
-          scopeId: input.scopeId,
-          featureKey: input.featureKey,
-          model: input.model,
-          authorId: ctx.session?.user?.id ?? null,
-        },
-      );
+      await ctx.app.modelProviders.setDefault({
+        scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+        key: input.featureKey,
+        model: input.model,
+        authorId: ctx.session?.user?.id ?? null,
+        actorId: ctx.session?.user?.id,
+      });
       return { ok: true };
     }),
 
@@ -724,34 +639,9 @@ export const modelProviderRouter = createTRPCRouter({
           .min(1, "Pick at least one scope."),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SAVE_CONFIG_DECLARATION,
-        saveConfigPermissionMiddleware,
-      ),
-    )
     .mutation(async ({ input, ctx }) => {
-      if (input.id) {
-        await updateConfig(
-          { prisma: ctx.prisma },
-          {
-            id: input.id,
-            config: input.config,
-            scopes: input.scopes,
-            authorId: ctx.session?.user?.id ?? null,
-          },
-        );
-        return { id: input.id };
-      }
-      const created = await createConfig(
-        { prisma: ctx.prisma },
-        {
-          config: input.config,
-          scopes: input.scopes,
-          authorId: ctx.session?.user?.id ?? null,
-        },
-      );
-      return { id: created.id };
+      const saved = await ctx.app.modelProviders.saveDefaultConfig({ ...input, authorId: ctx.session?.user?.id ?? null, actorId: ctx.session?.user?.id });
+      return { id: saved.id };
     }),
 
   /**
@@ -761,14 +651,8 @@ export const modelProviderRouter = createTRPCRouter({
    */
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .use(
-      declareAuthzMiddleware(
-        DELETE_CONFIG_DECLARATION,
-        deleteConfigPermissionMiddleware,
-      ),
-    )
     .mutation(async ({ input, ctx }) => {
-      await deleteConfig({ prisma: ctx.prisma }, input.id);
+      await ctx.app.modelProviders.deleteDefaultConfig({ id: input.id, actorId: ctx.session?.user?.id });
       return { ok: true };
     }),
 
@@ -810,7 +694,7 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return getInheritedValuesForScopes(ctx, {
+      return ctx.app.modelProviders.getInheritedValues({
         projectId: input.projectId,
         scopes: input.scopes,
         excludeConfigId: input.excludeConfigId,
@@ -833,7 +717,7 @@ export const modelProviderRouter = createTRPCRouter({
  * `assertCanManageAllScopes` in the service, which is where organization
  * scope demands `organization:manage`, team demands `team:manage`, and
  * project demands `project:manage`. Same division of labour as
- * `scopeAwarePermissionMiddleware` below.
+ * the canonical service's authorization dependency.
  */
 function checkProjectOrOrganizationPermission(
   projectPermission: "project:update" | "project:delete",
@@ -936,88 +820,4 @@ function checkProviderValidationPermission() {
       return params.next();
     },
   );
-}
-
-/**
- * Permission middleware for the role/feature default writers. Each scope
- * demands its matching permission so a project admin can't silently push
- * a role default up to the organization scope. Matches the per-scope
- * permission map the existing model-providers update mutation uses.
- */
-async function scopeAwarePermissionMiddleware({
-  ctx,
-  input,
-  next,
-}: {
-  ctx: any;
-  input: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
-  next: () => Promise<unknown>;
-}): Promise<unknown> {
-  await assertCanWriteScope(ctx, input.scopeType, input.scopeId);
-  ctx.permissionChecked = true;
-  return next();
-}
-
-/**
- * Permission middleware for saveDefaultModelsConfig. Iterates every
- * scope in the desired attachment set + every scope being removed (on
- * an update) and asserts the caller can write each one. Setting
- * `ctx.permissionChecked = true` is required by the permission-builder
- * contract — without it `enforcePermissionCheck` throws.
- */
-async function saveConfigPermissionMiddleware({
-  ctx,
-  input,
-  next,
-}: {
-  ctx: any;
-  input: {
-    id?: string;
-    scopes: Array<{
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>;
-  };
-  next: () => Promise<unknown>;
-}): Promise<unknown> {
-  for (const s of input.scopes) {
-    await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
-  }
-  if (input.id) {
-    const existing = await getScopeAttachmentsForConfig(ctx, input.id);
-    const desired = new Set(
-      input.scopes.map((s) => `${s.scopeType}::${s.scopeId}`),
-    );
-    const removed = existing.filter(
-      (e) => !desired.has(`${e.scopeType}::${e.scopeId}`),
-    );
-    for (const r of removed) {
-      await assertCanWriteScope(ctx, r.scopeType, r.scopeId);
-    }
-  }
-  ctx.permissionChecked = true;
-  return next();
-}
-
-/**
- * Permission middleware for deleteDefaultModelsConfig. Reads the
- * config's current scope attachments and asserts the caller can write
- * each one — deleting a config the caller can't fully manage would
- * remove rules at scopes they don't own.
- */
-async function deleteConfigPermissionMiddleware({
-  ctx,
-  input,
-  next,
-}: {
-  ctx: any;
-  input: { id: string };
-  next: () => Promise<unknown>;
-}): Promise<unknown> {
-  const scopes = await getScopeAttachmentsForConfig(ctx, input.id);
-  for (const s of scopes) {
-    await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
-  }
-  ctx.permissionChecked = true;
-  return next();
 }

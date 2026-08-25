@@ -1,12 +1,11 @@
 import type { MiddlewareHandler } from "hono";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { prisma } from "~/server/db";
+import type { App } from "~/server/app-layer/app";
 
 export type ApiKeyServiceMiddlewareVariables = {
-  apiKeyService: ApiKeyService;
+  apiKeyService: App["apiKeys"];
 };
 
 export const apiKeyServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set("apiKeyService", ApiKeyService.create(prisma));
+  c.set("apiKeyService", c.var.langwatchApp.apiKeys);
   await next();
 };

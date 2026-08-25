@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 /**
  * The route's rejection logs used to carry the whole body and the whole span.
@@ -30,25 +32,22 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 const mockIngestNormalizedSpan = vi.fn();
 const mockCheckLimit = vi.fn();
+const mockResolve = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: vi.fn(),
+    },
     usage: { checkLimit: mockCheckLimit },
     traces: { collection: { ingestNormalizedSpan: mockIngestNormalizedSpan } },
     evaluations: { reportEvaluation: vi.fn() },
     planProvider: { getActivePlan: vi.fn() },
     usageLimits: { notifyPlanLimitReached: vi.fn() },
   })),
-}));
-
-const mockResolve = vi.fn();
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({ resolve: mockResolve, markUsed: vi.fn() })),
-  },
 }));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
@@ -75,6 +74,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 const { app: collectorApp } = await import("../collector");
 
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", collectorApp);
 
 const fakeProject = {

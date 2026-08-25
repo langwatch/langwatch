@@ -4,7 +4,7 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
 import { spendRowToEnvelope } from "~/runtime/app/features/webhooks";
-import { eventMatches } from "@langwatch/enterprise-webhooks-contract";
+import { eventMatches } from "@langwatch/enterprise-webhook-contract";
 import {
   appendReplayToEndpointStream,
   type SendBatchPayload,

@@ -73,14 +73,11 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import {
-  API_KEY_PREFIX,
-  hashSecret,
-  INGEST_KEY_PREFIX,
-} from "../src/server/api-key/api-key-token.utils";
+import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
+import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
+import { ROLE_KIND } from "@langwatch/role-contract";
 import { modelProviders } from "../src/server/modelProviders/registry";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
-import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
 import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
@@ -107,6 +104,14 @@ const ADMIN_NAME = "Haven Local Admin";
 
 // Must match domain.DefaultLocalAPIKey in tools/thuishaven/domain/overlay.go.
 const DEFAULT_INGESTION_KEY = "sk-lw-local-development-key";
+const API_KEY_PEPPER: string =
+  process.env.CREDENTIALS_SECRET ??
+  process.env.NEXTAUTH_SECRET ??
+  (() => {
+    throw new Error(
+      "CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys",
+    );
+  })();
 
 const PRIVATE_TOKEN_LOOKUP_ID = "LocalDevPrivate1";
 const PRIVATE_TOKEN_SECRET = "LocalDevPrivateAccessTokenSecretFixedValue000000";
@@ -295,14 +300,14 @@ async function main() {
       description:
         "Static local-dev personal access token seeded by prisma/seed.ts",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: hashSecret(PRIVATE_TOKEN_SECRET),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
       permissionMode: "all",
       userId: user.id,
       createdByUserId: user.id,
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: hashSecret(PRIVATE_TOKEN_SECRET),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
       userId: user.id,
       organizationId: organization.id,
       revokedAt: null,
@@ -337,7 +342,7 @@ async function main() {
       description:
         "Restricted role for the static local-dev public ingestion token (traces:create only)",
       permissions: ["traces:create"],
-      kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+      kind: ROLE_KIND.SYSTEM_API_KEY,
     },
     update: { permissions: ["traces:create"] },
   });
@@ -348,12 +353,12 @@ async function main() {
       description:
         "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: hashSecret(PUBLIC_TOKEN_SECRET),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
       permissionMode: "restricted",
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: hashSecret(PUBLIC_TOKEN_SECRET),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
       organizationId: organization.id,
       revokedAt: null,
     },

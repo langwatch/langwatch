@@ -1,6 +1,5 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const optimizationRouter = createTRPCRouter({
@@ -90,18 +89,15 @@ export const optimizationRouter = createTRPCRouter({
         });
 
         // Archive the linked evaluator if it exists
-        const linkedEvaluator = await ctx.prisma.evaluator.findFirst({
-          where: {
-            workflowId: workflowId,
-            projectId: projectId,
-            archivedAt: null,
-          },
+        const linkedEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
+          workflowId,
+          projectId,
         });
 
         if (linkedEvaluator) {
-          await ctx.prisma.evaluator.update({
-            where: { id: linkedEvaluator.id, projectId: projectId },
-            data: { archivedAt: new Date() },
+          await ctx.app.evaluators.archive({
+            id: linkedEvaluator.id,
+            projectId,
           });
         }
       } catch (error) {
@@ -170,24 +166,21 @@ export const optimizationRouter = createTRPCRouter({
 
         if (isEvaluator) {
           // Check if an evaluator already exists for this workflow
-          const existingEvaluator = await ctx.prisma.evaluator.findFirst({
-            where: {
-              workflowId: workflowId,
-              projectId: projectId,
-              archivedAt: null,
-            },
+          const existingEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
+            workflowId,
+            projectId,
           });
 
           if (existingEvaluator) {
             // Update existing evaluator's name to match workflow
-            await ctx.prisma.evaluator.update({
-              where: { id: existingEvaluator.id, projectId: projectId },
+            await ctx.app.evaluators.update({
+              id: existingEvaluator.id,
+              projectId,
               data: { name: workflow.name },
             });
           } else {
             // Create a new evaluator linked to this workflow
-            const evaluatorService = EvaluatorService.create(ctx.prisma);
-            await evaluatorService.create({
+            await ctx.app.evaluators.create({
               id: `evaluator_${nanoid()}`,
               projectId: projectId,
               name: workflow.name,

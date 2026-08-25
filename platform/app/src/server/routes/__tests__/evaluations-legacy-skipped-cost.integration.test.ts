@@ -11,6 +11,8 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 const mockRunEvaluation = vi.fn();
 vi.mock("~/server/evaluations/runEvaluation", () => ({
@@ -18,10 +20,6 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
 }));
 
 const mockResolve = vi.fn();
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: { create: vi.fn(() => ({ resolve: mockResolve })) },
-}));
-
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
@@ -62,6 +60,7 @@ vi.mock("~/server/app-layer/app", async () => {
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   const fakeApp = () => ({
+    apiKeys: { tryResolveToken: mockResolve, markUsed: vi.fn() },
     permissions: appPermissionsService(dbForPermissions),
     evaluations: { reportEvaluation: mockReportEvaluation },
   });
@@ -71,6 +70,7 @@ vi.mock("~/server/app-layer/app", async () => {
 const { app: evaluationsLegacyApp } = await import("../evaluations-legacy");
 
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", evaluationsLegacyApp);
 
 const INCONCLUSIVE_DETAILS =

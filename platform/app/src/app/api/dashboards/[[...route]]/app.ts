@@ -1,5 +1,6 @@
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { DashboardSummary } from "@langwatch/dashboard-contract";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
@@ -60,14 +61,14 @@ secured.access(requires("analytics:view")).get(
     const project = c.get("project");
     const service = c.get("dashboardService");
 
-    const dashboards = await service.getAll(project.id);
+    const dashboards = await service.getAll({ projectId: project.id });
 
     return c.json({
-      data: dashboards.map((d) => ({
+      data: dashboards.map((d: DashboardSummary) => ({
         id: d.id,
         name: d.name,
         order: d.order,
-        graphCount: d._count.graphs,
+        graphCount: d.graphCount,
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,
         platformUrl: platformUrl({
@@ -95,7 +96,7 @@ secured.access(requires("analytics:create")).post(
     const { name } = c.req.valid("json");
     const service = c.get("dashboardService");
 
-    const dashboard = await service.create(project.id, name);
+    const dashboard = await service.create({ projectId: project.id, name });
 
     return c.json(
       {
@@ -130,7 +131,7 @@ secured.access(requires("analytics:update")).put(
     const service = c.get("dashboardService");
 
     try {
-      const result = await service.reorder(project.id, dashboardIds);
+      const result = await service.reorder({ projectId: project.id, dashboardIds });
       return c.json(result);
     } catch (error) {
       mapDashboardReorderError(error);
@@ -151,7 +152,7 @@ secured.access(requires("analytics:view")).get(
     const service = c.get("dashboardService");
 
     try {
-      const dashboard = await service.getById(project.id, id);
+      const dashboard = await service.getById({ projectId: project.id, dashboardId: id });
       return c.json({
         id: dashboard.id,
         name: dashboard.name,
@@ -185,7 +186,7 @@ secured.access(requires("analytics:update")).patch(
     const service = c.get("dashboardService");
 
     try {
-      const dashboard = await service.rename(project.id, id, name);
+      const dashboard = await service.rename({ projectId: project.id, dashboardId: id, name });
       return c.json({
         id: dashboard.id,
         name: dashboard.name,
@@ -217,7 +218,7 @@ secured.access(requires("analytics:manage")).delete(
     const service = c.get("dashboardService");
 
     try {
-      const dashboard = await service.delete(project.id, id);
+      const dashboard = await service.delete({ projectId: project.id, dashboardId: id });
       return c.json({
         id: dashboard.id,
         name: dashboard.name,

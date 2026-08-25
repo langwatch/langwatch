@@ -6,7 +6,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import { getProtectionsForProject } from "~/server/api/utils";
-import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
@@ -33,7 +33,7 @@ import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
 import type { AutomationService } from "@langwatch/automation-contract";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -84,7 +84,7 @@ export function buildAutomationDispatchPorts({
   redis: Redis | Cluster | null;
   automation: AutomationService;
   projects: ProjectService;
-  evaluations: { runs: EvaluationRunService };
+  evaluations: EvaluationService;
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
   analytics: AnalyticsService;
@@ -242,7 +242,7 @@ export function buildAutomationDispatchPorts({
     projects,
     baseHost,
     traceSummaryStore,
-    evaluationRuns: evaluations.runs,
+    evaluationRuns: evaluations,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>

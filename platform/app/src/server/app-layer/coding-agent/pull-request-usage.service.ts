@@ -37,12 +37,18 @@
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
-import { GithubPullRequestNotMappedError } from "../github/errors";
-import { normalizeGithubHost } from "../github/githubHost";
-import type {
-  GithubPullRequestRow,
-  GithubPullRequestsRepository,
-} from "../github/repositories/github-pull-requests.repository";
+import {
+  GithubPullRequestNotMappedError,
+  type GithubPullRequest,
+  type GithubService,
+} from "@langwatch/github-contract";
+import { GithubCompositionAdapter } from "@langwatch/github-server";
+import { env } from "~/env.mjs";
+const normalizeGithubHost = (host: string) =>
+  GithubCompositionAdapter.normalizeGithubHost(host, {
+    host: env.GITHUB_LANGY_HOST,
+  });
+type GithubPullRequestRow = GithubPullRequest;
 import { ingestSourceTypeOfAgent } from "./coding-agent-source-type";
 import {
   assignDrivingSessionsToPullRequests,
@@ -348,11 +354,14 @@ export interface SessionModelTotalsLookup {
 }
 
 export interface PullRequestUsageServiceDeps {
-  pullRequests: GithubPullRequestsRepository;
+  pullRequests: Pick<
+    GithubService,
+    "findAllByBranches" | "tryFindByNumber"
+  >;
   sessions: Pick<CodingAgentSessionRepository, "listByRepositoryBranch">;
   personalSessions: PersonalSessionLookup;
   sessionEvents: SessionModelTotalsLookup;
-  installations: RepositoryCoverageLookup;
+  installations: Pick<GithubService, "coversRepository">;
   resolveOrganizationId(projectId: string): Promise<string | undefined>;
   /**
    * Whether a tool's usage rides a bundled subscription rather than being
@@ -646,7 +655,7 @@ export class PullRequestUsageService {
     rows: PullRequestUsageRow[];
     modelBreakdown: ModelUsage[];
   }> {
-    const target = await this.deps.pullRequests.findByNumber({
+    const target = await this.deps.pullRequests.tryFindByNumber({
       organizationId: query.organizationId,
       repositoryHost: query.repositoryHost,
       repositoryFullName: query.repositoryFullName,
@@ -774,7 +783,7 @@ function attachedToPullRequest({
   );
 }
 
-function toAssignable(pullRequests: GithubPullRequestRow[]) {
+function toAssignable(pullRequests: ReadonlyArray<GithubPullRequestRow>) {
   return pullRequests.map((pullRequest) => ({
     prNumber: pullRequest.prNumber,
     headBranch: pullRequest.headBranch,

@@ -37,12 +37,14 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn(async () => null),
 }));
 
-import { AzureDatasetStorage } from "~/server/datasets/azure-dataset-storage";
-import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { AzureDatasetStorage } from "@langwatch/dataset-server";
+import { AppDatasetStorageResolver } from "~/runtime/app/features/dataset-storage";
 import { resolveAzureCredentials } from "../azure-credentials";
 import { resetAzureTokenCacheForTests } from "../azure-token-provider";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { maybeAzureDriver } from "../stored-objects-factory";
+
+const datasetStorageResolver = new AppDatasetStorageResolver();
 
 /** A keyless install: identity mode, and no account key anywhere. */
 function configureWorkloadIdentity() {
@@ -107,7 +109,7 @@ describe("Azure byte paths without an account key", () => {
     it("selects the Azure dataset storage rather than crashing on an absent key", async () => {
       // Previously this path dereferenced env.AZURE_BLOB_ACCOUNT_KEY! and
       // died inside Buffer.from(undefined) — a crash, not a config error.
-      const storage = await getDatasetStorage("proj-1");
+      const storage = await datasetStorageResolver.forProject("proj-1");
 
       expect(storage).toBeInstanceOf(AzureDatasetStorage);
     });
@@ -116,7 +118,7 @@ describe("Azure byte paths without an account key", () => {
     it("hands every consumer the same credentials from the one resolver", async () => {
       const credentials = resolveAzureCredentials();
 
-      // The maintenance tasks reach storage through getDatasetStorage and the
+      // The maintenance tasks reach storage through the injected storage resolver and the
       // destination resolver, both of which route through resolveAzureCredentials.
       const destination = await resolveProjectStorageDestination("proj-1");
 

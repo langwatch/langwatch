@@ -19,8 +19,8 @@
  * public surfaces are protocol-mandated (GitHub's Setup URL + webhook delivery),
  * every sensitive read is guarded by the signed state or the HMAC.
  *
- * The route is just HTTP plumbing. DB writes + GitHub HTTP live in
- * app-layer/github/github-installations.service.ts.
+ * The route is just HTTP plumbing. DB writes + GitHub HTTP live behind the
+ * composed GithubService.
  *
  * Spec: specs/integrations/github-connection.feature.
  */
@@ -28,36 +28,17 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import type { Context } from "hono";
 import { z } from "zod";
-import { env } from "~/env.mjs";
+import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
+import { GithubInstallationConflictError } from "@langwatch/github-contract";
 import {
   createServiceApp,
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
-import { getApp } from "~/server/app-layer";
-import { GithubInstallationConflictError } from "~/server/app-layer/github/github-installations.service";
-import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
-import { getGithubAppInstallUrl } from "~/server/app-layer/github/githubHost";
-import {
-  consumeGithubInstallNonce,
-  registerGithubInstallNonce,
-} from "~/server/app-layer/github/githubInstallNonce";
-import {
-  popupErrorHtml,
-  popupResponseHtml,
-} from "~/server/app-layer/github/githubInstallPopupHtml";
-import {
-  type GithubInstallStatePayload,
-  STATE_TTL_MS,
-  signGithubInstallState,
-  verifyGithubInstallState,
-} from "~/server/app-layer/github/githubInstallState";
-import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-
-import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:github");
 
@@ -82,20 +63,15 @@ const INSTALL_HANDLER_AUTH_REASON =
 
 const secured = createServiceApp({ basePath: "/api" });
 
-function signingKey(): string {
-  const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
-  if (!secret) {
-    throw new Error("CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set");
-  }
-  return secret;
+function signState(service: GithubService, payload: GithubInstallStatePayload): string {
+  return service.signInstallState(payload);
 }
 
-function signState(payload: GithubInstallStatePayload): string {
-  return signGithubInstallState(payload, signingKey());
-}
-
-function verifyState(token: string | null): GithubInstallStatePayload | null {
-  return verifyGithubInstallState(token, signingKey());
+function verifyState(
+  service: GithubService,
+  token: string | null,
+): GithubInstallStatePayload | null {
+  return service.tryVerifyInstallState(token);
 }
 
 // Only allow internal relative paths as returnTo, to prevent open-redirects.
@@ -124,8 +100,7 @@ const POPUP_CSP =
   "frame-ancestors 'none'";
 
 function popupHtml(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  c: any,
+  c: Context,
   body: string,
   status: number,
 ): Response {
@@ -141,8 +116,7 @@ function setupError({
   errorMessage,
   status,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  c: any;
+  c: Context;
   state: GithubInstallStatePayload | null;
   errorMessage: string;
   status: number;
@@ -151,16 +125,16 @@ function setupError({
     const returnTo = safeReturnTo(state.returnTo);
     return c.redirect(withGithubError(returnTo, errorMessage), 302);
   }
-  return popupHtml(c, popupErrorHtml(errorMessage), status);
+  return popupHtml(c, c.app.github.popupErrorHtml(errorMessage), status);
 }
 
 function publicGithubErrorMessage(): string {
   return "GitHub installation failed. Please try again.";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleInstall(c: any): Promise<Response> {
-  const config = getGithubAppConfig();
+async function handleInstall(c: Context): Promise<Response> {
+  const service: GithubService = c.app.github;
+  const config = service.getAppConfig();
   if (!config.configured) {
     return c.json(
       { error: "The GitHub integration is not available on this instance." },
@@ -168,7 +142,7 @@ async function handleInstall(c: any): Promise<Response> {
     );
   }
   const session = await getServerAuthSession({
-    req: c.req.raw as NextRequestShim,
+    req: c.req.raw,
   });
   if (!session?.user) {
     return c.json({ error: "Not authenticated" }, { status: 401 });
@@ -183,7 +157,7 @@ async function handleInstall(c: any): Promise<Response> {
   // Cross-tenant guard FIRST: the user must be a member of the org they install
   // for, so a non-member's response never depends on anything about that org.
   if (
-    !(await getApp().github.installations.isOrganizationMember({
+    !(await service.isOrganizationMember({
       userId: session.user.id,
       organizationId,
     }))
@@ -209,12 +183,12 @@ async function handleInstall(c: any): Promise<Response> {
   const mode = c.req.query("mode") === "popup" ? "popup" : "redirect";
   const returnTo = safeReturnTo(c.req.query("return"));
   const nonce = randomBytes(16).toString("base64url");
-  const nonceRegistered = await registerGithubInstallNonce(
+  const nonceRegistered = await service.registerInstallNonce({
     nonce,
-    Math.ceil(STATE_TTL_MS / 1000),
-  );
+    ttlSec: Math.ceil(service.getInstallStateTtlMs() / 1000),
+  });
 
-  const state = signState({
+  const state = signState(service, {
     userId: session.user.id,
     organizationId,
     mode,
@@ -226,14 +200,14 @@ async function handleInstall(c: any): Promise<Response> {
 
   // GitHub redirects back to the App's configured Setup URL after install; the
   // signed `state` round-trips so /setup can bind the installation to the org.
-  const url = new URL(getGithubAppInstallUrl(config.appSlug));
+  const url = new URL(service.getAppInstallUrl());
   url.searchParams.set("state", state);
   return c.redirect(url.toString(), 302);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleSetup(c: any): Promise<Response> {
-  const state = verifyState(c.req.query("state") ?? null);
+async function handleSetup(c: Context): Promise<Response> {
+  const service: GithubService = c.app.github;
+  const state = verifyState(service, c.req.query("state") ?? null);
   const installationId = c.req.query("installation_id");
   if (!state || !installationId) {
     return setupError({
@@ -251,7 +225,7 @@ async function handleSetup(c: any): Promise<Response> {
 
   let accountLogin: string;
   try {
-    ({ accountLogin } = await getApp().github.installations.recordInstallation({
+    ({ accountLogin } = await service.recordInstallation({
       installationId,
       organizationId: state.organizationId,
     }));
@@ -259,14 +233,14 @@ async function handleSetup(c: any): Promise<Response> {
     await reportInstallationFailure({ err, state });
     const publicMsg = publicGithubErrorMessage();
     return state.mode === "popup"
-      ? popupHtml(c, popupErrorHtml(publicMsg), 502)
+      ? popupHtml(c, service.popupErrorHtml(publicMsg), 502)
       : c.redirect(withGithubError(returnTo, publicMsg), 302);
   }
 
   await recordInstallAudit({ state, installationId, accountLogin });
 
   if (state.mode === "popup") {
-    return popupHtml(c, popupResponseHtml(accountLogin), 200);
+    return popupHtml(c, service.popupResponseHtml(accountLogin), 200);
   }
   return c.redirect(returnTo, 302);
 }
@@ -279,13 +253,12 @@ async function rejectUnauthorizedSetup({
   c,
   state,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  c: any;
+  c: Context;
   state: GithubInstallStatePayload;
 }): Promise<Response | null> {
   // Re-bind the session to the state's user.
   const session = await getServerAuthSession({
-    req: c.req.raw as NextRequestShim,
+    req: c.req.raw,
   });
   if (!session?.user || session.user.id !== state.userId) {
     return setupError({
@@ -298,7 +271,7 @@ async function rejectUnauthorizedSetup({
 
   // Burn the single-use nonce (skips when Redis was down at /install).
   if (state.nonceRegistered) {
-    const consumed = await consumeGithubInstallNonce(state.nonce);
+    const consumed = await c.app.github.tryConsumeInstallNonce(state.nonce);
     if (consumed === false) {
       return setupError({
         c,
@@ -311,7 +284,7 @@ async function rejectUnauthorizedSetup({
 
   // Re-check tenant membership (defense in depth against a stale state).
   if (
-    !(await getApp().github.installations.isOrganizationMember({
+    !(await c.app.github.isOrganizationMember({
       userId: state.userId,
       organizationId: state.organizationId,
     }))
@@ -435,8 +408,8 @@ const webhookActionSchema = z.enum([
 function verifyWebhookSignature(
   rawBody: string,
   header: string | undefined,
+  secret: string,
 ): boolean {
-  const secret = getGithubAppConfig().webhookSecret;
   if (!secret || !header) return false;
   const expected =
     "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
@@ -457,11 +430,13 @@ function verifyWebhookSignature(
 async function applyPullRequestEvent({
   payload,
   deliveryId,
+  service,
 }: {
   payload: unknown;
   deliveryId: string | undefined;
+  service: GithubService;
 }): Promise<void> {
-  const event = parseGithubPullRequestEvent(payload);
+  const event = service.tryParsePullRequestEvent(payload);
   if (!event) {
     // The parser declines four different deliveries, and every one of them
     // still answers 200. Without this line a linkage outage looks from the
@@ -476,7 +451,7 @@ async function applyPullRequestEvent({
     return;
   }
   try {
-    await getApp().github.pullRequests.mapping.applyPullRequestEvent(event);
+    await service.applyPullRequestEvent(event);
   } catch (err) {
     logger.warn(
       { err, action: event.action, installationId: event.installationId },
@@ -485,14 +460,18 @@ async function applyPullRequestEvent({
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleWebhook(c: any): Promise<Response> {
-  if (!getGithubAppConfig().webhookSecret) {
+async function handleWebhook(c: Context): Promise<Response> {
+  const config = c.app.github.getAppConfig();
+  if (!config.webhookSecret) {
     return c.json({ error: "Webhook not configured" }, { status: 404 });
   }
   // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
   const rawBody = await c.req.text();
-  if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))) {
+  if (!verifyWebhookSignature(
+    rawBody,
+    c.req.header("x-hub-signature-256"),
+    config.webhookSecret,
+  )) {
     return c.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -509,6 +488,7 @@ async function handleWebhook(c: any): Promise<Response> {
     await applyPullRequestEvent({
       payload,
       deliveryId: c.req.header("x-github-delivery"),
+      service: c.app.github,
     });
     return c.json({ received: true });
   }
@@ -534,7 +514,7 @@ async function handleWebhook(c: any): Promise<Response> {
   }
 
   try {
-    await getApp().github.installations.handleWebhookEvent({
+    await c.app.github.handleWebhookEvent({
       action,
       installationId,
     });

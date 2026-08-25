@@ -7,10 +7,6 @@ import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { organizationMiddleware } from "../../middleware";
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
-import {
-  type ModelProviderServiceMiddlewareVariables,
-  modelProviderServiceMiddleware,
-} from "../../middleware/model-provider-service";
 import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
 import { baseResponses } from "../../shared/base-responses";
 import {
@@ -22,14 +18,12 @@ const logger = createLogger("langwatch:api:model-providers");
 
 patchZodOpenapi();
 
-export type ModelProviderAppVariables = AuthMiddlewareVariables &
-  ModelProviderServiceMiddlewareVariables &
-  OrganizationMiddlewareVariables;
+export type ModelProviderAppVariables = AuthMiddlewareVariables & OrganizationMiddlewareVariables;
 
 export function registerModelProviderRoutes(
   secured: SecuredApp<{ Variables: ModelProviderAppVariables }>,
 ): void {
-  // organizationMiddleware + modelProviderServiceMiddleware run AFTER the
+  // organizationMiddleware runs AFTER the
   // access chain (which authenticates and sets `project`), so they are
   // applied per-route rather than app-wide.
 
@@ -38,7 +32,6 @@ export function registerModelProviderRoutes(
   secured.access(requires("project:view")).get(
     "/",
     organizationMiddleware,
-    modelProviderServiceMiddleware,
     describeRoute({
       description:
         "List all model providers for a project with masked API keys",
@@ -55,7 +48,7 @@ export function registerModelProviderRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("modelProviderService");
+      const service = c.var.langwatchApp.modelProviders;
       const project = c.get("project");
 
       logger.info(
@@ -63,11 +56,9 @@ export function registerModelProviderRoutes(
         "Getting all model providers for project",
       );
 
-      const providers = await service.getProjectModelProvidersForFrontend(
-        project.id,
-      );
+      const providers = await service.getForProject({ projectId: project.id });
 
-      return c.json(apiResponseModelProvidersSchema.parse(providers));
+      return c.json(apiResponseModelProvidersSchema.parse(toLegacyProviders(providers)));
     },
   );
 
@@ -76,7 +67,6 @@ export function registerModelProviderRoutes(
   secured.access(requires("project:update")).put(
     "/:provider",
     organizationMiddleware,
-    modelProviderServiceMiddleware,
     describeRoute({
       description: "Create or update a model provider",
       responses: {
@@ -101,7 +91,7 @@ export function registerModelProviderRoutes(
     }),
     zValidator("json", updateModelProviderInputSchema),
     async (c) => {
-      const service = c.get("modelProviderService");
+      const service = c.var.langwatchApp.modelProviders;
       const project = c.get("project");
       const { provider } = c.req.param();
       const data = c.req.valid("json");
@@ -123,13 +113,13 @@ export function registerModelProviderRoutes(
         // preserves the legacy single-instance upsert contract. The
         // multi-instance create flow lives behind the tRPC `update`
         // procedure, which goes through the id-based path.
-        await service.upsertByProviderKey({
+        await service.upsert({
           projectId: project.id,
           provider,
           enabled: data.enabled,
           customKeys: data.customKeys as Record<string, unknown> | undefined,
-          customModels: data.customModels,
-          customEmbeddingsModels: data.customEmbeddingsModels,
+          customModels: toCanonicalModels(data.customModels, "chat"),
+          customEmbeddingsModels: toCanonicalModels(data.customEmbeddingsModels, "embedding"),
           extraHeaders: data.extraHeaders,
           defaultModel,
         });
@@ -141,16 +131,38 @@ export function registerModelProviderRoutes(
       }
 
       // Return updated providers list with masked keys
-      const providers = await service.getProjectModelProvidersForFrontend(
-        project.id,
-      );
+      const providers = await service.getForProject({ projectId: project.id });
 
       logger.info(
         { projectId: project.id, provider },
         "Successfully upserted model provider",
       );
 
-      return c.json(apiResponseModelProvidersSchema.parse(providers));
+      return c.json(apiResponseModelProvidersSchema.parse(toLegacyProviders(providers)));
     },
   );
+}
+
+function toLegacyProviders(providers: Record<string, { id: string; provider: string; enabled: boolean; customKeys: Record<string, unknown> | null; customModels: Array<{ id: string; label: string; type: string }>; customEmbeddingsModels: Array<{ id: string; label: string; type: string }>; models?: string[] | null; embeddingsModels?: string[] | null }>) {
+  return Object.fromEntries(Object.entries(providers).map(([key, provider]) => [key, {
+    id: provider.id,
+    provider: provider.provider,
+    enabled: provider.enabled,
+    customKeys: provider.customKeys,
+    deploymentMapping: null,
+    models: provider.models ?? null,
+    embeddingsModels: provider.embeddingsModels ?? null,
+    customModels: provider.customModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "chat" as const })),
+    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({ modelId: model.id, displayName: model.label, mode: "embedding" as const })),
+  }]));
+}
+
+function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((model) => {
+    if (typeof model === "string") return [{ id: model, label: model, type }];
+    if (!model || typeof model !== "object") return [];
+    const item = model as { modelId?: unknown; displayName?: unknown };
+    return typeof item.modelId === "string" ? [{ id: item.modelId, label: typeof item.displayName === "string" ? item.displayName : item.modelId, type }] : [];
+  });
 }

@@ -8,16 +8,6 @@ import {
   type SecuredApp,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import type { Session } from "~/server/auth";
-import { prisma } from "~/server/db";
-import { getDefaultModelsSnapshot } from "~/server/modelProviders/modelDefaults.read";
-import {
-  assertCanWriteScope,
-  createConfig,
-  deleteConfig,
-  getScopeAttachmentsForConfig,
-  updateConfig,
-} from "~/server/modelProviders/modelDefaults.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
@@ -32,15 +22,6 @@ import {
 const logger = createLogger("langwatch:api:model-defaults");
 
 patchZodOpenapi();
-
-// Build a Session-shaped object for the service's RBAC walk. Hono
-// auth gives us apiKeyUserId; user-bound API keys always carry one.
-// Legacy project tokens don't — assertCanWriteScope rejects those,
-// which is the documented API contract for default-model writes.
-function sessionFor(userId: string | undefined): Session | null {
-  if (!userId) return null;
-  return { user: { id: userId } } as Session;
-}
 
 /**
  * Uniform error mapping for the default-model write handlers: a typed
@@ -82,11 +63,7 @@ export function registerModelDefaultsRoutes(
     async (c) => {
       const project = c.get("project");
       const userId = c.get("apiKeyUserId");
-
-      const snapshot = await getDefaultModelsSnapshot(
-        { prisma, session: sessionFor(userId) },
-        { projectId: project.id },
-      );
+      const snapshot = await c.var.langwatchApp.modelProviders.getDefaultSnapshot({ projectId: project.id, actorId: userId });
 
       return c.json(
         apiResponseModelDefaultsSchema.parse({
@@ -96,7 +73,7 @@ export function registerModelDefaultsRoutes(
             organizationId: snapshot.organizationId,
             organizationName: snapshot.organizationName,
           },
-          effective: snapshot.effective,
+          effective: Object.fromEntries(["DEFAULT", "FAST", "EMBEDDINGS"].map((role) => [role, snapshot.effective[role] ?? null])),
           configs: snapshot.configs.map((c) => ({
             id: c.id,
             config: c.config,
@@ -137,22 +114,9 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        // Authz: every target scope must pass the caller's manage check.
-        for (const s of body.scopes) {
-          await assertCanWriteScope(
-            { prisma, session: sessionFor(userId) },
-            s.scopeType,
-            s.scopeId,
-          );
-        }
-        const { id } = await createConfig(
-          { prisma },
-          {
-            config: body.config,
-            scopes: body.scopes,
-            authorId: userId ?? null,
-          },
-        );
+        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
+        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({ config: body.config, scopes: body.scopes, authorId: userId ?? null, actorId: userId });
+        const id = saved.id;
         logger.info(
           { projectId: project.id, configId: id, userId },
           "Created default-model config",
@@ -184,35 +148,9 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        const ctx = { prisma, session: sessionFor(userId) };
-        // Authz: caller must be able to write every scope this config
-        // is currently attached to AND every scope they're newly
-        // attaching. Mirrors the tRPC save mutation's gate.
-        const current = await getScopeAttachmentsForConfig({ prisma }, id);
-        // Ownership backstop: a config with no scope attachments would skip the
-        // per-scope write check below entirely, leaving it editable by any
-        // authenticated caller across tenants. Treat an orphan config as not
-        // found rather than silently authorizing the write.
-        if (current.length === 0) {
-          throw new HTTPException(404, { message: "Config not found" });
-        }
-        for (const s of current) {
-          await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
-        }
-        if (body.scopes) {
-          for (const s of body.scopes) {
-            await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
-          }
-        }
-        await updateConfig(
-          { prisma },
-          {
-            id,
-            config: body.config,
-            scopes: body.scopes,
-            authorId: userId ?? null,
-          },
-        );
+        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
+        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({ id, config: body.config, scopes: body.scopes, authorId: userId ?? null, actorId: userId });
+        if (!saved) throw new HTTPException(404, { message: "Config not found" });
         logger.info(
           { projectId: project.id, configId: id, userId },
           "Updated default-model config",
@@ -240,17 +178,8 @@ export function registerModelDefaultsRoutes(
       const { id } = c.req.param();
 
       try {
-        const ctx = { prisma, session: sessionFor(userId) };
-        const current = await getScopeAttachmentsForConfig({ prisma }, id);
-        // Same ownership backstop as PUT: an orphan config (no scope
-        // attachments) must not be deletable by any authenticated caller.
-        if (current.length === 0) {
-          throw new HTTPException(404, { message: "Config not found" });
-        }
-        for (const s of current) {
-          await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
-        }
-        await deleteConfig({ prisma }, id);
+        if (!userId) throw new HTTPException(401, { message: "A user-bound credential is required for default-model writes" });
+        await c.var.langwatchApp.modelProviders.deleteDefaultConfig({ id, actorId: userId });
         logger.info(
           { projectId: project.id, configId: id, userId },
           "Deleted default-model config",

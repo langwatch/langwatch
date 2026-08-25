@@ -46,8 +46,7 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { getApp } from "~/server/app-layer/app";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
@@ -76,7 +75,6 @@ import {
   CODE_EVALUATOR_CHECK_PREFIX,
   codeEvaluatorConfigSchema,
 } from "~/server/evaluators/codeEvaluator";
-import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   type ESBatchEvaluation,
   type ESBatchEvaluationRESTParams,
@@ -100,6 +98,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import { bodyLimit } from "./_lib/body-limit";
 import {
   datasetEvaluateRequestSchema,
@@ -117,8 +116,6 @@ import {
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:evaluations-legacy");
-const tokenResolver = TokenResolver.create(prisma);
-
 const AUTH_REASON = "project API key resolved in-handler";
 
 // The static evaluator catalogue: the same list for every caller, with no
@@ -170,7 +167,8 @@ async function authenticateRequest(
     return { error: message, status: 401, body: { message } };
   }
 
-  const resolved = await tokenResolver.resolve({
+  const apiKeys = appFromContext(c).apiKeys;
+  const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -190,7 +188,7 @@ async function authenticateRequest(
 
   const markUsed = () => {
     if (resolved.type === "apiKey") {
-      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 
@@ -379,7 +377,7 @@ secured.access(legacyEvaluationAuth).post(
     }
 
     try {
-      await processBatchEvaluation(project, params);
+      await processBatchEvaluation(c.app, project, params);
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error(
@@ -736,7 +734,7 @@ secured.access(legacyEvaluationAuth).post(
       };
     }
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
+    const experiment = await c.app.experiments.tryGetBySlug({
       projectId: project.id,
       slug: experimentSlug,
     });
@@ -1470,8 +1468,8 @@ async function handleEvaluatorCall(
       traceback: [],
     };
   } finally {
-    await getApp()
-      .evaluations.reportEvaluation({
+    await c.app.evaluations
+      .reportEvaluation({
         tenantId: project.id,
         evaluationId,
         evaluatorId,
@@ -1586,12 +1584,14 @@ const processTargets = (
 };
 
 const processBatchEvaluation = async (
+  app: Pick<RequestAppServices, "evaluations" | "experiments">,
   project: Project,
   param: ESBatchEvaluationRESTParams,
-) => {
+): Promise<void> => {
   const { experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
+    experiments: app.experiments,
     project,
     experiment_id,
     experiment_slug,
@@ -1619,19 +1619,20 @@ const processBatchEvaluation = async (
 
   eSBatchEvaluationSchema.parse(batchEvaluation);
 
-  await dispatchToClickHouse(project, experiment.id, batchEvaluation);
+  await dispatchToClickHouse(app, project, experiment.id, batchEvaluation);
 };
 
 const dispatchToClickHouse = async (
+  app: Pick<RequestAppServices, "evaluations" | "experiments">,
   project: Project,
   experimentId: string,
   batchEvaluation: ESBatchEvaluation,
-) => {
+): Promise<void> => {
   const { run_id: runId } = batchEvaluation;
   const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
   try {
-    await getApp().experimentRuns.startExperimentRun({
+    await app.experiments.startExperimentRun({
       tenantId: project.id,
       runId,
       experimentId,
@@ -1649,8 +1650,8 @@ const dispatchToClickHouse = async (
 
   const resultPromises = [
     ...batchEvaluation.dataset.map((entry) =>
-      getApp()
-        .experimentRuns.recordTargetResult({
+      app.experiments
+        .recordTargetResult({
           tenantId: project.id,
           runId,
           experimentId,
@@ -1678,8 +1679,8 @@ const dispatchToClickHouse = async (
         }),
     ),
     ...batchEvaluation.evaluations.map((evaluation) =>
-      getApp()
-        .experimentRuns.recordEvaluatorResult({
+      app.experiments
+        .recordEvaluatorResult({
           tenantId: project.id,
           runId,
           experimentId,
@@ -1721,7 +1722,7 @@ const dispatchToClickHouse = async (
     batchEvaluation.timestamps.stopped_at
   ) {
     try {
-      await getApp().experimentRuns.completeExperimentRun({
+      await app.experiments.completeExperimentRun({
         tenantId: project.id,
         runId,
         experimentId,
@@ -1738,11 +1739,10 @@ const dispatchToClickHouse = async (
   }
 
   {
-    const appInstance = getApp();
     const evalPromises = batchEvaluation.evaluations.map((evaluation) => {
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
-      return appInstance.evaluations
+      return app.evaluations
         .reportEvaluation({
           tenantId: project.id,
           evaluationId,

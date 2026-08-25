@@ -1,19 +1,25 @@
-import { z } from "zod/v4";
+import {
+  createSecretInputSchema,
+  deleteSecretInputSchema,
+  listSecretsInputSchema,
+  secretIdSchema,
+  secretProjectIdSchema,
+  secretValueSchema,
+} from "@langwatch/secret-contract";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-/**
- * Regex for valid secret names: uppercase letters, digits, underscores.
- * Must start with a letter.
- */
-const SECRET_NAME_REGEX = /^[A-Z][A-Z0-9_]*$/;
+const legacyUpdateInputSchema = z
+  .object({
+    projectId: secretProjectIdSchema,
+    secretId: secretIdSchema,
+    value: secretValueSchema,
+  })
+  .strict();
 
-const secretNameSchema = z
-  .string()
-  .min(1, "Secret name is required")
-  .regex(
-    SECRET_NAME_REGEX,
-    "Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter",
-  );
+const legacyDeleteInputSchema = deleteSecretInputSchema
+  .omit({ id: true })
+  .extend({ secretId: secretIdSchema });
 
 /**
  * Secrets router
@@ -30,7 +36,7 @@ export const secretsRouter = createTRPCRouter({
    * them only offers a way to break the feature that owns them.
    */
   list: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(listSecretsInputSchema)
     .permission("secrets:view")
     .query(({ ctx, input }) => ctx.app.secrets.list(input)),
 
@@ -39,16 +45,7 @@ export const secretsRouter = createTRPCRouter({
    * Encrypts the value before storing. Enforces name format and per-project limit.
    */
   create: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        name: secretNameSchema,
-        value: z
-          .string()
-          .min(1, "Secret value is required")
-          .max(10_000, "Secret value is too long"),
-      }),
-    )
+    .input(createSecretInputSchema.omit({ actorId: true }))
     .permission("secrets:manage")
     .mutation(({ ctx, input }) =>
       ctx.app.secrets.create({
@@ -62,16 +59,7 @@ export const secretsRouter = createTRPCRouter({
    * Encrypts the new value and records who made the change.
    */
   update: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        secretId: z.string(),
-        value: z
-          .string()
-          .min(1, "Secret value is required")
-          .max(10_000, "Secret value is too long"),
-      }),
-    )
+    .input(legacyUpdateInputSchema)
     .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
       await ctx.app.secrets.update({
@@ -88,12 +76,7 @@ export const secretsRouter = createTRPCRouter({
    * Verifies the secret belongs to the project before deleting.
    */
   delete: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        secretId: z.string(),
-      }),
-    )
+    .input(legacyDeleteInputSchema)
     .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
       await ctx.app.secrets.delete({

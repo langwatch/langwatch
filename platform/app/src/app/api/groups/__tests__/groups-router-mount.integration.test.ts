@@ -18,7 +18,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { createApiRouter } from "~/server/api-router";
 import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -74,7 +73,7 @@ describe("Feature: Groups REST API through the composed router", () => {
       },
     });
 
-    const created = await ApiKeyService.create(prisma).create({
+    const created = await getApp().apiKeys.create({
       name: `groups-mount-key-${nanoid(6)}`,
       userId,
       createdByUserId: userId,

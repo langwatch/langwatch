@@ -8,16 +8,16 @@ import { validator as zValidator } from "~/server/api/validation";
 import type {
   ApiKeyDetail,
   ApiKeyService,
-} from "~/server/api-key/api-key.service";
+} from "@langwatch/api-key-contract";
 import {
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
-} from "~/server/api-key/errors";
+} from "@langwatch/api-key-contract";
 import {
   API_KEY_PERMISSION_MODES,
+  apiKeyPermissionFormatSchema as permissionFormatSchema,
   refineRestrictedPermissions,
-} from "~/server/api-key/restricted-permissions";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+} from "@langwatch/api-key-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";

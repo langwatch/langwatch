@@ -6,7 +6,7 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import { buildSeriesName } from "@langwatch/analytics-contract";
 import {
   aggregateSeriesValues,
   extractGroupTotals,

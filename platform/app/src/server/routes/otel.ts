@@ -15,8 +15,10 @@ import {
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "@ee/governance/services/ingestKeyProvenance.utils";
+} from "./ingest/ingest-key-provenance.utils";
 import { createLogger } from "@langwatch/observability";
+import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { Context } from "hono";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
@@ -28,12 +30,10 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
 import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
-import { prisma } from "~/server/db";
-import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
+import type { GovernancePolicyService } from "@langwatch/enterprise-governance-contract";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   OTLP_CORRECTED_PATH_HEADER,
@@ -81,17 +81,7 @@ const secured = createServiceApp({ basePath: "/api/otel/v1" });
 
 // ── shared auth + limit check ────────────────────────────────────────
 
-const tokenResolver = TokenResolver.create(prisma);
-const governanceRuntime = AppGovernanceRuntime.create(prisma);
-
-type RouteContext = {
-  req: {
-    raw: Request;
-    path: string;
-    method: string;
-    header: (name: string) => string | undefined;
-  };
-};
+type RouteContext = Context;
 
 /**
  * Classifies a token by prefix without exposing the value. Mirrors the
@@ -134,7 +124,7 @@ async function authenticate(
 
   let resolved;
   try {
-    resolved = await tokenResolver.resolve({
+    resolved = await c.app.apiKeys.tryResolveToken({
       token: credentials.token,
       projectId: credentials.projectId,
     });
@@ -258,17 +248,19 @@ function logCorrectedPath({
  * outside that try block so it is never mistaken for a lookup failure.
  */
 async function enforcePlanLimit({
+  app,
   project,
   customerTraceIds,
   logger,
 }: {
+  app: App;
   project: { id: string; teamId: string; team: { organizationId: string } };
   customerTraceIds: string[];
   logger: ReturnType<typeof createLogger>;
 }): Promise<void> {
   let limitResult: UsageLimitResult;
   try {
-    limitResult = await getApp().usage.checkLimit({
+    limitResult = await app.usage.checkLimit({
       teamId: project.teamId,
     });
   } catch (error) {
@@ -285,11 +277,11 @@ async function enforcePlanLimit({
   if (!limitResult.exceeded) return;
 
   try {
-    const activePlan = await getApp().planProvider.getActivePlan({
+    const activePlan = await app.planProvider.getActivePlan({
       organizationId: project.team.organizationId,
     });
-    getApp()
-      .usageLimits.notifyPlanLimitReached({
+    app.usageLimits
+      .notifyPlanLimitReached({
         organizationId: project.team.organizationId,
         planName: activePlan.name ?? "free",
         usageUnit: limitResult.usageUnit,
@@ -352,9 +344,11 @@ async function enforcePlanLimit({
 async function applyReceiverProvenanceToTraces({
   request,
   resolved,
+  policy,
 }: {
   request: IExportTraceServiceRequest;
-  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+  resolved: ResolvedApiKeyToken | null;
+  policy: GovernancePolicyService;
 }): Promise<void> {
   const typedRequest = request as unknown as Parameters<
     typeof enforceApiKeyIdOnTraceRequest
@@ -385,7 +379,7 @@ async function applyReceiverProvenanceToTraces({
   // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
   // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
   // billed cost split. Gateway usage never reaches here.
-  const nonBillable = await governanceRuntime.resolveSourceNonBillable({
+  const nonBillable = await policy.resolveSourceNonBillable({
     organizationId: resolved.organizationId,
     sourceType: resolved.ingestSourceType,
   });
@@ -407,9 +401,11 @@ async function applyReceiverProvenanceToTraces({
 async function applyReceiverProvenanceToLogs({
   request,
   resolved,
+  policy,
 }: {
   request: unknown;
-  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+  resolved: ResolvedApiKeyToken | null;
+  policy: GovernancePolicyService;
 }): Promise<void> {
   enforceApiKeyIdOnLogRequest(
     request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
@@ -422,7 +418,7 @@ async function applyReceiverProvenanceToLogs({
   // same bundled-vs-billed resolution the trace path does; without it their
   // cost never gets the non-billable marker and a bundled coding session reads
   // as real spend.
-  const nonBillable = await governanceRuntime.resolveSourceNonBillable({
+  const nonBillable = await policy.resolveSourceNonBillable({
     organizationId: resolved.organizationId,
     sourceType: resolved.ingestSourceType,
   });
@@ -444,7 +440,7 @@ function applyReceiverProvenanceToMetrics({
   resolved,
 }: {
   request: unknown;
-  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+  resolved: ResolvedApiKeyToken | null;
 }): void {
   enforceApiKeyIdOnMetricRequest(
     request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
@@ -563,6 +559,7 @@ secured
         }
 
         await enforcePlanLimit({
+          app: c.app,
           project,
           customerTraceIds,
           logger: loggerTraces,
@@ -608,16 +605,17 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
         }
 
         await applyReceiverProvenanceToTraces({
           request: traceRequest,
           resolved,
+          policy: c.app.governance.policy,
         });
 
         const collectionResult =
-          await getApp().traces.collection.handleOtlpTraceRequest(
+          await c.app.traces.collection.handleOtlpTraceRequest(
             project.id,
             traceRequest,
             DEFAULT_PII_REDACTION_LEVEL,
@@ -659,6 +657,7 @@ secured
         span.setAttribute("langwatch.project.id", project.id);
 
         await enforcePlanLimit({
+          app: c.app,
           project,
           customerTraceIds: [],
           logger: loggerLogs,
@@ -691,15 +690,16 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
         }
 
         await applyReceiverProvenanceToLogs({
           request: logRequest,
           resolved,
+          policy: c.app.governance.policy,
         });
 
-        const result = await getApp().traces.logCollection.handleOtlpLogRequest(
+        const result = await c.app.traces.logCollection.handleOtlpLogRequest(
           {
             tenantId: project.id,
             organizationId: project.team.organizationId,
@@ -757,6 +757,7 @@ secured
         span.setAttribute("langwatch.project.id", project.id);
 
         await enforcePlanLimit({
+          app: c.app,
           project,
           customerTraceIds: [],
           logger: loggerMetrics,
@@ -794,11 +795,11 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
         }
 
         const result =
-          await getApp().traces.metricCollection.handleOtlpMetricRequest({
+          await c.app.traces.metricCollection.handleOtlpMetricRequest({
             tenantId: project.id,
             organizationId: project.team.organizationId,
             metricRequest: metricsRequest,

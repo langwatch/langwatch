@@ -39,25 +39,8 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
-});
-
-vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
-  getGithubAppConfig: () => appConfig,
-}));
-
-// The uninstall deep link is built from the GitHub host this instance is bound
-// to, so the suite controls that host as well.
 const { githubHost } = vi.hoisted(() => ({
   githubHost: { webBase: "https://github.com" },
-}));
-vi.mock("~/server/app-layer/github/githubHost", () => ({
-  getGithubWebBase: () => githubHost.webBase,
 }));
 
 vi.mock("~/server/api/rbac", async (importOriginal) => {
@@ -73,19 +56,26 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/app-layer", () => ({
-  getApp: () => ({
-    github: {
-      installations: {
-        configured: true,
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  const base = appPermissionsMock();
+  return {
+    ...base,
+    getApp: () => ({
+      ...base.getApp(),
+      github: {
+        getAppConfig: () => appConfig,
+        getWebBase: () => githubHost.webBase,
         isOrganizationMember,
         getAllForOrganization,
-        getByInstallationId,
+        tryGetByInstallationId: getByInstallationId,
         listRepositoriesForOrganization,
       },
-    },
-  }),
-}));
+    }),
+  };
+});
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn() },
 }));

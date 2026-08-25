@@ -65,7 +65,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler, ValidationTargets } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { validator as openApiValidator } from "hono-openapi";
+import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
 import type { ZodIssue, ZodSchema } from "zod";
 
 import { remediation } from "~/server/app-layer/error-remediation";
@@ -335,3 +335,16 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
  * precise one.
  */
 export const validator = build as unknown as typeof openApiValidator;
+
+/**
+ * The same validation and handled-error behaviour without OpenAPI metadata.
+ * Used only by live compatibility routes that have been removed from the
+ * published API while clients migrate to their replacement.
+ */
+export const hiddenValidator = ((...args: Parameters<typeof openApiValidator>) => {
+  const middleware = validator(...args);
+  delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[
+    uniqueSymbol
+  ];
+  return middleware;
+}) as typeof openApiValidator;

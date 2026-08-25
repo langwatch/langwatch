@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PromptScope } from "~/generated/prisma/client";
 
-import { runtimeParametersSchema } from "~/prompts/schemas/field-schemas";
+import { runtimeParametersSchema } from "@langwatch/prompt-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 const configDataSchema = getLatestConfigVersionSchema().shape.configData;

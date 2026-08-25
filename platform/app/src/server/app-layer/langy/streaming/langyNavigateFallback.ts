@@ -21,12 +21,9 @@
  * relay stream.
  */
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 
 type UrlForProjectSlug = (projectSlug: string) => string;
 
@@ -60,10 +57,9 @@ const NAVIGATE_PAGES: Record<string, string> = {
  * its platform URL from the project slug. Null = not resolvable here.
  */
 type NavigateResolver = (a: {
+  app: RequestAppServices;
   projectId: string;
   resourceId: string;
-  agents?: AgentService;
-  evaluators?: EvaluatorService;
 }) => Promise<UrlForProjectSlug | null>;
 
 /** The prompts page (the playground) with that prompt's editor drawer open:
@@ -90,8 +86,8 @@ const evaluatorPath = (evaluatorId: string): string =>
  * fall into `prompt_` and miss the prompt lookup, correctly dropping.)
  */
 const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
-  scenariorun_: async ({ projectId, resourceId }) => {
-    const run = await getApp().simulations.tryGetScenarioRunData({
+  scenariorun_: async ({ app, projectId, resourceId }) => {
+    const run = await app.simulations.tryGetScenarioRunData({
       projectId,
       scenarioRunId: resourceId,
     });
@@ -100,8 +96,8 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       scenarioRunPlatformUrl({ projectSlug, scenarioRunId: resourceId });
   },
 
-  prompt_: async ({ projectId, resourceId }) => {
-    const prompt = await getApp().prompts.tryGetPromptByIdOrHandle({
+  prompt_: async ({ app, projectId, resourceId }) => {
+    const prompt = await app.prompts.tryGetPromptByIdOrHandle({
       idOrHandle: resourceId,
       projectId,
     });
@@ -110,9 +106,9 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       platformUrl({ projectSlug, path: promptPath(prompt.id) });
   },
 
-  dataset_: async ({ projectId, resourceId }) => {
+  dataset_: async ({ app, projectId, resourceId }) => {
     // Throws DatasetNotFoundError on a miss; the caller maps any throw to null.
-    const dataset = await getApp().dataset.getBySlugOrId({
+    const dataset = await app.dataset.getBySlugOrId({
       slugOrId: resourceId,
       projectId,
     });
@@ -123,11 +119,10 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       });
   },
 
-  workflow_: async ({ projectId, resourceId }) => {
-    const workflow = await prisma.workflow.findFirst({
-      where: { id: resourceId, projectId, archivedAt: null },
-      select: { id: true },
-    });
+  workflow_: async ({ app, projectId, resourceId }) => {
+    const workflow = await app.workflows
+      .getById({ id: resourceId, projectId, includeVersion: false })
+      .catch(() => null);
     if (!workflow) return null;
     return (projectSlug) =>
       platformUrl({
@@ -136,8 +131,8 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       });
   },
 
-  experiment_: async ({ projectId, resourceId }) => {
-    const experiment = await getApp().experiments.findById({
+  experiment_: async ({ app, projectId, resourceId }) => {
+    const experiment = await app.experiments.findById({
       projectId,
       id: resourceId,
     });
@@ -152,8 +147,8 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       });
   },
 
-  monitor_: async ({ projectId, resourceId }) => {
-    const monitor = await getApp().monitors.tryGetMonitorById({
+  monitor_: async ({ app, projectId, resourceId }) => {
+    const monitor = await app.monitors.tryGetMonitorById({
       projectId,
       id: resourceId,
     });
@@ -162,8 +157,8 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       platformUrl({ projectSlug, path: monitorPath(monitor.id) });
   },
 
-  evaluator_: async ({ projectId, resourceId, evaluators }) => {
-    const evaluator = await evaluators?.tryGetById({
+  evaluator_: async ({ app, projectId, resourceId }) => {
+    const evaluator = await app.evaluators.tryGetById({
       id: resourceId,
       projectId,
     });
@@ -172,9 +167,9 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       platformUrl({ projectSlug, path: evaluatorPath(evaluator.id) });
   },
 
-  agent_: async ({ projectId, resourceId, agents }) => {
+  agent_: async ({ app, projectId, resourceId }) => {
     // Throws AgentNotFoundError on a miss; the caller maps any throw to null.
-    const agent = await agents?.getById({
+    const agent = await app.agents.getById({
       id: resourceId,
       projectId,
     });
@@ -195,15 +190,13 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
  * case-sensitive and lowercasing one would resolve an id that does not exist.
  */
 async function resolveUrlBuilder({
+  app,
   projectId,
   resourceId,
-  agents,
-  evaluators,
 }: {
+  app: RequestAppServices;
   projectId: string;
   resourceId: string;
-  agents?: AgentService;
-  evaluators?: EvaluatorService;
 }): Promise<((projectSlug: string) => string) | null> {
   const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
   if (pagePath) {
@@ -214,30 +207,27 @@ async function resolveUrlBuilder({
     resourceId.startsWith(prefix),
   )?.[1];
   if (!resolver) return null;
-  return resolver({ projectId, resourceId, agents, evaluators }).catch(() => null);
+  return resolver({ app, projectId, resourceId }).catch(() => null);
 }
 
 export async function resolveNavigateFallbackUrl({
+  app,
   projectId,
   resourceId,
-  agents,
-  evaluators,
 }: {
+  app: RequestAppServices;
   projectId: string;
   resourceId: string;
-  agents?: AgentService;
-  evaluators?: EvaluatorService;
 }): Promise<string | null> {
   const buildUrl = await resolveUrlBuilder({
+    app,
     projectId,
     resourceId,
-    agents,
-    evaluators,
   });
   if (!buildUrl) return null;
 
-  const project = await getApp()
-    .projects.tryGetById(projectId)
+  const project = await app.projects
+    .tryGetById(projectId)
     .catch(() => null);
   if (!project?.slug) return null;
 

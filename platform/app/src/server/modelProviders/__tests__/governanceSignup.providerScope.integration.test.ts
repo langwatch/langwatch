@@ -26,7 +26,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
+import { getApp } from "~/server/app-layer/app";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
@@ -115,7 +115,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
       },
     });
 
-    await new PersonalWorkspaceService(prisma).ensure({
+    await getApp().organizations.ensurePersonalWorkspace({
       userId,
       organizationId,
       displayName: "ACME Admin",

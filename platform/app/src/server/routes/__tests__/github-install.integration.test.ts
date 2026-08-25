@@ -13,30 +13,19 @@
  * they are what the GitHub App's own configuration still points at, and they are
  * exercised here for exactly that reason.
  *
- * getApp() is mocked at the app-layer boundary; Hono is exercised end-to-end
- * through `app.request`.
+ * Hono is exercised end-to-end through `app.request` with the composed App
+ * supplied as request context, exactly as the production API router mounts it.
  *
  * Spec: specs/integrations/github-connection.feature.
  */
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import type { App } from "~/server/app-layer/app";
 
-wireDefaultTestApp();
-
-// vi.hoisted runs before the import graph executes. A plain module-body
-// assignment is too late: wireDefaultTestApp's import chain reaches
-// ~/env.mjs, whose snapshot would capture the real .env secret first and the
-// route would refuse every state this file signs.
 const { TEST_SIGNING_KEY } = vi.hoisted(() => {
-  const key = "x".repeat(64);
-  process.env.CREDENTIALS_SECRET = key;
-  return { TEST_SIGNING_KEY: key };
+  return { TEST_SIGNING_KEY: "x".repeat(64) };
 });
 
-// The App credentials are read through getGithubAppConfig, so the suite can
-// take the App away mid-file without fighting the env snapshot t3-env takes at
-// import time.
 const { appConfig } = vi.hoisted(() => ({
   appConfig: {
     appId: "app-123",
@@ -46,10 +35,6 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
-vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
-  getGithubAppConfig: () => appConfig,
-}));
-
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
 const probeOrganizationPermission = vi.fn();
@@ -61,23 +46,6 @@ const isEnabled = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
-}));
-vi.mock("~/server/app-layer", () => ({
-  getApp: () => ({
-    github: {
-      installations: {
-        isOrganizationMember: (...a: unknown[]) => isOrganizationMember(...a),
-        recordInstallation: (...a: unknown[]) => recordInstallation(...a),
-        handleWebhookEvent: (...a: unknown[]) => handleWebhookEvent(...a),
-      },
-      pullRequests: {
-        mapping: {
-          applyPullRequestEvent: (...a: unknown[]) =>
-            applyPullRequestEvent(...a),
-        },
-      },
-    },
-  }),
 }));
 vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: (...args: unknown[]) => auditLog(...args),
@@ -97,11 +65,76 @@ vi.mock(
       probeOrganizationPermission(...args)) as never,
   }),
 );
-vi.mock("~/server/db", () => ({ prisma: {} }));
+const githubService = {
+  getAppConfig: () => appConfig,
+  getWebBase: () => "https://github.com",
+  getAppInstallUrl: () =>
+    "https://github.com/apps/langwatch-langy/installations/new",
+  getInstallStateTtlMs: () => 10 * 60 * 1000,
+  registerInstallNonce: vi.fn(async () => false),
+  tryConsumeInstallNonce: vi.fn(async () => true),
+  signInstallState: (payload: Record<string, unknown>) => signState(payload),
+  tryVerifyInstallState: (token: string | null | undefined) =>
+    verifyState(token),
+  popupResponseHtml: (login: string) => `<p>github-connected @${login}</p>`,
+  popupErrorHtml: (message: string) => `<p>github-error ${message}</p>`,
+  tryParsePullRequestEvent: (payload: unknown) => parsePullRequestEvent(payload),
+  isOrganizationMember: (...args: unknown[]) => isOrganizationMember(...args),
+  recordInstallation: (...args: unknown[]) => recordInstallation(...args),
+  handleWebhookEvent: (...args: unknown[]) => handleWebhookEvent(...args),
+  applyPullRequestEvent: (...args: unknown[]) => applyPullRequestEvent(...args),
+} as const;
+
+const routeApp = { github: githubService } as unknown as App;
+
+function signState(payload: Record<string, unknown>): string {
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const sig = createHmac("sha256", TEST_SIGNING_KEY).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+
+function verifyState(token: string | null | undefined) {
+  if (!token) return null;
+  const [body, signature] = token.split(".");
+  if (!body || !signature) return null;
+  const expected = createHmac("sha256", TEST_SIGNING_KEY)
+    .update(body)
+    .digest("base64url");
+  if (signature !== expected) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (Date.now() - payload.issuedAt > 10 * 60 * 1000) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function parsePullRequestEvent(payload: unknown) {
+  if (!payload || typeof payload !== "object") return null;
+  const value = payload as Record<string, any>;
+  const pull = value.pull_request;
+  const repository = value.repository;
+  if (
+    !pull ||
+    !repository ||
+    pull.head?.repo?.full_name?.toLowerCase() !== repository.full_name?.toLowerCase()
+  ) {
+    return null;
+  }
+  return {
+    action: value.action,
+    installationId: String(value.installation.id),
+    repositoryOwner: repository.owner.login,
+    repositoryName: repository.name,
+    headBranch: pull.head.ref,
+    pullRequest: { number: pull.number, state: pull.state },
+  };
+}
 
 async function request(path: string, init?: RequestInit) {
   const { app } = await import("../github");
-  return app.request(path, init);
+  return app.request(path, init, { langwatchApp: routeApp });
 }
 
 async function makeState(
@@ -113,21 +146,15 @@ async function makeState(
     issuedAt: number;
   }> = {},
 ) {
-  const { signGithubInstallState } = await import(
-    "~/server/app-layer/github/githubInstallState"
-  );
-  return signGithubInstallState(
-    {
-      userId: over.userId ?? "u1",
-      organizationId: over.organizationId ?? "org1",
-      mode: over.mode ?? "popup",
-      returnTo: over.returnTo ?? "/settings/integrations#github",
-      issuedAt: over.issuedAt ?? Date.now(),
-      nonce: "n",
-      nonceRegistered: false,
-    },
-    TEST_SIGNING_KEY,
-  );
+  return signState({
+    userId: over.userId ?? "u1",
+    organizationId: over.organizationId ?? "org1",
+    mode: over.mode ?? "popup",
+    returnTo: over.returnTo ?? "/settings/integrations#github",
+    issuedAt: over.issuedAt ?? Date.now(),
+    nonce: "n",
+    nonceRegistered: false,
+  });
 }
 
 beforeEach(() => {
@@ -307,7 +334,7 @@ describe("GET /api/github/setup", () => {
   describe("when the installation is already owned by another organization", () => {
     async function mockConflictRejection() {
       const { GithubInstallationConflictError } = await import(
-        "~/server/app-layer/github/github-installations.service"
+        "@langwatch/github-contract"
       );
       recordInstallation.mockRejectedValue(
         new GithubInstallationConflictError({

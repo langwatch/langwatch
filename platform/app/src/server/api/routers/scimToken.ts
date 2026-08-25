@@ -8,6 +8,7 @@ const enterpriseScimProcedure = protectedProcedure
   .permission("organization:manage")
   .use(async ({ ctx, input, next }) => {
     await assertEnterprisePlan({
+      planProvider: ctx.app.planProvider,
       organizationId: input.organizationId,
       errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
     });

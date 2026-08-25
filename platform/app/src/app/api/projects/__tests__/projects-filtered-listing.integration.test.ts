@@ -16,7 +16,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -56,7 +56,7 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
     permissions?: string[];
   }) =>
     (
-      await ApiKeyService.create(prisma).create({
+      await getApp().apiKeys.create({
         name: `reach-${nanoid(6)}`,
         userId: args.userId,
         createdByUserId: args.userId,

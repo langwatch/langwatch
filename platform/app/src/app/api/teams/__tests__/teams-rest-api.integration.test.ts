@@ -7,7 +7,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -162,7 +162,7 @@ describe("Feature: Teams REST API", () => {
       },
     });
 
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     const created = await apiKeyService.create({
       name: `teams-key-${nanoid(6)}`,
       userId,
@@ -627,7 +627,7 @@ describe("Feature: Teams REST API", () => {
     let viewerKeyToken: string;
 
     beforeAll(async () => {
-      const apiKeyService = ApiKeyService.create(prisma);
+      const apiKeyService = getApp().apiKeys;
       const viewerKey = await apiKeyService.create({
         name: `teams-viewer-${nanoid(6)}`,
         userId,

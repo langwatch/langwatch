@@ -12,8 +12,8 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it, vi } from "vitest";
+import type { PromptService } from "@langwatch/prompt-contract";
 import { prisma } from "~/server/db";
-import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { OrganizationService } from "../organization.service";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
@@ -23,20 +23,20 @@ const SEEDING_FAILURE = "prompt tag seeding is unavailable";
 /** A tag repository whose seeding is down, recording who it was asked about. */
 function buildFailingTagRepository(seenOrganizationIds: string[]) {
   return {
-    seedForOrg: vi.fn(
+    seedTagsForOrganization: vi.fn(
       async ({ organizationId }: { organizationId: string }) => {
         seenOrganizationIds.push(organizationId);
         throw new Error(SEEDING_FAILURE);
       },
     ),
-  } as unknown as PromptTagRepository;
+  } as Pick<PromptService, "seedTagsForOrganization">;
 }
 
 /** A tag repository that works, for the retry half of the scenario. */
 function buildWorkingTagRepository() {
   return {
-    seedForOrg: vi.fn(async () => {}),
-  } as unknown as PromptTagRepository;
+    seedTagsForOrganization: vi.fn(async () => {}),
+  } as Pick<PromptService, "seedTagsForOrganization">;
 }
 
 describe("OrganizationService.createForProvisioning", () => {

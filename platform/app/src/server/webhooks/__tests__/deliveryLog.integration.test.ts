@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaWebhookDeliveryRepository } from "~/server/app-layer/automations/repositories/webhook-delivery.prisma.repository";
+import { AppAutomationRuntime } from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -150,9 +150,12 @@ describe("the shared webhook delivery log", () => {
       await writeAutomationsRow(now, `evt_${ns}_read`);
       await writePlatformRow(now, `btch_${ns}_read`);
 
-      const rows = await new PrismaWebhookDeliveryRepository(
-        prisma,
-      ).findAllRecentByTriggerId({ projectId, triggerId, limit: 50 });
+      const rows = await AppAutomationRuntime.create({
+        database: prisma,
+        redis: null,
+      })
+        .build()
+        .getRecentWebhookDeliveries({ projectId, triggerId, limit: 50 });
 
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.map((r) => r.dispatchId)).toContain(`evt_${ns}_read`);

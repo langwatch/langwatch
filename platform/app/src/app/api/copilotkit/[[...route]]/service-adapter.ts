@@ -18,10 +18,10 @@ import type {
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
-import type { runtimeInputsSchema } from "~/prompts/schemas";
+import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
+import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";

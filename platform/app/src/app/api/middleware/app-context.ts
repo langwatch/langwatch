@@ -16,6 +16,25 @@ const APP_CONTEXT_KEY = "langwatchApp";
 
 export type AppContextVariables = { [APP_CONTEXT_KEY]: App };
 
+/** Explicit bindings for an internal Hono re-dispatch. */
+export type AppContextBindings = { [APP_CONTEXT_KEY]: App };
+
+export function appContextBindingsFor(app: App): AppContextBindings {
+  return { [APP_CONTEXT_KEY]: app };
+}
+
+function appFromBindings(c: Context): App | undefined {
+  const bindings: unknown = c.env;
+  if (
+    !bindings ||
+    typeof bindings !== "object" ||
+    !(APP_CONTEXT_KEY in bindings)
+  ) {
+    return undefined;
+  }
+  return bindings[APP_CONTEXT_KEY] as App;
+}
+
 function installAppContext(c: Context, app: App): void {
   c.set(APP_CONTEXT_KEY, app);
   Object.defineProperty(c, "app", {
@@ -44,7 +63,7 @@ export function appContextMiddlewareFor(app: App): MiddlewareHandler {
  * families never recover it from a global singleton.
  */
 export const appContextMiddleware: MiddlewareHandler = async (c, next) => {
-  const app = c.get(APP_CONTEXT_KEY) as App | undefined;
+  const app = (c.get(APP_CONTEXT_KEY) as App | undefined) ?? appFromBindings(c);
   if (!app) {
     throw new Error(
       "Application context is missing. Mount the route below appContextMiddlewareFor(app).",

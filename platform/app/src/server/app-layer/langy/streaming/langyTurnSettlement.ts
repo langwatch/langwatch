@@ -1,5 +1,5 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
-import type { LangyStreamEntry } from "./langyTokenBuffer";
+import type { LangyStreamEntry } from "@langwatch/langy-server";
 
 /**
  * Decide whether to synthesize a terminal stream entry for a turn whose live

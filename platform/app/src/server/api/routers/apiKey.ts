@@ -4,12 +4,12 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import type { App } from "~/server/app-layer/app";
 import {
   API_KEY_PERMISSION_MODES,
+  apiKeyPermissionFormatSchema as permissionFormatSchema,
   refineRestrictedPermissions,
-} from "~/server/api-key/restricted-permissions";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+} from "@langwatch/api-key-contract";
 
 function mapApiKeyHandledError(error: unknown): never {
   if (HandledError.isHandled(error)) {
@@ -52,7 +52,7 @@ function mapApiKeyHandledError(error: unknown): never {
 }
 
 async function ensureCallerIsOrgMember(
-  service: ApiKeyService,
+  service: App["apiKeys"],
   userId: string,
   organizationId: string,
 ): Promise<void> {
@@ -84,7 +84,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "listing caller's own role bindings" },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -148,13 +148,13 @@ export const apiKeyRouter = createTRPCRouter({
       },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
         input.organizationId,
       );
-      return apiKeyService.getNameByIdInOrg({
+      return apiKeyService.tryGetNameByIdInOrg({
         id: input.apiKeyId,
         organizationId: input.organizationId,
       });
@@ -171,7 +171,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "listing API keys" },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -195,7 +195,7 @@ export const apiKeyRouter = createTRPCRouter({
           bindings: allBindings.map((rb) => ({
             id: rb.id,
             role: rb.role,
-            customRoleId: rb.customRoleId,
+            customRoleId: rb.customRoleId ?? null,
             scopeType: rb.scopeType,
             scopeId: rb.scopeId,
           })),
@@ -242,7 +242,7 @@ export const apiKeyRouter = createTRPCRouter({
         roleBindings: apiKey.roleBindings.map((rb) => ({
           id: rb.id,
           role: rb.role,
-          customRoleId: rb.customRoleId,
+          customRoleId: rb.customRoleId ?? null,
           customRoleName: rb.customRoleId
             ? (customRoleName.get(rb.customRoleId) ?? null)
             : null,
@@ -283,7 +283,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "creating API key for user's own org" },
     })
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -374,7 +374,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "updating API key" },
     })
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -432,7 +432,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "revoking API key" },
     })
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -474,7 +474,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "listing org projects for permission picker" },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -493,7 +493,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "listing org teams for scope picker" },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,
@@ -512,7 +512,7 @@ export const apiKeyRouter = createTRPCRouter({
       allow: { organizationId: "listing org members for key assignment" },
     })
     .query(async ({ ctx, input }) => {
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const apiKeyService = ctx.app.apiKeys;
       await ensureCallerIsOrgMember(
         apiKeyService,
         ctx.session.user.id,

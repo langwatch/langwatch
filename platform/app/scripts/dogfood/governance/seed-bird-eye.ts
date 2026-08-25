@@ -41,9 +41,11 @@
  *        --org <organizationId> [--days 30] [--rows 240]'
  */
 import { randomBytes } from "crypto";
+import { PROJECT_KIND } from "@langwatch/project-contract";
+import { getApp } from "~/server/app-layer/app";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
 
 interface Args {
   organizationId: string;
@@ -561,10 +563,10 @@ export async function runSeedBirdEye(args: Args): Promise<SeedBirdEyeSummary> {
       `data-spread=${args.days * 2}d rows=${args.rows}`,
   );
 
-  const govProject = await ensureHiddenGovernanceProject(
-    prisma,
-    args.organizationId,
-  );
+  const govProject = await getApp().projects.ensureInternal({
+    organizationId: args.organizationId,
+    kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+  });
   console.log(`[seed-bird-eye] hidden Governance Project: id=${govProject.id}`);
 
   const sources = await ensureSourcesAcrossTeams({
@@ -603,6 +605,7 @@ const isCliInvocation =
 
 if (isCliInvocation) {
   const args = parseArgs(process.argv.slice(2));
+  initializeDefaultApp({ processRole: "web" });
   runSeedBirdEye(args)
     .catch((err) => {
       console.error(`[seed-bird-eye] ERROR: ${err.message}\n${err.stack}`);

@@ -33,7 +33,10 @@ import {
   type SeatChangeFixture,
 } from "./seatChangeLastTeamAdminFixture";
 
-vi.mock("~/runtime/app/features/audit-log", () => ({
+vi.mock("~/runtime/app/features/audit-log", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/runtime/app/features/audit-log")
+  >()),
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

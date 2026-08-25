@@ -30,6 +30,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
 import { prisma } from "~/server/db";
 import {
@@ -73,6 +74,12 @@ const VK_TAGSTORM_ID = `vk-mat-tagstorm-${suffix}`;
 // A VK on the routing policy whose allowlist names the policy-omitted
 // provider. Dispatch must still exclude it.
 const VK_POLICY_ALLOWLIST_ID = `vk-mat-policy-allow-${suffix}`;
+const evaluatorService = {
+  tryGetById: async ({ id, projectId }: { id: string; projectId: string }) =>
+    prisma.evaluator.findFirst({
+      where: { id, projectId, archivedAt: null },
+    }),
+} as unknown as EvaluatorService;
 
 describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   beforeAll(async () => {
@@ -713,7 +720,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
 
   describe("when GatewayGuardrailService.create gates on AS_GUARDRAIL monitor", () => {
     it("accepts an evaluator with at least one enabled AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma);
+      const service = GatewayGuardrailService.create(prisma, evaluatorService);
       const row = await service.create({
         projectId: PROJECT_ID,
         name: `Accept guardrail ${suffix}`,
@@ -729,7 +736,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
 
     it("rejects an evaluator with no AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma);
+      const service = GatewayGuardrailService.create(prisma, evaluatorService);
       await expect(
         service.create({
           projectId: PROJECT_ID,

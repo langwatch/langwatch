@@ -29,7 +29,7 @@ import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
-} from "~/server/app-layer/analytics/routing/field-availability";
+} from "@langwatch/analytics-contract";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";

@@ -9,7 +9,13 @@
  * noticing, and the join can be exercised without a page of rollups.
  */
 import { assignSessionsToPullRequests } from "../coding-agent/pull-request-assignment";
-import { normalizeGithubHost } from "../github/githubHost";
+import { GithubCompositionAdapter } from "@langwatch/github-server";
+import { env } from "~/env.mjs";
+
+const normalizeGithubHost = (host: string) =>
+  GithubCompositionAdapter.normalizeGithubHost(host, {
+    host: env.GITHUB_LANGY_HOST,
+  });
 
 /** Identity only: the number, where it lives, and what it is called. */
 export interface SessionGroupPullRequestDto {
@@ -29,7 +35,7 @@ export interface GithubPullRequestLookup {
     organizationId: string;
     keys: ReadonlyArray<PullRequestBranchKey>;
   }): Promise<
-    Array<{
+    ReadonlyArray<{
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;

@@ -1,8 +1,7 @@
 import {
-  AppGatewayDebitsProcessRuntime,
+  GatewayDebitProcess,
   GATEWAY_DEBITS_PROCESS_NAME,
-  type GatewayDebitsProcessDeps,
-} from "@ee/governance/process-manager/gatewayDebits.process";
+} from "@langwatch/enterprise-governance-server";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,
@@ -43,7 +42,7 @@ export interface GatewaySpendProcessingPipelineDeps {
   webhookDelivery?: WebhookDeliveryProcessDeps;
   /** The gateway's budget debits; absent without the ClickHouse spend path
    *  (the ledger is the only spend store). */
-  gatewayDebits?: GatewayDebitsProcessDeps;
+  gatewayDebits?: GatewayDebitProcess;
   /** The M2 settlement sweeper: settles admissions whose confirmation
    *  never arrived inside the grace window. */
   settlement?: SpendSettlementProcessDeps;
@@ -96,9 +95,7 @@ export function createGatewaySpendProcessingPipeline(
   if (deps.gatewayDebits) {
     pipeline = pipeline.withProcessManager(
       GATEWAY_DEBITS_PROCESS_NAME,
-      AppGatewayDebitsProcessRuntime.create(
-        deps.gatewayDebits,
-      ).processManager(),
+      deps.gatewayDebits.processManager(),
     );
   }
   if (deps.settlement) {

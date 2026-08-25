@@ -22,8 +22,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { resolveTeamPermission } from "~/server/api/rbac";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -141,7 +140,7 @@ describe("Feature: Role bindings REST API", () => {
     // A service key whose initial reach is a team the tested project does
     // not belong to, so any project access it gains comes from the binding
     // under test.
-    const serviceKey = await ApiKeyService.create(prisma).create({
+    const serviceKey = await getApp().apiKeys.create({
       name: `rb-service-key-${nanoid(6)}`,
       userId: null,
       createdByUserId: seeded.adminUserId,

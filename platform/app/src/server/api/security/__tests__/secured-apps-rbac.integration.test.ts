@@ -29,7 +29,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -112,7 +112,7 @@ beforeAll(async () => {
   const userA = await makeAdminUser(orgA, a.team);
   const userB = await makeAdminUser(orgB, b.team);
 
-  const apiKeyService = ApiKeyService.create(prisma);
+  const apiKeyService = getApp().apiKeys;
 
   const admin = await apiKeyService.create({
     name: `admin-${ns}`,
@@ -271,7 +271,7 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
      */
     it("stops honouring the key on a write route the owner can no longer reach", async () => {
       const owner = await makeAdminUser(orgA, teamA);
-      const { token } = await ApiKeyService.create(prisma).create({
+      const { token } = await getApp().apiKeys.create({
         name: `degrading-${nanoid(6)}`,
         userId: owner.id,
         createdByUserId: owner.id,

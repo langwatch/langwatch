@@ -18,8 +18,7 @@ import {
   PERSONAL_FEATURES,
   PersonalProjectNotFoundError,
   PersonalProjectOwnerMismatchError,
-  PersonalWorkspaceFeaturesService,
-} from "@ee/governance/services/personalWorkspaceFeatures.service";
+} from "@langwatch/organization-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -42,9 +41,8 @@ export const personalWorkspaceFeaturesRouter = createTRPCRouter({
       },
     })
     .query(async ({ ctx, input }) => {
-      const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
-        return await service.get({
+        return await ctx.app.organizations.getPersonalWorkspaceFeatures({
           projectId: input.projectId,
           callerUserId: ctx.session.user.id,
         });
@@ -69,9 +67,8 @@ export const personalWorkspaceFeaturesRouter = createTRPCRouter({
       },
     })
     .mutation(async ({ ctx, input }) => {
-      const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
-        return await service.enableAll({
+        return await ctx.app.organizations.enableAllPersonalWorkspaceFeatures({
           projectId: input.projectId,
           callerUserId: ctx.session.user.id,
         });
@@ -96,9 +93,8 @@ export const personalWorkspaceFeaturesRouter = createTRPCRouter({
       },
     })
     .mutation(async ({ ctx, input }) => {
-      const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
-        return await service.disableAll({
+        return await ctx.app.organizations.disableAllPersonalWorkspaceFeatures({
           projectId: input.projectId,
           callerUserId: ctx.session.user.id,
         });

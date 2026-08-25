@@ -3,7 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { Project } from "~/generated/prisma/client";
-import { getTokenType } from "~/server/api-key/api-key-token.utils";
+import { getTokenType } from "@langwatch/api-key-contract";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { getServerAuthSession } from "~/server/auth";
 import { authMiddleware } from "./auth";

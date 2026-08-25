@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { ROLE_KIND } from "@langwatch/role-contract";
 import {
   OrganizationUserRole,
   type PrismaClient,
@@ -14,7 +15,6 @@ import {
   teamRoleHasPermission,
 } from "../api/rbac";
 import { getApp } from "../app-layer/app";
-import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -246,11 +246,11 @@ async function collectBindingsForApiKey({
  */
 function systemRoleGuard(principal: Principal) {
   if (principal.type !== "apiKey") {
-    return { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } };
+    return { kind: { not: ROLE_KIND.SYSTEM_API_KEY } };
   }
   return {
     OR: [
-      { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } },
+      { kind: { not: ROLE_KIND.SYSTEM_API_KEY } },
       {
         roleBindings: { every: { apiKeyId: principal.id } },
         assignedUsers: { none: {} },

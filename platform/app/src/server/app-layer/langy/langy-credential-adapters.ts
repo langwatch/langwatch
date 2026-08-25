@@ -1,9 +1,9 @@
 import type { LangyCredentialSession } from "@langwatch/langy-contract";
+import type { GithubService } from "@langwatch/github-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { mintLangySessionApiKey } from "./langyApiKey";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
-import type { GithubInstallationsService } from "../github/github-installations.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createLogger } from "@langwatch/observability";
 
@@ -39,7 +39,7 @@ export class AppLangyVirtualKeyService {
 }
 
 export class AppLangyGithubService {
-  constructor(private readonly installations: GithubInstallationsService) {}
+  constructor(private readonly github: () => GithubService) {}
 
   get enabled(): boolean {
     return true;
@@ -49,7 +49,7 @@ export class AppLangyGithubService {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<{ token: string; repoScopeKey: string } | null> {
-    const result = await this.installations.mintTurnToken(input);
+    const result = await this.github().tryMintTurnToken(input);
     return result
       ? { token: result.token, repoScopeKey: result.repoScopeKey }
       : null;
@@ -99,7 +99,7 @@ export function createAppLangyCredentialComposition({
   mirrorProjectId,
 }: {
   prisma: PrismaClient;
-  github: GithubInstallationsService;
+  github: () => GithubService;
   workerCallbackUrl?: string;
   workerGatewayBaseUrl?: string;
   mirrorProjectId?: string;

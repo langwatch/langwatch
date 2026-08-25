@@ -1,14 +1,13 @@
 import {
   WebhookEndpointConfiguration,
-  AppWebhookEntitlementRuntime,
-  WebhookEntitlementService,
+  AppWebhookAccessRuntime,
   WebhookIdPort,
-  WebhookPlanPort,
   WebhookSecretPort,
   createWebhookEndpointService,
   type WebhookEndpointRuntime,
   type WebhookEndpointServiceOptions,
 } from "~/runtime/app/features/webhooks";
+import type { EntitlementService } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -28,20 +27,6 @@ class AppWebhookSecretAdapter extends WebhookSecretPort {
 
   decrypt(value: string): string {
     return decrypt(value);
-  }
-}
-
-class AppWebhookPlanAdapter extends WebhookPlanPort {
-  constructor(
-    private readonly resolve: (
-      organizationId: string,
-    ) => Promise<{ webhookEndpointsEnabled?: boolean }>,
-  ) {
-    super();
-  }
-
-  async hasWebhookEndpoints(organizationId: string): Promise<boolean> {
-    return (await this.resolve(organizationId)).webhookEndpointsEnabled === true;
   }
 }
 
@@ -67,12 +52,8 @@ export function createEnterpriseWebhookEndpointService(
   });
 }
 
-export function installEnterpriseWebhookEntitlement(
-  resolve: (
-    organizationId: string,
-  ) => Promise<{ webhookEndpointsEnabled?: boolean }>,
+export function installEnterpriseWebhookAccess(
+  entitlements: EntitlementService,
 ): void {
-  AppWebhookEntitlementRuntime.install(
-    WebhookEntitlementService.create(new AppWebhookPlanAdapter(resolve)),
-  );
+  AppWebhookAccessRuntime.install(entitlements);
 }

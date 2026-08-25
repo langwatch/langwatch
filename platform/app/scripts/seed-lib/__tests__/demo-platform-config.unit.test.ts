@@ -4,7 +4,7 @@ import {
   DEMO_PROMPT_CONFIG_DATA,
 } from "../../../prisma/demo-platform-ids";
 import { httpComponentSchema } from "../../../src/optimization_studio/types/dsl";
-import { getLatestConfigVersionSchema } from "../../../src/server/prompt-config/repositories/llm-config-version-schema";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 // The demo platform seeds these configs as raw JSON, and the app re-validates
 // that JSON on every read (agent repository / prompt version repository), so

@@ -27,6 +27,7 @@
  */
 
 import { Hono } from "hono";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import {
   canonicalOtlpPath,
   stampCorrectedPath,
@@ -62,6 +63,6 @@ for (const pattern of CANDIDATE_PATTERNS) {
     const forwarded = new Request(url.toString(), c.req.raw);
     stampCorrectedPath({ headers: forwarded.headers, originalPath });
 
-    return otelApp.fetch(forwarded);
+    return otelApp.fetch(forwarded, appContextBindingsFor(c.app));
   });
 }

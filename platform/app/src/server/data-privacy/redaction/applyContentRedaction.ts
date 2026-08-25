@@ -1,4 +1,4 @@
-import { PROVENANCE_ATTR_API_KEY_ID } from "@ee/governance/services/ingestKeyProvenance.utils";
+import { PROVENANCE_ATTR_API_KEY_ID } from "~/server/routes/ingest/ingest-key-provenance.utils";
 import {
   compileSecretPatterns,
   isSensitiveAttributeKey,

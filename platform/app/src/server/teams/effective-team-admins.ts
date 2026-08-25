@@ -52,7 +52,6 @@ async function readTeamAdminPrincipals({
   }
   return { userIds, groupIds };
 }
-
 /**
  * Every user the given admin-holding groups expand to — the one membership
  * fan-out all the group-derived admin answers share, so the expansion cannot

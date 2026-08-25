@@ -1,13 +1,9 @@
-import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
-import { NodeLicenseCryptographyAdapter } from "@langwatch/enterprise-licensing-server";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import {
-  PostgresSsoAdapter,
+  LicensingSsoAdapter,
   BetterAuthSsoAdapter,
   SsoGateLogger,
   SsoProviderMountInspector,
-  SsoLicenseVerifier,
-  type SsoLicenseInspection,
 } from "@langwatch/enterprise-sso-server";
 export {
   LEGACY_CALLBACK_PROVIDER_IDS,
@@ -17,7 +13,7 @@ export {
   legacyCallbackUrl,
 } from "@langwatch/enterprise-sso-server";
 import { createLogger } from "@langwatch/observability";
-import { prisma } from "~/server/db";
+import { getLicenseHandler } from "~/runtime/app/licensing";
 
 export const ssoConfiguration: SsoConfiguration = {
   isSaas:
@@ -64,27 +60,6 @@ class AppSsoGateLogger extends SsoGateLogger {
   }
 }
 
-class AppSsoLicenseVerifier extends SsoLicenseVerifier {
-  private readonly cryptography = NodeLicenseCryptographyAdapter.create({
-    publicKey:
-      process.env.LANGWATCH_LICENSE_PUBLIC_KEY ?? DEFAULT_LICENSE_PUBLIC_KEY,
-  });
-
-  inspect(licenseKey: string): SsoLicenseInspection {
-    const parsed = this.cryptography.parseLicenseKey(licenseKey);
-    if (!parsed) return { valid: false, reason: "invalid_format" };
-    if (!this.cryptography.verifySignature(parsed)) {
-      return { valid: false, reason: "invalid_signature" };
-    }
-    return {
-      valid: true,
-      expiresAt: parsed.data.expiresAt,
-      organizationName: parsed.data.organizationName,
-      expired: this.cryptography.isExpired(parsed.data.expiresAt),
-    };
-  }
-}
-
 class AppSsoProviderMountInspector extends SsoProviderMountInspector {
   isMounted(configuration: SsoConfiguration): boolean {
     return (
@@ -95,10 +70,9 @@ class AppSsoProviderMountInspector extends SsoProviderMountInspector {
   }
 }
 
-const gate = PostgresSsoAdapter.create({
-  database: prisma,
+const gate = LicensingSsoAdapter.create({
   configuration: ssoConfiguration,
-  verifier: new AppSsoLicenseVerifier(),
+  licensing: getLicenseHandler(),
   logger: new AppSsoGateLogger(),
   providerMountInspector: new AppSsoProviderMountInspector(),
 }).build();

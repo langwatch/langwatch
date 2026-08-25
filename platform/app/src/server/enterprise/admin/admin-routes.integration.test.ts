@@ -33,10 +33,6 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 
-vi.mock("~/server/users/user.service", () => ({
-  UserService: { create: () => ({}) },
-}));
-
 vi.mock("ra-data-simple-prisma", () => ({
   defaultHandler: vi.fn(async () => ({ data: [] })),
   getListHandler: vi.fn(async () => ({ data: [], total: 0 })),

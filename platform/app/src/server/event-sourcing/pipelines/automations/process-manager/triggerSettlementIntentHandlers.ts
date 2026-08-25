@@ -34,7 +34,7 @@ import {
 } from "~/server/app-layer/automations/providers/webhook/server";
 import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
 import type { AutomationService } from "@langwatch/automation-contract";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
@@ -116,7 +116,7 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  evaluationRuns: EvaluationRunService;
+  evaluationRuns: EvaluationService;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];

@@ -1,5 +1,13 @@
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import {
+  CODE_EVALUATOR_CHECK_PREFIX,
+  codeEvaluatorConfigSchema,
+  codeEvaluatorIdFromCheckType,
+  codeEvaluatorOutputFields,
+  defaultCodeEvaluatorConfig,
+  isCodeEvaluatorCheckType,
+  type CodeEvaluatorConfig,
+} from "@langwatch/evaluator-contract";
 import {
   type Code,
   type End,
@@ -16,73 +24,30 @@ import {
  * is ever created for them.
  */
 
-const codeEvaluatorFieldSchema = z.object({
-  identifier: z.string().min(1),
-  type: z.string().min(1),
-});
-
-export const codeEvaluatorConfigSchema = z.object({
-  code: z.string().min(1),
-  inputs: z.array(codeEvaluatorFieldSchema).min(1),
-  outputs: z.array(codeEvaluatorFieldSchema).min(1),
-});
-
-export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
-
 /**
- * The fixed evaluator result contract. A code evaluator's function returns a
- * dictionary with any subset of these keys; whichever are present become the
- * evaluation result. These mirror the studio's evaluator End node, so the
- * outputs are not user-customizable, only the inputs are.
- *
- * This is the full result contract from `evaluationResultSchema`, in the same
- * details-first order as `EVALUATOR_RESULT_FIELDS` in EndPropertiesPanel so
- * the two evaluator surfaces stay consistent (reasoning before verdict). It is
- * intentionally distinct from `STANDARD_EVALUATOR_OUTPUT_FIELDS` in
- * evaluator.service.ts, which drops the free-text `details`: that is the
- * evaluator-as-target mapping set, not the return contract. It is defined here,
- * rather than imported from either, to stay client-safe for the evaluator
- * drawer and avoid a circular import.
+ * Compatibility exports for the evaluation runtime's DSL builder. The portable
+ * evaluator contract owns this vocabulary; this module only builds the Studio
+ * execution DSL.
  */
+export {
+  CODE_EVALUATOR_CHECK_PREFIX,
+  codeEvaluatorConfigSchema,
+  codeEvaluatorIdFromCheckType,
+  isCodeEvaluatorCheckType,
+};
+export type { CodeEvaluatorConfig };
+
 export const CODE_EVALUATOR_OUTPUT_FIELDS: Array<{
   identifier: string;
   type: Field["type"];
-}> = [
-  { identifier: "details", type: "str" },
-  { identifier: "passed", type: "bool" },
-  { identifier: "score", type: "float" },
-  { identifier: "label", type: "str" },
-];
+}> = codeEvaluatorOutputFields.map((field) => ({
+  ...field,
+  type: field.type as Field["type"],
+}));
 
 /** Default shape new code evaluators are seeded with in the editor. */
-export const DEFAULT_CODE_EVALUATOR_CONFIG: CodeEvaluatorConfig = {
-  code: `class Code:
-    def __call__(self, output: str, expected_output: str):
-        # Return a dict with any of: passed (bool), score (float),
-        # label (str), details (str). All are optional.
-        passed = output.strip() == expected_output.strip()
-
-        return {"passed": passed, "score": 1.0 if passed else 0.0}
-`,
-  inputs: [
-    { identifier: "output", type: "str" },
-    { identifier: "expected_output", type: "str" },
-  ],
-  outputs: CODE_EVALUATOR_OUTPUT_FIELDS.map((field) => ({ ...field })),
-};
-
-/** checkType prefix routing a monitor/evaluation to a stored code evaluator. */
-export const CODE_EVALUATOR_CHECK_PREFIX = "code/";
-
-export const isCodeEvaluatorCheckType = (evaluatorType: string): boolean =>
-  evaluatorType.startsWith(CODE_EVALUATOR_CHECK_PREFIX);
-
-export const codeEvaluatorIdFromCheckType = (
-  evaluatorType: string,
-): string | undefined =>
-  isCodeEvaluatorCheckType(evaluatorType)
-    ? evaluatorType.slice(CODE_EVALUATOR_CHECK_PREFIX.length)
-    : undefined;
+export const DEFAULT_CODE_EVALUATOR_CONFIG: CodeEvaluatorConfig =
+  defaultCodeEvaluatorConfig;
 
 const stripValues = (fields: CodeEvaluatorConfig["inputs"]): Field[] =>
   fields.map(({ identifier, type }) => ({

@@ -4,7 +4,7 @@ import {
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
 
-import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
+import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -12,7 +12,6 @@ export interface RoleBindingScope {
   scopeType: RoleBindingScopeType;
   scopeId: string;
 }
-
 /**
  * The teams an organization actually shares, which is every team except the
  * personal workspace each member gets to themselves.

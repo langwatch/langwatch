@@ -1,14 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import {
   commitMessageSchema,
   versionSchema,
-} from "~/prompts/schemas/field-schemas";
+} from "@langwatch/prompt-contract";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {

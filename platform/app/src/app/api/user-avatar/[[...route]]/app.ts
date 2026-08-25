@@ -16,6 +16,11 @@
  * Spec: specs/settings/user-avatar.feature
  */
 import { Readable } from "node:stream";
+import {
+  safeUserAvatarMediaType,
+  USER_AVATAR_OWNER_KIND,
+  USER_AVATAR_PURPOSE,
+} from "@langwatch/user-contract";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
@@ -26,11 +31,6 @@ import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "~/server/stored-objects/media-response";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import {
-  AVATAR_OWNER_KIND,
-  AVATAR_PURPOSE,
-  safeAvatarMediaType,
-} from "~/server/user-avatar/avatar";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
 import { dualAuth } from "../../middleware/dual-auth";
 
@@ -54,7 +54,7 @@ function streamAvatarResponse({
   method: "GET" | "HEAD";
 }): Response {
   const headers: Record<string, string> = {
-    "Content-Type": safeAvatarMediaType(row.media_type),
+    "Content-Type": safeUserAvatarMediaType(row.media_type),
     "Content-Length": String(row.size_bytes),
     // Content-addressed id => the bytes at a URL never change, so the browser
     // can cache aggressively. A new upload mints a new id (new URL), and a
@@ -113,8 +113,8 @@ async function handleAvatarRead(
   // readable route from serving trace/scenario media (see file header).
   if (
     !result ||
-    result.row.purpose !== AVATAR_PURPOSE ||
-    result.row.owner_kind !== AVATAR_OWNER_KIND
+    result.row.purpose !== USER_AVATAR_PURPOSE ||
+    result.row.owner_kind !== USER_AVATAR_OWNER_KIND
   ) {
     return jsonResponse({ status: "not_found" }, 404);
   }

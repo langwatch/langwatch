@@ -68,7 +68,7 @@ import type {
   LangyTurnAccessStore,
   LangyTurnHandoffStore,
 } from "@langwatch/langy-server";
-import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import type { Session } from "~/server/auth";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "@langwatch/prompt-contract";

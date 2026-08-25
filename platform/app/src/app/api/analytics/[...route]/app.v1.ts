@@ -7,7 +7,6 @@ import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 
@@ -66,7 +65,7 @@ export function registerAnalyticsRoutes(
       };
 
       try {
-        const analyticsService = getApp().analytics.service;
+        const analyticsService = c.app.analytics;
         const timeseriesResult = await analyticsService.getTimeseries(input);
         return c.json(timeseriesResult);
       } catch (e) {

@@ -1,14 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import type { CustomGraph, Prisma } from "~/generated/prisma/client";
-import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
-import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -47,12 +42,24 @@ const updateGraphSchema = z.object({
   filters: z.record(z.string(), z.unknown()).optional(),
 });
 
-function toGraphResponse(graph: CustomGraph) {
+function toGraphResponse(graph: {
+  id: string;
+  name: string;
+  graph: Record<string, unknown>;
+  filters: Record<string, unknown> | null;
+  dashboardId: string | null;
+  gridColumn: number;
+  gridRow: number;
+  colSpan: number;
+  rowSpan: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
   return {
     id: graph.id,
     name: graph.name,
-    graph: (graph.graph ?? {}) as Record<string, unknown>,
-    filters: (graph.filters ?? null) as Record<string, unknown> | null,
+    graph: graph.graph,
+    filters: graph.filters,
     dashboardId: graph.dashboardId,
     gridColumn: graph.gridColumn,
     gridRow: graph.gridRow,
@@ -95,15 +102,9 @@ secured.access(requires("analytics:view")).get(
     const { dashboardId } = c.req.valid("query");
     logger.info({ projectId: project.id, dashboardId }, "Listing graphs");
 
-    const graphs = await prisma.customGraph.findMany({
-      where: {
-        projectId: project.id,
-        kind: BUILDER_CHART_KIND,
-        ...(dashboardId ? { dashboardId } : {}),
-      },
-      orderBy: dashboardId
-        ? [{ gridRow: "asc" }, { gridColumn: "asc" }]
-        : { createdAt: "desc" },
+    const graphs = await c.app.dashboard.listGraphs({
+      projectId: project.id,
+      ...(dashboardId === undefined ? {} : { dashboardId }),
     });
 
     return c.json(graphs.map(toGraphResponse));
@@ -137,15 +138,15 @@ secured.access(requires("analytics:view")).get(
     const project = c.get("project");
     const { id } = c.req.param();
 
-    const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
-    });
-
-    if (!graph) {
-      return c.json({ error: "Graph not found" }, 404);
+    try {
+      const graph = await c.app.dashboard.getGraph({ projectId: project.id, graphId: id });
+      return c.json(toGraphResponse(graph));
+    } catch (error) {
+      if (error instanceof Error && error.name === "GraphNotFoundError") {
+        return c.json({ error: "Graph not found" }, 404);
+      }
+      throw error;
     }
-
-    return c.json(toGraphResponse(graph));
   },
 );
 
@@ -173,40 +174,27 @@ secured.access(requires("analytics:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating graph");
 
-    if (
-      body.dashboardId &&
-      !(await dashboardBelongsToProject(prisma, body.dashboardId, project.id))
-    ) {
-      return c.json({ error: "Dashboard not found" }, 404);
-    }
-
-    // Deliberately not filtered by `kind`: the grid is one shared space, so the
-    // next free row has to account for every chart occupying it. Scoping this to
-    // builder rows would place a new chart on top of a saved workbench chart the
-    // moment those gain dashboard placement.
-    let gridRow = body.gridRow;
-    if (gridRow === undefined && body.dashboardId) {
-      const lastGraph = await prisma.customGraph.findFirst({
-        where: { dashboardId: body.dashboardId, projectId: project.id },
-        orderBy: { gridRow: "desc" },
-      });
-      gridRow = (lastGraph?.gridRow ?? -1) + 1;
-    }
-
-    const graph = await prisma.customGraph.create({
-      data: {
-        id: nanoid(),
-        name: body.name,
-        graph: body.graph as Prisma.InputJsonValue,
+    let graph;
+    try {
+      graph = await c.app.dashboard.createGraph({
         projectId: project.id,
-        filters: (body.filters ?? {}) as Prisma.InputJsonValue,
-        dashboardId: body.dashboardId ?? null,
-        gridColumn: body.gridColumn ?? 0,
-        gridRow: gridRow ?? 0,
-        colSpan: body.colSpan ?? 1,
-        rowSpan: body.rowSpan ?? 1,
-      },
-    });
+        name: body.name,
+        graph: body.graph,
+        ...(body.filters === undefined ? {} : { filters: body.filters }),
+        ...(body.dashboardId === undefined ? {} : { dashboardId: body.dashboardId }),
+        layout: {
+          ...(body.gridColumn === undefined ? {} : { gridColumn: body.gridColumn }),
+          ...(body.gridRow === undefined ? {} : { gridRow: body.gridRow }),
+          ...(body.colSpan === undefined ? {} : { colSpan: body.colSpan }),
+          ...(body.rowSpan === undefined ? {} : { rowSpan: body.rowSpan }),
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "DashboardNotFoundError") {
+        return c.json({ error: "Dashboard not found" }, 404);
+      }
+      throw error;
+    }
 
     return c.json(toGraphResponse(graph), 201);
   },
@@ -241,26 +229,21 @@ secured.access(requires("analytics:update")).patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
-    });
-
-    if (!graph) {
-      return c.json({ error: "Graph not found" }, 404);
+    let updated;
+    try {
+      updated = await c.app.dashboard.updateGraph({
+        projectId: project.id,
+        graphId: id,
+        ...(body.name === undefined ? {} : { name: body.name }),
+        ...(body.graph === undefined ? {} : { graph: body.graph }),
+        ...(body.filters === undefined ? {} : { filters: body.filters }),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "GraphNotFoundError") {
+        return c.json({ error: "Graph not found" }, 404);
+      }
+      throw error;
     }
-
-    const updated = await prisma.customGraph.update({
-      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
-      data: {
-        ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.graph !== undefined
-          ? { graph: body.graph as Prisma.InputJsonValue }
-          : {}),
-        ...(body.filters !== undefined
-          ? { filters: body.filters as Prisma.InputJsonValue }
-          : {}),
-      },
-    });
 
     return c.json(toGraphResponse(updated));
   },
@@ -296,17 +279,14 @@ secured.access(requires("analytics:manage")).delete(
     const project = c.get("project");
     const { id } = c.req.param();
 
-    const graph = await prisma.customGraph.findFirst({
-      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
-    });
-
-    if (!graph) {
-      return c.json({ error: "Graph not found" }, 404);
+    try {
+      await c.app.dashboard.deleteGraph({ projectId: project.id, graphId: id });
+    } catch (error) {
+      if (error instanceof Error && error.name === "GraphNotFoundError") {
+        return c.json({ error: "Graph not found" }, 404);
+      }
+      throw error;
     }
-
-    await prisma.customGraph.delete({
-      where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },
-    });
 
     return c.json({ id, deleted: true });
   },

@@ -5,7 +5,7 @@ import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
 import type {
   ScheduledJobRecord,
-  ScheduledJobRepository,
+  ScheduledJobStore,
 } from "../scheduler.types";
 
 // The abandon path must be OBSERVABLE — assert captureException fires.
@@ -72,7 +72,7 @@ function makeJob(
  * always wins (single worker), `settleClaim` records what the policy decided.
  */
 function makeRepo(job: ScheduledJobRecord): {
-  repo: ScheduledJobRepository;
+  repo: ScheduledJobStore;
   settleClaim: ReturnType<typeof vi.fn>;
   claim: ReturnType<typeof vi.fn>;
 } {
@@ -80,7 +80,7 @@ function makeRepo(job: ScheduledJobRecord): {
   let earliestServed = false;
   const settleClaim = vi.fn(async () => true);
   const claim = vi.fn(async () => true);
-  const repo: ScheduledJobRepository = {
+  const repo: ScheduledJobStore = {
     findDue: vi.fn(async () => {
       if (dueServed) return [];
       dueServed = true;
@@ -357,11 +357,11 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
      * catch-up and fast-forward, never replay every missed slot.
      */
     function makeStatefulRepo(initial: ScheduledJobRecord): {
-      repo: ScheduledJobRepository;
+      repo: ScheduledJobStore;
       getJob: () => ScheduledJobRecord;
     } {
       let job = { ...initial };
-      const repo: ScheduledJobRepository = {
+      const repo: ScheduledJobStore = {
         findDue: vi.fn(async ({ now }: { now: Date }) =>
           job.active && job.nextRunAt.getTime() <= now.getTime()
             ? [{ ...job }]

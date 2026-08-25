@@ -1,5 +1,3 @@
-import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { describeRoute, resolver } from "hono-openapi";
 import {
   createProjectApp,
@@ -7,8 +5,6 @@ import {
   type SecuredApp,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
@@ -90,7 +86,7 @@ function registerUsageRoute(
       const { windowStartMs, windowEndMs } = c.req.valid("query");
       const window =
         windowStartMs !== undefined && windowEndMs !== undefined
-          ? { start: new Date(windowStartMs), end: new Date(windowEndMs) }
+          ? { startMs: windowStartMs, endMs: windowEndMs }
           : undefined;
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
@@ -100,20 +96,19 @@ function registerUsageRoute(
       // ClickHouse partitions and to avoid summing a multi-org user's
       // spend across every org. Absent when the org never minted an
       // ingestion source, in which case there is no ledger traffic.
-      const team = await prisma.team.findUnique({
-        where: { id: project.teamId },
-        select: { organizationId: true },
-      });
-      const governanceProject = team
-        ? await findHiddenGovernanceProject({
-            prisma,
-            organizationId: team.organizationId,
+      const organizationId =
+        c.get("apiKeyOrganizationId") ??
+        (await c.var.langwatchApp.organizations.getOrganizationIdByTeamId(
+          project.teamId,
+        ));
+      const governanceProject = organizationId
+        ? await c.var.langwatchApp.projects.tryFindInternal({
+            organizationId,
+            kind: "internal_governance",
           })
         : null;
 
-      const usage = PersonalUsageService.create(
-        getApp().governance.personalUsage,
-      );
+      const usage = c.var.langwatchApp.governance.personalUsage;
       const input = {
         personalProjectId: project.id,
         userId: ownerUserId,

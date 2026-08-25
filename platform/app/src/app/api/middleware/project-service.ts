@@ -1,16 +1,12 @@
 import type { MiddlewareHandler } from "hono";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import { prisma } from "~/server/db";
+import type { ProjectService } from "@langwatch/project-contract";
+import { appFromContext } from "~/app/api/middleware/app-context";
 
 export type ProjectServiceMiddlewareVariables = {
   projectService: ProjectService;
 };
 
 export const projectServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set(
-    "projectService",
-    new ProjectService(new PrismaProjectRepository(prisma)),
-  );
+  c.set("projectService", appFromContext(c).projects);
   await next();
 };

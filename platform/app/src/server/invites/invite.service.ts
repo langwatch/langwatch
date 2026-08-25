@@ -17,7 +17,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
-import { RoleService } from "../role/role.service";
+import type { RoleService } from "@langwatch/role-contract";
 import {
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
@@ -59,7 +59,7 @@ const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { TeamUserRole } from "~/generated/prisma/client";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import { LiteMemberViewerOnlyError } from "@langwatch/organization-contract";
 import { getApp } from "../app-layer/app";
 import type {
   PlanProvider,
@@ -295,18 +295,18 @@ export class InviteService {
     options?: {
       planProvider?: PlanProvider;
       authzGrants?: AuthzGrantsService;
+      roleService?: RoleService;
     },
   ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
     const provider: PlanProvider = options?.planProvider ?? {
       getActivePlan: (params) => getApp().planProvider.getActivePlan(params),
     };
-    const roleService = new RoleService(prisma);
     return new InviteService(
       prisma,
       licenseRepo,
       provider,
-      roleService,
+      options?.roleService,
       options?.authzGrants,
     );
   }
@@ -970,9 +970,9 @@ export class InviteService {
     // Through the role service, which is where assignability is defined: an
     // invite validated against a different rule than `applyInvite` applies
     // would be accepted here and silently dropped on acceptance.
-    const roleService = this.roleService ?? new RoleService(this.prisma);
+    const roleService = this.roleService ?? getApp().roles;
     const validCustomRoleIds = new Set(
-      await roleService.filterAssignableRoleIds({
+      await roleService.filterAssignable({
         roleIds: customRoleIds,
         organizationId,
       }),
@@ -1407,7 +1407,7 @@ export class InviteService {
         .filter((m) => m.role === TeamUserRole.CUSTOM && m.customRoleId)
         .map((m) => m.customRoleId!);
       if (customRoleIds.length > 0) {
-        const validRoles = await this.roleService.filterAssignableRoleIds({
+        const validRoles = await this.roleService.filterAssignable({
           roleIds: customRoleIds,
           organizationId: invite.organizationId,
         });

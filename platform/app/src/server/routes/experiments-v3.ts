@@ -256,6 +256,7 @@ secured.access(sessionAuth).post(
         datasetId: request.dataset_id,
         parameters: request.parameters,
       },
+      { evaluators: c.app.evaluators },
     );
 
     if ("error" in dataResult) {
@@ -591,6 +592,7 @@ secured.access(apiKeyAuthRun).post(
         datasetId: runInputs.dataset_id,
         parameters: runInputs.parameters,
       },
+      { evaluators: c.app.evaluators },
     );
 
     if ("error" in dataResult) {

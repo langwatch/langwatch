@@ -336,9 +336,17 @@ describe("trace dedup OOM safety", () => {
       __dirname,
       "..",
       "..",
-      "app-layer",
-      "simulations",
+      "..",
+      "..",
+      "..",
+      "..",
+      "packages",
+      "features",
+      "simulation",
+      "server",
+      "src",
       "repositories",
+      "clickhouse",
       "simulation.clickhouse.repository.ts",
     );
     const simulationRepoSource = fs.readFileSync(simulationRepoPath, "utf-8");
@@ -349,16 +357,25 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // experiment-run.service.ts: entire file (@regression #3158)
+  // Canonical Experiment run repository: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
-  describe("ExperimentRunService (entire file)", () => {
+  describe("ClickHouseExperimentRunRepository (entire file)", () => {
     const experimentRunServicePath = path.resolve(
       __dirname,
       "..",
       "..",
-      "experiments-v3",
-      "services",
-      "experiment-run.service.ts",
+      "..",
+      "..",
+      "..",
+      "..",
+      "packages",
+      "features",
+      "experiment",
+      "server",
+      "src",
+      "repositories",
+      "clickhouse",
+      "clickhouse.experiment-run.repository.ts",
     );
     const experimentRunServiceSource = fs.readFileSync(
       experimentRunServicePath,

@@ -85,10 +85,7 @@ import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
-import type { GithubInstallationsService } from "./github/github-installations.service";
-import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
-import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
-import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import type { GithubService } from "@langwatch/github-contract";
 import type { LangyService } from "@langwatch/langy-contract";
 import type { BlobStoreService } from "./ops/blob-store.service";
 import type { EventExplorerService } from "./ops/event-explorer.service";
@@ -365,18 +362,7 @@ export interface AppDependencies {
    * The organization's GitHub connection, consumed by Langy for writes and by
    * pull-request linkage for reads.
    */
-  github: {
-    installations: GithubInstallationsService;
-    /**
-     * Branch to pull-request linkage: the mapping that discovers and stores
-     * them, the live status read, and the store both sit on.
-     */
-    pullRequests: {
-      mapping: GithubPullRequestMappingService;
-      status: GithubPullRequestStatusService;
-      repository: GithubPullRequestsRepository;
-    };
-  };
+  github: GithubService;
   /** Cross-tenant stored-object lookups — the documented, project-filter-free
    *  exception `/api/files/:id` uses to resolve an id's owning project before
    *  every subsequent read switches back to a project-scoped client. */

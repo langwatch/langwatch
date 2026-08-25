@@ -28,7 +28,6 @@ import { traced } from "../../../app-layer/tracing";
 import { prisma } from "../../../db";
 import { createLicenseEnforcementService } from "../../../license-enforcement";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -116,7 +115,7 @@ describe("organization.setMemberDisabled", () => {
 
     globalForApp.__langwatch_app = createTestApp({
       organizations: traced(
-        new OrganizationService(repo, new PromptTagRepository(prisma)),
+        new OrganizationService(repo, createTestApp().prompts),
         "OrganizationService",
       ),
       // `createTestApp` otherwise pins FREE_PLAN, whose single seat is not the

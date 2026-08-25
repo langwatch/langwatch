@@ -119,8 +119,7 @@ export class OnboardingChecksService {
    */
   private async getSimulationsCount(projectId: string): Promise<number> {
     try {
-      const facade = getApp().simulations.runs;
-      const scenarioSets = await facade.getScenarioSetsData({
+      const scenarioSets = await getApp().simulations.getScenarioSetsData({
         projectId,
       });
       return scenarioSets.length > 0 ? 1 : 0;

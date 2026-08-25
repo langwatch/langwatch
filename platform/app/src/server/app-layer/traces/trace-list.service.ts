@@ -1,7 +1,9 @@
 import { createLogger } from "@langwatch/observability";
+import type {
+  EvaluationService,
+  EvaluationSummary,
+} from "@langwatch/evaluation-contract";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
@@ -106,7 +108,7 @@ export interface TraceListItem {
 export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
-  evaluations: Record<string, EvalSummary[]>;
+  evaluations: Record<string, EvaluationSummary[]>;
   nextCursor: TraceListCursor | null;
 }
 
@@ -488,7 +490,7 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
 export class TraceListService {
   constructor(
     private readonly repository: TraceListRepository,
-    private readonly evaluationRunService: EvaluationRunService,
+    private readonly evaluations: EvaluationService,
     private readonly topicService: TopicService,
   ) {}
 
@@ -544,11 +546,11 @@ export class TraceListService {
     const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
-    const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
-      params.tenantId,
+    const evaluations = await this.evaluations.findSummariesByTraceIds({
+      tenantId: params.tenantId,
       traceIds,
-      params.timeRange.from,
-    );
+      since: params.timeRange.from,
+    });
 
     // Tease input/output/error previews and user-authored labels of items
     // beyond the caller's visibility window — existence and counts stay

@@ -12,37 +12,15 @@
 import {
   NoEligibleProvidersError,
   PersonalVirtualKeyNotFoundError,
-  PersonalVirtualKeyService,
   RoutingPolicyHasNoProvidersError,
-} from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+} from "@langwatch/enterprise-governance-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-/**
- * Service options for VK lifecycle calls. Forwards the gateway-URL
- * env signal so the service can pick the right default for the
- * deployment shape: explicit `LW_GATEWAY_BASE_URL` always wins,
- * otherwise SaaS gets `gateway.langwatch.ai` and self-hosted falls
- * back to `http://localhost:5563` (the Docker port the AI gateway
- * binds to). Without this, fresh self-hosted installs displayed the
- * production gateway URL on the VK reveal card and the user's curl
- * routed to the wrong place (Ariana QA option-C dogfood finding).
- */
-const gatewayUrlOptions = () => ({
-  // LW_GATEWAY_PUBLIC_URL is the unambiguous TS-side public-URL var.
-  // LW_GATEWAY_BASE_URL is the legacy fallback — kept for SaaS deploys
-  // where the value still carried the public URL before the Go gateway
-  // started hijacking the same name for control-plane discovery.
-  gatewayBaseUrl: env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL,
-  isSaas: env.IS_SAAS,
-});
 
 async function assertOrgMembership({
   prisma,
@@ -122,10 +100,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         }
       }
 
-      const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        ...gatewayUrlOptions(),
-      });
-      const keys = await service.list({
+      const keys = await ctx.app.governance.personalVirtualKeys.list({
         userId: principalUserId,
         organizationId: input.organizationId,
       });
@@ -166,8 +141,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
 
       // Make sure the personal workspace exists (lazy backfill for users
       // who joined the org before we shipped this feature).
-      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
-      const workspace = await workspaceService.ensure({
+      const workspace = await ctx.app.organizations.ensurePersonalWorkspace({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         displayName: ctx.session.user.name,
@@ -194,12 +168,9 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         });
       }
 
-      const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        ...gatewayUrlOptions(),
-      });
       let issued;
       try {
-        issued = await service.issue({
+        issued = await ctx.app.governance.personalVirtualKeys.issue({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           personalProjectId: workspace.project.id,
@@ -255,11 +226,8 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
-      const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        ...gatewayUrlOptions(),
-      });
       try {
-        await service.revoke({
+        await ctx.app.governance.personalVirtualKeys.revoke({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           virtualKeyId: input.id,
