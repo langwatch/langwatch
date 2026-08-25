@@ -77,10 +77,24 @@ describe("given a hosted deployment", () => {
       expect(screen.getByTestId("front-door-tagline")).toBeTruthy();
     });
 
+    /** @scenario The case panel claims nothing it has not been given */
     it("leaves the trusted-by slot out until something fills it", () => {
       renderShell();
 
+      const panel = screen.getByTestId("front-door-value-panel");
+
+      expect(screen.getByTestId("front-door-headline")).toBeTruthy();
+      expect(screen.getByTestId("front-door-tagline")).toBeTruthy();
       expect(screen.queryByTestId("front-door-trust")).toBeNull();
+      // Nothing borrowed: the wordmark is ours and lives in its own slot, so
+      // the rest of the panel carries no mark at all. A row of integration
+      // logos lived here once and argued the wrong thing — that we are
+      // compatible, when the question being asked is whether anyone trusts us.
+      const marks = panel.querySelectorAll("svg, img");
+      const wordmark = screen.getByTestId("front-door-panel-logo");
+      for (const mark of marks) {
+        expect(wordmark.contains(mark)).toBe(true);
+      }
     });
 
     it("renders the plain card when there is no case to make", () => {
