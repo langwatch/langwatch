@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text, VisuallyHidden } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 import "../auth.css";
@@ -22,12 +22,19 @@ import { MONO_FONT } from "../authTheme";
 export function AuthField({
   label,
   labelEnd,
+  labelHidden = false,
   error,
   children,
 }: {
   label: string;
   /** The label line's far end: a quiet link, nothing louder. */
   labelEnd?: ReactNode;
+  /**
+   * The label stays the field's accessible name and stops being a line on
+   * screen. For the one-field step whose placeholder already says the whole
+   * thing — an email box reading you@company.com needs no caption above it.
+   */
+  labelHidden?: boolean;
   error?: FieldError;
   children: (id: string) => ReactNode;
 }) {
@@ -35,32 +42,38 @@ export function AuthField({
 
   return (
     <Box width="full">
-      {/* Centred when the label stands alone, because everything else on this
-          card is: the title, the button's word, the divider, the method rail
-          and the footer all sit on the centre line, and a lone label pinned
-          left was the one thing that did not. It goes back to a two-ended row
-          the moment there is something to put at the far end — a centred
-          label with a link hanging off the right of it is not centred, it is
-          two things fighting. */}
-      <HStack
-        width="full"
-        justify={labelEnd ? "space-between" : "center"}
-        marginBottom="7px"
-      >
-        {/* The site's small technical voice: mono, spaced, quiet — the same
-            register the "or" divider speaks in. */}
-        <Text
-          asChild
-          fontFamily={MONO_FONT}
-          fontSize="11px"
-          textTransform="uppercase"
-          letterSpacing="0.14em"
-          color="fg.muted"
-        >
+      {labelHidden ? (
+        <VisuallyHidden asChild>
           <label htmlFor={id}>{label}</label>
-        </Text>
-        {labelEnd ?? null}
-      </HStack>
+        </VisuallyHidden>
+      ) : (
+        /* Centred when the label stands alone, because everything else on this
+           card is: the title, the button's word, the divider, the method rail
+           and the footer all sit on the centre line, and a lone label pinned
+           left was the one thing that did not. It goes back to a two-ended row
+           the moment there is something to put at the far end — a centred
+           label with a link hanging off the right of it is not centred, it is
+           two things fighting. */
+        <HStack
+          width="full"
+          justify={labelEnd ? "space-between" : "center"}
+          marginBottom="7px"
+        >
+          {/* The site's small technical voice: mono, spaced, quiet — the same
+              register the "or" divider speaks in. */}
+          <Text
+            asChild
+            fontFamily={MONO_FONT}
+            fontSize="11px"
+            textTransform="uppercase"
+            letterSpacing="0.14em"
+            color="fg.muted"
+          >
+            <label htmlFor={id}>{label}</label>
+          </Text>
+          {labelEnd ?? null}
+        </HStack>
+      )}
       {children(id)}
       {error?.message ? (
         <Text

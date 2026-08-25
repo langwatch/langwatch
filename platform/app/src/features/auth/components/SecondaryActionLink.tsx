@@ -39,18 +39,17 @@ export function SecondaryActionLink({
         fontSize="13px"
         fontWeight={500}
         color="fg.muted"
-        paddingX="3"
-        paddingY="1.5"
-        borderRadius={SHAPE.control}
-        transition="color 0.15s ease, background-color 0.15s ease"
+        transition="color 0.15s ease"
         _hover={{
           color: "fg",
-          backgroundColor: "auth.fieldBg",
+          textDecoration: "underline",
+          textUnderlineOffset: "3px",
         }}
         _focusVisible={{
           outline: "2px solid",
           outlineColor: "fg.subtle",
           outlineOffset: "2px",
+          borderRadius: SHAPE.control,
         }}
         data-testid={testId}
       >
