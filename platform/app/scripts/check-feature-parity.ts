@@ -455,6 +455,7 @@ const LEGACY_INERT: string[] = [
   // file as it lands. Remove each entry with its first binding.
   "specs/identity/org-admin-identity-surface.feature",
   "specs/identity/platform-ops-identity-lookup.feature",
+  "specs/identity/scim-reconciliation-surfaces.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",
