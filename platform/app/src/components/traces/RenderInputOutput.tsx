@@ -1,209 +1,106 @@
-import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
-import React, { useMemo, useState } from "react";
+import React from "react";
+import { TraceInputOutput, type TraceJsonViewOptions } from "@langwatch/trace-web";
 import type { SpanInputOutput } from "~/server/tracer/types";
-import { collectMediaParts } from "~/shared/traces/mediaParts";
-import dynamic from "~/utils/compat/next-dynamic";
+import { collectMediaParts, type MediaPartData } from "~/shared/traces/mediaParts";
 import { isPythonRepr, parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
+import dynamic from "~/utils/compat/next-dynamic";
 import { CopyIcon } from "../icons/Copy";
 import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
-import { TraceMediaStrip } from "./TraceMediaStrip";
+import { TraceMediaPart } from "./TraceMediaPart";
 
-// Must be outside the component — React.lazy creates a new type on each call,
-// so calling dynamic() inside render causes infinite suspend loops.
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
   loading: () => <div />,
 });
 
+type RenderInputOutputProps = {
+  value: SpanInputOutput["value"] | string | undefined;
+  showTools?: boolean | "copy-only";
+  collapsed?: ReactJsonViewProps["collapsed"];
+  collapseStringsAfterLength?: ReactJsonViewProps["collapseStringsAfterLength"];
+};
+
 export const RenderInputOutput = React.memo(function RenderInputOutput(
-  props: Partial<ReactJsonViewProps> & {
-    value: SpanInputOutput["value"] | string | undefined;
-    showTools?: boolean | "copy-only";
-  },
+  props: RenderInputOutputProps,
 ) {
-  let { value } = props;
   const { colorMode } = useColorMode();
 
-  let json: object | undefined;
-  try {
-    if (value && typeof value === "string") {
-      const json_ = JSON.parse(value);
-      if (typeof json_ === "object") {
-        json = json_;
-      }
-      if (typeof json_ === "string") {
-        value = json_;
-      }
-    }
-    if (typeof value === "object" && value !== null) {
-      json = value;
-    }
-  } catch {
-    /* this is just a safe json parse fallback */
-  }
-
-  const propsWithoutValue = { ...props };
-  delete propsWithoutValue.value;
-
-  const [raw, setRaw] = useState(false);
-
-  // Traces carry media inside the message content — audio recordings,
-  // images, attachments. Surface them inline at the top (players, previews,
-  // file chips) while the JSON stays available below. Empty (the common
-  // case) → nothing extra rendered, no hook cost.
-  const mediaParts = useMemo(
-    () => collectMediaParts(json ?? value),
-    // `json` is derived from `value` (re-created via JSON.parse on every
-    // render), so listing it defeats the memo; `value` alone determines the
-    // result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [value],
-  );
-
-  const renderCopyButton = () => {
-    return (
-      <Tooltip content="Copy">
-        <Box>
-          <TinyButton
-            position="relative"
-            onClick={() => {
-              void (async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    json
-                      ? JSON.stringify(json, null, 2)
-                      : value
-                        ? typeof value === "string"
-                          ? value
-                          : JSON.stringify(value, null, 2)
-                        : `${value}`,
-                  );
-                  toaster.create({
-                    title: "Copied to clipboard",
-                    type: "success",
-                  });
-                } catch {
-                  if (
-                    window.location.protocol === "http:" &&
-                    window.location.hostname !== "localhost" &&
-                    window.location.hostname !== "127.0.0.1"
-                  ) {
-                    toaster.create({
-                      title: "Cannot copy to clipboard on HTTP",
-                      type: "error",
-                    });
-                    return;
-                  }
-                  toaster.create({
-                    title: "Failed to copy to clipboard",
-                    type: "error",
-                  });
-                }
-              })();
-            }}
-          >
-            <CopyIcon width={12} height={12} />
-          </TinyButton>
-        </Box>
-      </Tooltip>
-    );
+  const copyToClipboard = async (value: string) => {
+    await navigator.clipboard.writeText(value);
+    toaster.create({
+      title: "Copied to clipboard",
+      type: "success",
+    });
   };
 
-  const renderJson = (json: object) => {
-    const json_ = parsePythonInsideJson(json);
-
-    let forceRaw = false;
-    if (typeof json_ !== "object") {
-      forceRaw = true;
+  const onCopyFailure = () => {
+    if (
+      window.location.protocol === "http:" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+    ) {
+      toaster.create({
+        title: "Cannot copy to clipboard on HTTP",
+        type: "error",
+      });
+      return;
     }
 
-    return (
-      <>
-        {props.showTools && (
-          <HStack position="absolute" top={-2} right={-2} zIndex={1} gap="-1px">
-            {!forceRaw && props.showTools !== "copy-only" && (
-              <Tooltip content="View Raw">
-                <Box>
-                  <TinyButton
-                    onClick={() => setRaw(!raw)}
-                    background={raw ? "bg.emphasized" : "bg.muted"}
-                  >
-                    {"{}"}
-                  </TinyButton>
-                </Box>
-              </Tooltip>
-            )}
-            {renderCopyButton()}
-          </HStack>
-        )}
-        {raw || forceRaw ? (
-          <Text fontFamily="mono" fontSize="13px">
-            {JSON.stringify(json, null, 2)}
-          </Text>
-        ) : (
-          <ReactJson
-            src={json_}
-            name={false}
-            displayDataTypes={false}
-            displayObjectSize={false}
-            enableClipboard={false}
-            collapseStringsAfterLength={1000}
-            style={{
-              fontSize: "13px",
-              backgroundColor: "transparent",
-            }}
-            theme={colorMode === "dark" ? "twilight" : "rjv-default"}
-            //@ts-ignore
-            displayArrayKey={false}
-            {...propsWithoutValue}
-          />
-        )}
-      </>
-    );
+    toaster.create({
+      title: "Failed to copy to clipboard",
+      type: "error",
+    });
   };
 
-  return (
-    <Box position="relative" width="full">
-      <TraceMediaStrip parts={mediaParts} />
-      {typeof document !== "undefined" &&
-      (json ?? (typeof value === "string" && isPythonRepr(value))) ? (
-        renderJson(json ?? (value as any))
-      ) : (
-        <>
-          {props.showTools && (
-            <HStack position="absolute" top={-2} right={-2} zIndex={1} gap="-1px">
-              {renderCopyButton()}
-            </HStack>
-          )}
-          <Text fontFamily="mono" fontSize="14px">
-            {value
-              ? typeof value === "string"
-                ? value
-                : JSON.stringify(value, null, 2)
-              : `${value}`}
-          </Text>
-        </>
-      )}
-    </Box>
-  );
-});
-function TinyButton(props: ButtonProps) {
-  return (
-    <Button
-      size="xs"
-      fontSize="10px"
-      fontFamily="mono"
-      padding={1}
-      height="22px"
-      width="auto"
-      minWidth="0"
-      borderRadius="0"
-      border="1px solid"
-      borderColor="border.emphasized"
-      colorPalette="gray"
-      {...props}
+  const renderJsonViewer = (value: object, options: TraceJsonViewOptions) => (
+    <ReactJson
+      src={value}
+      name={false}
+      displayDataTypes={false}
+      displayObjectSize={false}
+      enableClipboard={false}
+      collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
+      collapsed={options.collapsed}
+      style={{
+        fontSize: "13px",
+        backgroundColor: "transparent",
+      }}
+      theme={colorMode === "dark" ? "twilight" : "rjv-default"}
+      displayArrayKey={false}
     />
   );
-}
+
+  return (
+    <TraceInputOutput
+      value={props.value}
+      showTools={props.showTools}
+      collectMediaParts={collectMediaParts}
+      renderMediaPart={(part: MediaPartData) => <TraceMediaPart part={part} />}
+      isPythonRepr={isPythonRepr}
+      parsePythonInsideJson={(value) => {
+        if (typeof value === "object" && value !== null) {
+          return parsePythonInsideJson(value);
+        }
+
+        if (typeof value === "string" && isPythonRepr(value)) {
+          const parsed = parsePythonInsideJson({ value });
+
+          if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
+            return parsed.value;
+          }
+        }
+
+        return value;
+      }}
+      renderJsonViewer={renderJsonViewer}
+      copyToClipboard={copyToClipboard}
+      onCopyFailure={onCopyFailure}
+      copyIcon={<CopyIcon width={12} height={12} />}
+      renderTooltip={(content, child) => <Tooltip content={content}>{child}</Tooltip>}
+      collapsed={props.collapsed}
+      collapseStringsAfterLength={props.collapseStringsAfterLength}
+    />
+  );
+});

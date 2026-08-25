@@ -17,6 +17,7 @@
  * lands on a named state whether the probe answers or fails.
  */
 import { Badge, Box, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatBytes } from "@langwatch/trace-web";
 import { AlertTriangle, ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
@@ -26,7 +27,6 @@ import {
   parseNotCapturedMedia,
 } from "~/shared/traces/mediaParts";
 import { api } from "~/utils/api";
-import { formatBytes } from "../ops/shared/formatters";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
 
 // ---------------------------------------------------------------------------

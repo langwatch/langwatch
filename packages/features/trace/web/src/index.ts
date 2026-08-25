@@ -9,4 +9,6 @@ export * from "./prompt-attributes";
 export * from "./sdk-info";
 export * from "./terminal-origin";
 export * from "./time-range-presets";
+export * from "./trace-input-output";
+export * from "./trace-media-strip";
 export * from "./url-state";

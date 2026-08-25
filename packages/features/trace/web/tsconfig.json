@@ -3,6 +3,7 @@
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -11,5 +12,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }

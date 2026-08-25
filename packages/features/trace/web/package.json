@@ -19,8 +19,23 @@
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7"
+  },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }
