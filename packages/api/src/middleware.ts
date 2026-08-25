@@ -1,5 +1,7 @@
 import {
+  classifyClient,
   createLogger,
+  endpointClassOf,
   getStatusCodeFromError,
   logHttpRequest,
 } from "@langwatch/observability";
@@ -191,6 +193,10 @@ export function loggerMiddleware(options?: { name?: string }) {
             duration,
             userAgent: c.req.header("user-agent") ?? null,
             error: requestError,
+            attribution: {
+              endpointClass: endpointClassOf(c.req.path),
+              ...classifyClient((name) => c.req.header(name)),
+            },
             extra: {
               ...(route ? { route } : {}),
               ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),

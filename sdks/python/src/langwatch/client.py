@@ -22,6 +22,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
 from .utils.auth import build_auth_headers
+from .utils.sdk_identity import build_sdk_identity_headers
 
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 
@@ -733,7 +734,7 @@ class Client(LangWatchClientProtocol):
                 api_key=Client._api_key,
                 project_id=Client._project_id,
             ),
-            "X-LangWatch-SDK-Version": str(__version__),
+            **build_sdk_identity_headers(str(__version__)),
         }
 
         if Client._debug:
@@ -773,10 +774,13 @@ class Client(LangWatchClientProtocol):
         """
         Sets up the REST API client for the client.
         """
-        headers = build_auth_headers(
-            api_key=Client._api_key,
-            project_id=Client._project_id,
-        )
+        headers = {
+            **build_auth_headers(
+                api_key=Client._api_key,
+                project_id=Client._project_id,
+            ),
+            **build_sdk_identity_headers(str(__version__)),
+        }
         rest_api_client = LangWatchApiClient(
             base_url=Client._endpoint_url,
             headers=headers,
