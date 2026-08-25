@@ -14,7 +14,7 @@ import type {
   SelfServeIssuedDnsRecord,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
-import { RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { domainNextStepFor } from "~/features/sso/logic/domainNextStep";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
@@ -111,9 +111,12 @@ export function DomainsSection({
           .
         </Text>
       ) : (
-        <Table.Root size="sm">
+        // Hairlines, not a filled band. The default header wears a solid
+        // fill, which on a three-row table reads as a heavier object than the
+        // thing it labels — and the rows underneath it are the content.
+        <Table.Root size="sm" variant="line">
           <Table.Header>
-            <Table.Row>
+            <Table.Row background="transparent">
               <Table.ColumnHeader>Domain</Table.ColumnHeader>
               <Table.ColumnHeader>Status</Table.ColumnHeader>
               <Table.ColumnHeader />
@@ -147,14 +150,18 @@ export function DomainsSection({
 
       {canManage && (
         <VStack align="stretch" gap={2}>
-          <HStack align="stretch">
+          {/* Both at their own height, aligned on the centre line. The button
+              used to be stretched to match the field — `height="auto"` inside
+              an `align="stretch"` row — which made a control twice as tall as
+              any other button on the page and flattened its label against the
+              top of it. */}
+          <HStack align="center">
             <Input
               placeholder="Domain, for example acme.com"
               value={domain}
               onChange={(event) => setDomain(event.target.value)}
             />
             <Button
-              height="auto"
               flexShrink={0}
               loading={claim.isPending}
               onClick={() =>
@@ -271,6 +278,9 @@ function DomainRow({
             label={chip.label}
             tone={chip.tone}
             title={chip.title}
+            // A settled domain is the one state somebody scans this table
+            // for, and green alone is a channel some readers do not have.
+            icon={chip.tone === "good" ? <Check size={12} /> : undefined}
           />
           {/* WHAT HAPPENS NEXT, IN WORDS. A chip is a label, not an
               instruction, and this row's whole job is to move somebody

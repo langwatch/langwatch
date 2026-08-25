@@ -177,12 +177,19 @@ export function IdentityChip({
   label,
   tone = "neutral",
   title,
+  icon,
   "data-testid": testId,
 }: {
   label: string;
   tone?: "neutral" | "good" | "warning" | "bad";
   /** The longer explanation, on hover. */
   title?: string;
+  /**
+   * A mark before the word, for the states worth recognising without
+   * reading — a settled one most of all. Colour alone carries it today, and
+   * colour is the one channel some readers do not have.
+   */
+  icon?: ReactNode;
   "data-testid"?: string;
 }) {
   const palette =
@@ -201,7 +208,9 @@ export function IdentityChip({
       colorPalette={palette}
       title={title}
       data-testid={testId}
+      gap={1}
     >
+      {icon}
       {label}
     </Badge>
   );
