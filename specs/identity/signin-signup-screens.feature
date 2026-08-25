@@ -68,6 +68,18 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
     When I try to sign in with a different method for the same email
     Then the screen names my organization's sign-in method as the way in
 
+  # A pending conditional-mediation request is supposed to be invisible, but a
+  # third-party passkey provider (1Password) answers it with its own unlock
+  # sheet the moment it starts. Opening the page must therefore not start one:
+  # somebody who came to read the page owes it no ceremony.
+  @integration
+  Scenario: The passkey offer waits until I reach for the address field
+    Given this deployment offers passkeys
+    When the sign-in screen opens
+    Then no passkey request has started
+    When I focus the address field
+    Then the passkey offer starts, once, and never again for this visit
+
   # ── Sign-up ────────────────────────────────────────────────────────────
 
   # Confirming the address does NOT gate the app (revises ADR-117 §6, which

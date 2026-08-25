@@ -97,14 +97,20 @@ export const frontDoorThemeConfig = defineConfig({
            * The card is glass on both grounds: a pane over the ground rather
            * than a panel sitting on it.
            *
-           * Thinner than it was (0.4 / 0.55). At those alphas the blur was
-           * doing real work and none of it was visible — the ground's colour
-           * arrived so dilute that the card read as a flat panel that happened
-           * to have a soft edge. Glass is only glass if you can see what is
-           * behind it move.
+           * The dark floor sat at 0.42 for a while and the ground's blue
+           * bloom shone straight through it: the card's top half took the
+           * blue, its bottom half the dark, and the pane read as two
+           * surfaces. 0.54 keeps the ground legible through the glass while
+           * giving the whole card one continuous floor — see the matching
+           * recalibration on `.lw-front-door-card`'s backdrop-filter.
            */
-          cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.42)"),
-          cardBorder: mode(white(0.85), white(0.1)),
+          cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.54)"),
+          /**
+           * On paper the border is a shadow's job done with a line: a soft
+           * dark hairline. The white(0.85) it used to be read as a bright
+           * ring around the card on a pale ground — an outline, not an edge.
+           */
+          cardBorder: mode("rgba(20, 20, 23, 0.09)", white(0.1)),
           /** Fields are the same idea, one step down. */
           fieldBg: mode(white(0.62), white(0.06)),
           fieldBorder: mode("rgba(20, 20, 23, 0.14)", white(0.14)),

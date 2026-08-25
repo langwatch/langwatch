@@ -54,7 +54,7 @@ export function FrontDoorValuePanel({
         align={{ base: "center", md: "flex-start" }}
         textAlign={{ base: "center", md: "start" }}
         gap={{ base: 3, md: 6 }}
-        maxWidth="520px"
+        maxWidth="640px"
         marginInlineStart={{ base: 0, md: "min(6vw, 72px)" }}
       >
         {/* The wordmark belongs to the PAGE, not to the card. Sitting in the
@@ -71,7 +71,7 @@ export function FrontDoorValuePanel({
         </Box>
         <Heading
           as="h2"
-          fontSize="clamp(30px, 3.4vw, 52px)"
+          fontSize="clamp(30px, 3.1vw, 48px)"
           fontFamily={HEADING_FONT}
           fontWeight={400}
           // Tight tracking and sub-1 leading are DISPLAY-size devices. The
@@ -86,7 +86,7 @@ export function FrontDoorValuePanel({
           // display size. Between them it is always the right leading for the
           // size actually rendered, and there is no width at which it jumps.
           letterSpacing={{ base: "-0.018em", md: "-0.03em" }}
-          lineHeight="clamp(38px, calc(18px + 2.3vw), 54px)"
+          lineHeight="clamp(38px, calc(18px + 2.1vw), 51px)"
           // The site's `.display` treatment, value for value: the subtle
           // vertical stretch and the ligatures are what make Sentient read
           // as the site's voice rather than merely the same file.
@@ -139,16 +139,30 @@ export function FrontDoorValuePanel({
  * markup so the copy stays a single string a writer can change without
  * touching a component, and so a headline whose accent word is not in it still
  * renders the whole headline.
+ *
+ * A `\n` in the copy is a deliberate line break. `text-wrap: balance` breaks
+ * where the maths says, and the maths does not know a phrase from a hole in
+ * the ground — it gave the sign-in headline a stranded two-word middle line.
+ * A display headline's breaks are part of the writing, so the writer sets
+ * them, and balance stays only as the fallback for a width where the written
+ * lines no longer fit.
  */
 function AccentedHeadline({ text, accent }: { text: string; accent?: string }) {
-  if (!accent) return <>{text}</>;
+  const withBreaks = (part: string, keyPrefix: string) => {
+    const lines = part.split("\n");
+    return lines.flatMap((line, index) =>
+      index === 0 ? [line] : [<br key={`${keyPrefix}-${index}`} />, line],
+    );
+  };
+
+  if (!accent) return <>{withBreaks(text, "line")}</>;
 
   const at = text.indexOf(accent);
-  if (at === -1) return <>{text}</>;
+  if (at === -1) return <>{withBreaks(text, "line")}</>;
 
   return (
     <>
-      {text.slice(0, at)}
+      {withBreaks(text.slice(0, at), "before")}
       <Box
         as="span"
         backgroundImage={FRONT_DOOR_GRADIENT.accent}
@@ -159,7 +173,7 @@ function AccentedHeadline({ text, accent }: { text: string; accent?: string }) {
       >
         {accent}
       </Box>
-      {text.slice(at + accent.length)}
+      {withBreaks(text.slice(at + accent.length), "after")}
     </>
   );
 }

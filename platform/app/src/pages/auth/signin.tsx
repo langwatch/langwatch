@@ -48,7 +48,7 @@ export default function SignIn() {
       // right. The panel greets rather than pitches, because somebody logging
       // in already made the decision the sign-up headline argues for.
       <FrontDoorShell
-        headline="Let's see what your agents have been up to."
+        headline={"Let's see what your agents\nhave been up to."}
         headlineAccent="up to"
         tagline="Log in and pick up where you left off."
       >

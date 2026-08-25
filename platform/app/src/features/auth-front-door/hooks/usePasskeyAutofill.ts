@@ -57,6 +57,13 @@ async function offerPasskeyFromAutofill({
  *     by something they did not do.
  *   - it resolves only if somebody PICKS the passkey. Until then the promise
  *     simply waits, which is why there is no loading state anywhere near it.
+ *   - it waits for a gesture. The request starts on the address field's first
+ *     focus, not on page load: a pending conditional request is supposed to be
+ *     silent, but a third-party passkey provider (1Password, notably) answers
+ *     it with its own unlock sheet the moment it starts — so starting it on
+ *     load ambushes somebody who only came to read the page. The autofill list
+ *     the credential rides in only shows under a focused field anyway, so
+ *     arming on focus costs nothing.
  */
 export function usePasskeyAutofill({
   enabled,
@@ -74,14 +81,37 @@ export function usePasskeyAutofill({
     // act on it: a navigation fired from an unmounted door would take somebody
     // somewhere they had already left.
     let live = true;
+    let offered = false;
 
-    void offerPasskeyFromAutofill({
-      isLive: () => live,
-      callbackUrl,
-    });
+    const isWebauthnField = (target: EventTarget | null): boolean =>
+      target instanceof HTMLInputElement &&
+      target.matches('input[autocomplete~="webauthn"]');
+
+    const offerOnce = () => {
+      if (offered || !live) return;
+      offered = true;
+      document.removeEventListener("focusin", onFocusIn);
+      void offerPasskeyFromAutofill({
+        isLive: () => live,
+        callbackUrl,
+      });
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      if (isWebauthnField(event.target)) offerOnce();
+    };
+
+    // Somebody may already be in the field by the time the deployment's
+    // method set arrives and enables this — offer immediately then.
+    if (isWebauthnField(document.activeElement)) {
+      offerOnce();
+    } else {
+      document.addEventListener("focusin", onFocusIn);
+    }
 
     return () => {
       live = false;
+      document.removeEventListener("focusin", onFocusIn);
     };
   }, [enabled, callbackUrl]);
 }

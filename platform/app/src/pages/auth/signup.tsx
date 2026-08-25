@@ -69,7 +69,7 @@ export default function SignUp() {
       // whether anybody else trusts us. Leave it empty until there is a cleared
       // name to put in it; an empty slot beats furniture.
       <FrontDoorShell
-        headline="See what your agents are actually doing."
+        headline={"See what your agents\nare actually doing."}
         headlineAccent="actually"
         // Names the thing they are seconds away from, rather than listing what
         // the product has. "Traces, evaluations and monitoring" was a feature

@@ -45,10 +45,10 @@ import {
 /** The pitch of the ground's signal grid. Change one, change the other. */
 const CELL = 72;
 
-/** Fast enough to be a game, slow enough to be read at a glance. */
-const TICK_MS = 118;
+/** Slow enough to be watched, fast enough to still be a game. */
+const TICK_MS = 160;
 
-/** The molecule moves at two thirds of the pace. That is the difficulty. */
+/** The molecule moves at a third of the pace. That is the difficulty. */
 const CHASER_EVERY = 3;
 
 /** Where the double-tap is heard. Both front-door layouts mark their mark. */
@@ -184,10 +184,44 @@ function useKeyboard({
   }, [playing, gameRef, stop]);
 }
 
+/**
+ * What the renderer remembers that the rules do not: where the molecule is
+ * gliding FROM, when the last token went down, when the game ended. The rules
+ * are node-to-node; everything continuous about the picture lives here.
+ */
+type Effects = {
+  chaserFrom: { x: number; y: number };
+  chaserMovedAt: number;
+  burst: { x: number; y: number; at: number } | null;
+  endedAt: number | null;
+};
+
 /** One beat of the world: the snake always, the molecule every third time. */
-const tick = ({ game, ticks }: { game: SnakeGame; ticks: number }) => {
+const beat = ({
+  game,
+  ticks,
+  fx,
+  now,
+}: {
+  game: SnakeGame;
+  ticks: number;
+  fx: Effects;
+  now: number;
+}) => {
   const moved = advance(game, Math.random);
-  return ticks % CHASER_EVERY === 0 ? advanceChaser(moved) : moved;
+  if (moved.eaten > game.eaten) fx.burst = { ...px(game.token), at: now };
+
+  let next = moved;
+  if (ticks % CHASER_EVERY === 0) {
+    next = advanceChaser(moved);
+    if (next.chaser !== moved.chaser) {
+      fx.chaserFrom = moved.chaser;
+      fx.chaserMovedAt = now;
+    }
+  }
+
+  if (next.ending && fx.endedAt === null) fx.endedAt = now;
+  return next;
 };
 
 const hudOf = (game: SnakeGame) => ({
@@ -233,6 +267,12 @@ function useGameLoop({
     let frame = 0;
     let ticks = 0;
     let lastTick = performance.now();
+    const fx: Effects = {
+      chaserFrom: gameRef.current?.chaser ?? { x: 0, y: 0 },
+      chaserMovedAt: lastTick,
+      burst: null,
+      endedAt: null,
+    };
 
     const loop = (now: number) => {
       let game = gameRef.current;
@@ -240,13 +280,19 @@ function useGameLoop({
       while (game && !game.ending && now - lastTick >= TICK_MS) {
         lastTick += TICK_MS;
         ticks += 1;
-        game = tick({ game, ticks });
+        game = beat({ game, ticks, fx, now });
         gameRef.current = game;
         setHud(hudOf(game));
       }
 
       if (game)
-        paint({ context, game, progress: progressOf(game, now, lastTick) });
+        paint({
+          context,
+          game,
+          fx,
+          now,
+          progress: progressOf(game, now, lastTick),
+        });
 
       frame = requestAnimationFrame(loop);
     };
@@ -281,39 +327,172 @@ const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }) =>
 function paint({
   context,
   game,
+  fx,
+  now,
   progress,
 }: {
   context: CanvasRenderingContext2D;
   game: SnakeGame;
+  fx: Effects;
+  now: number;
   progress: number;
 }) {
   const accent = themed("detail", "#f56b1a");
   context.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-  paintToken({ context, game, accent });
-  paintSnake({ context, game, progress, accent });
-  paintMolecule({ context, game });
+  // The world dims when it is over, so the ending reads on the picture and
+  // not only in the HUD line.
+  const fade = fx.endedAt ? Math.max(0.3, 1 - (now - fx.endedAt) / 900) : 1;
+
+  paintToken({ context, game, accent, now });
+  paintBurst({ context, fx, accent, now });
+  paintSnake({ context, game, progress, accent, fade });
+  paintMolecule({ context, game, fx, now });
 }
 
 function paintToken({
   context,
   game,
   accent,
+  now,
 }: {
   context: CanvasRenderingContext2D;
   game: SnakeGame;
   accent: string;
+  now: number;
 }) {
   const at = px(game.token);
+  // A slow breath and a ripple that keeps leaving it: something worth
+  // crossing the board for, not a dropped pixel.
+  const breath = 0.5 + 0.5 * Math.sin(now / 420);
+  const ripple = (now % 1600) / 1600;
 
   context.save();
+  context.strokeStyle = accent;
+  context.globalAlpha = (1 - ripple) * 0.35;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.arc(at.x, at.y, 6 + ripple * 15, 0, Math.PI * 2);
+  context.stroke();
+
+  context.globalAlpha = 1;
   context.fillStyle = accent;
   context.shadowColor = accent;
-  context.shadowBlur = 14;
+  context.shadowBlur = 12 + breath * 9;
   context.beginPath();
-  context.arc(at.x, at.y, 4.5, 0, Math.PI * 2);
+  context.arc(at.x, at.y, 3.8 + breath * 1.2, 0, Math.PI * 2);
   context.fill();
   context.restore();
+}
+
+/** The moment of eating: one ring, out and gone. */
+function paintBurst({
+  context,
+  fx,
+  accent,
+  now,
+}: {
+  context: CanvasRenderingContext2D;
+  fx: Effects;
+  accent: string;
+  now: number;
+}) {
+  if (!fx.burst) return;
+  const t = (now - fx.burst.at) / 480;
+  if (t >= 1) {
+    fx.burst = null;
+    return;
+  }
+
+  const eased = 1 - (1 - t) * (1 - t);
+  context.save();
+  context.strokeStyle = accent;
+  context.globalAlpha = (1 - t) * 0.5;
+  context.lineWidth = 2 - t;
+  context.beginPath();
+  context.arc(fx.burst.x, fx.burst.y, 5 + eased * 24, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+/**
+ * The snake's spine in pixels, head first: the head reaching for the node it
+ * is on its way to, the tail retracting across the tick — which is what makes
+ * the crawl continuous instead of a series of hops. Split into runs wherever
+ * the lattice wrapped, so a crossing is never drawn as a dash across the
+ * whole page.
+ */
+function spineRuns(
+  game: SnakeGame,
+  progress: number,
+): { x: number; y: number }[][] {
+  const step = STEP_PIXELS[game.direction];
+  const head = px(game.snake[0]!);
+  const reaching = {
+    x: head.x + step.x * progress,
+    y: head.y + step.y * progress,
+  };
+
+  const runs: { x: number; y: number }[][] = [[reaching]];
+  for (let i = 0; i < game.snake.length; i++) {
+    const node = game.snake[i]!;
+    const before = i === 0 ? null : game.snake[i - 1]!;
+    if (before && !adjacent(before, node)) runs.push([]);
+    runs[runs.length - 1]!.push(px(node));
+  }
+
+  const last = runs[runs.length - 1]!;
+  if (last.length >= 2) {
+    const tail = last[last.length - 1]!;
+    const beforeTail = last[last.length - 2]!;
+    last[last.length - 1] = {
+      x: tail.x + (beforeTail.x - tail.x) * progress,
+      y: tail.y + (beforeTail.y - tail.y) * progress,
+    };
+  }
+
+  return runs;
+}
+
+/**
+ * Trace a run with its corners rounded: each interior node becomes a small
+ * curve rather than a right angle, which is most of what "smooth" means at
+ * this size.
+ */
+function traceRounded(
+  context: CanvasRenderingContext2D,
+  points: { x: number; y: number }[],
+) {
+  if (points.length < 2) return;
+  context.moveTo(points[0]!.x, points[0]!.y);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const at = points[i]!;
+    const before = points[i - 1]!;
+    const after = points[i + 1]!;
+    const radius = Math.min(
+      13,
+      Math.hypot(at.x - before.x, at.y - before.y) / 2,
+      Math.hypot(after.x - at.x, after.y - at.y) / 2,
+    );
+
+    const inLen = Math.hypot(at.x - before.x, at.y - before.y) || 1;
+    const outLen = Math.hypot(after.x - at.x, after.y - at.y) || 1;
+    const entry = {
+      x: at.x - ((at.x - before.x) / inLen) * radius,
+      y: at.y - ((at.y - before.y) / inLen) * radius,
+    };
+    const exit = {
+      x: at.x + ((after.x - at.x) / outLen) * radius,
+      y: at.y + ((after.y - at.y) / outLen) * radius,
+    };
+
+    context.lineTo(entry.x, entry.y);
+    context.quadraticCurveTo(at.x, at.y, exit.x, exit.y);
+  }
+
+  const end = points[points.length - 1]!;
+  context.lineTo(end.x, end.y);
 }
 
 function paintSnake({
@@ -321,46 +500,58 @@ function paintSnake({
   game,
   progress,
   accent,
+  fade,
 }: {
   context: CanvasRenderingContext2D;
   game: SnakeGame;
   progress: number;
   accent: string;
+  fade: number;
 }) {
+  const runs = spineRuns(game, progress);
+
   context.save();
-  context.strokeStyle = accent;
-  context.globalAlpha = game.ending ? 0.45 : 0.9;
-  context.lineWidth = 3;
   context.lineCap = "round";
   context.lineJoin = "round";
+  context.strokeStyle = accent;
 
-  for (let i = 0; i < game.snake.length - 1; i++) {
-    const from = game.snake[i]!;
-    const to = game.snake[i + 1]!;
-    if (!adjacent(from, to)) continue;
-
-    const a = px(from);
-    const b = px(to);
-    const last = i === game.snake.length - 2;
-
+  // A wide soft pass underneath, then the body over it: light the grid line
+  // carries, not a wire laid on top of it.
+  context.globalAlpha = 0.14 * fade;
+  context.lineWidth = 11;
+  context.shadowColor = accent;
+  context.shadowBlur = 22;
+  for (const run of runs) {
     context.beginPath();
-    context.moveTo(a.x, a.y);
-    // The tail retracts across the tick rather than vanishing on it, which
-    // is what makes the crawl continuous instead of a series of hops.
-    context.lineTo(
-      last ? a.x + (b.x - a.x) * (1 - progress) : b.x,
-      last ? a.y + (b.y - a.y) * (1 - progress) : b.y,
-    );
+    traceRounded(context, run);
     context.stroke();
   }
 
-  // ...and the head reaches for the node it is on its way to.
-  const head = px(game.snake[0]!);
-  const step = STEP_PIXELS[game.direction];
+  context.globalAlpha = 0.92 * fade;
+  context.lineWidth = 4.5;
+  context.shadowBlur = 0;
+  for (const run of runs) {
+    context.beginPath();
+    traceRounded(context, run);
+    context.stroke();
+  }
+
+  // The head: a hot cap with a white core, so the eye always knows which end
+  // is alive.
+  const head = runs[0]![0]!;
+  context.globalAlpha = fade;
+  context.fillStyle = accent;
+  context.shadowColor = accent;
+  context.shadowBlur = 16;
   context.beginPath();
-  context.moveTo(head.x, head.y);
-  context.lineTo(head.x + step.x * progress, head.y + step.y * progress);
-  context.stroke();
+  context.arc(head.x, head.y, 5, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "rgba(255, 244, 235, 0.95)";
+  context.shadowBlur = 0;
+  context.beginPath();
+  context.arc(head.x, head.y, 2, 0, Math.PI * 2);
+  context.fill();
   context.restore();
 }
 
@@ -457,21 +648,50 @@ function buildMolecule() {
 /** Not a token colour: nothing else on the front door is allowed to be this. */
 const MOLECULE_INK = "#b58cff";
 
+/** Ease both ends of a glide, so each step lands instead of stopping. */
+const easeInOut = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * Where the molecule is THIS frame: gliding between the node it left and the
+ * node the rules put it on, across the whole of its slower beat. The rules
+ * teleport it a node at a time; the glide is what the eye sees instead.
+ */
+function moleculeAt(game: SnakeGame, fx: Effects, now: number) {
+  const from = fx.chaserFrom;
+  const to = game.chaser;
+  if (!adjacent(from, to)) return px(to);
+
+  const t = easeInOut(
+    Math.min(1, (now - fx.chaserMovedAt) / (TICK_MS * CHASER_EVERY)),
+  );
+  const a = px(from);
+  const b = px(to);
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
 function paintMolecule({
   context,
   game,
+  fx,
+  now,
 }: {
   context: CanvasRenderingContext2D;
   game: SnakeGame;
+  fx: Effects;
+  now: number;
 }) {
-  const at = px(game.chaser);
+  const at = moleculeAt(game, fx, now);
+  // It is unwell: a slow tumble and a faint breath, never a straight run.
+  const tumble = Math.sin(now / 650) * 0.14;
+  const breath = 0.92 + 0.08 * Math.sin(now / 900);
 
   context.save();
-  context.translate(at.x, at.y);
-  context.scale(0.86, 0.86);
+  context.translate(at.x, at.y + Math.sin(now / 780) * 1.6);
+  context.rotate(tumble);
+  context.scale(breath, breath);
   context.strokeStyle = MOLECULE_INK;
   context.shadowColor = MOLECULE_INK;
-  context.shadowBlur = 10;
+  context.shadowBlur = 12;
   context.lineWidth = 1.4;
   context.lineJoin = "round";
   context.globalAlpha = 0.95;

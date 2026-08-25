@@ -1,5 +1,11 @@
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
-import { type CSSProperties, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import "../authFrontDoor.css";
@@ -71,6 +77,7 @@ export function FrontDoorGround({
 
   const target = useMemo(() => resolveGroundShift(stage), [stage]);
   const shift = useTweenedGround(target, { instant: reduceMotion });
+  const lensRef = useLensPointer();
 
   const live = !reduceMotion && webglSupported;
   const centered = protect === "center";
@@ -154,10 +161,49 @@ export function FrontDoorGround({
         // the centred door, whose glow is the whole composition.
         <div className="lw-front-door-signal-grid" />
       ) : null}
+      {!centered ? (
+        // Under the pointer the same grid sharpens into view — the ground
+        // stays soft everywhere the person is not. Dark only, like the grid.
+        <div ref={lensRef} className="lw-front-door-lens" />
+      ) : null}
       <div
         className="lw-front-door-ambient-protect"
         style={{ background: PROTECT_RADIAL[protect] }}
       />
     </div>
   );
+}
+
+/**
+ * Follows the pointer by writing `--lw-lens-x/y` straight onto the lens node
+ * — sixty writes a second is nothing for a style property and would be a
+ * disaster as React state. The lens fades in on the first movement and back
+ * out when the pointer leaves the page, so a keyboard-only visit never sees
+ * it at all.
+ */
+function useLensPointer() {
+  const lensRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const lens = lensRef.current;
+      if (!lens) return;
+      lens.style.setProperty("--lw-lens-x", `${event.clientX}px`);
+      lens.style.setProperty("--lw-lens-y", `${event.clientY}px`);
+      lens.style.opacity = "1";
+    };
+    const leave = () => {
+      const lens = lensRef.current;
+      if (lens) lens.style.opacity = "0";
+    };
+
+    window.addEventListener("pointermove", move, { passive: true });
+    document.documentElement.addEventListener("pointerleave", leave);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      document.documentElement.removeEventListener("pointerleave", leave);
+    };
+  }, []);
+
+  return lensRef;
 }

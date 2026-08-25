@@ -342,22 +342,68 @@
 	-webkit-mask-image: linear-gradient(to right, black, transparent 82%);
 	mask-image: linear-gradient(to right, black, transparent 82%);
 }
+
+/*
+ * The lens: the one place the ground is in focus. The field is soft by
+ * design — glow, not shapes — but under the pointer the same signal grid
+ * sharpens into view, as if the cursor were a glass held over the surface.
+ * Pointer-driven, not an animation: it moves exactly when the person does,
+ * so it runs under reduced motion like any other cursor response. The
+ * position rides two custom properties `FrontDoorGround` writes straight to
+ * the node on pointermove — no React render per mouse event. Dark ground
+ * only, like the grid it focuses.
+ */
+.lw-front-door-lens {
+	display: none;
+}
+
+.dark .lw-front-door-lens {
+	display: block;
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 480ms ease;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+	background-size: 72px 72px;
+	-webkit-mask-image: radial-gradient(
+		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+		black 0%,
+		rgba(0, 0, 0, 0.5) 55%,
+		transparent 100%
+	);
+	mask-image: radial-gradient(
+		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+		black 0%,
+		rgba(0, 0, 0, 0.5) 55%,
+		transparent 100%
+	);
+}
 /* The press: the button gives a little, springs back, and gives off a
-   little of the brand's warmth — the activation a click deserves. The pill
-   itself is glass like the card it sits on: a touch translucent, lit along
-   its top edge, the ground faintly moving through it. */
+   little of the brand's warmth — the activation a click deserves.
+
+   The pill used to be glossed: a 22% white sheen down its top half over a
+   backdrop blur, which read as wet plastic on ink and as mud on paper — and
+   a bevelled second draft read as 2009. What is left is flat and certain: a
+   whisper of top light so the surface has a direction, a soft throw of the
+   brand's own glow underneath, and a hover that MOVES — the colour shift
+   between the paper oranges is too small to be the whole signal, so the
+   pill lifts a pixel and deepens its glow, which reads on both grounds.
+   No blur: the fill is effectively solid, so the blur was only cost. */
 .lw-front-door-primary {
 	background-image: linear-gradient(
 		180deg,
-		rgba(255, 255, 255, 0.22),
-		rgba(255, 255, 255, 0.04) 55%,
-		rgba(255, 255, 255, 0) 100%
+		rgba(255, 255, 255, 0.14),
+		rgba(255, 255, 255, 0) 55%
 	);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-	-webkit-backdrop-filter: blur(8px);
-	backdrop-filter: blur(8px);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.2),
+		0 1px 2px rgba(12, 8, 5, 0.1),
+		0 10px 26px -14px var(--chakra-colors-front-door-glow);
 	transition:
-		transform 120ms ease,
+		transform 140ms ease,
 		box-shadow 260ms ease,
 		background-color 200ms ease;
 }
@@ -388,22 +434,26 @@
 }
 
 .lw-front-door-primary:hover {
+	transform: translateY(-1px);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.28),
-		0 2px 18px -4px var(--chakra-colors-front-door-glow);
+		inset 0 1px 0 rgba(255, 255, 255, 0.24),
+		0 2px 4px rgba(12, 8, 5, 0.12),
+		0 8px 26px -8px var(--chakra-colors-front-door-glow);
 }
 
 .lw-front-door-primary:active {
-	transform: translateY(1px);
+	transform: translateY(0.5px);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.28),
-		0 4px 26px -6px var(--chakra-colors-front-door-glow);
+		inset 0 1px 0 rgba(255, 255, 255, 0.2),
+		0 1px 2px rgba(12, 8, 5, 0.12),
+		0 5px 18px -6px var(--chakra-colors-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.lw-front-door-primary {
 		transition: none;
 	}
+	.lw-front-door-primary:hover,
 	.lw-front-door-primary:active {
 		transform: none;
 	}
@@ -418,14 +468,15 @@
 	background: var(--chakra-colors-front-door-card-bg) !important;
 	border-color: var(--chakra-colors-front-door-card-border) !important;
 	box-shadow: var(--lw-front-door-card-shadow);
-	/* Less blur and more saturation than before (26px / 1.5). A heavy blur
-	   over a thin surface averages the ground to a single flat tone, which is
-	   the opposite of the effect: what makes it read as glass is the ground's
-	   colour still being RECOGNISABLE through it, softened rather than erased.
-	   The brightness lift keeps the type off a muddy floor now that more of
-	   the ground is coming through. */
-	-webkit-backdrop-filter: blur(18px) saturate(1.9) brightness(1.04);
-	backdrop-filter: blur(18px) saturate(1.9) brightness(1.04);
+	/* Recalibrated from 18px / 1.9 / brightness(1.04). That mix let the
+	   ground's blue bloom come through so hot that the card's top half read
+	   as a different surface than its bottom — a band, not glass. More blur
+	   softens the ground's internal edges as they cross the card, the tamer
+	   saturation stops amplifying them, and the deeper card floor (see
+	   `cardBg` in frontDoorTheme.ts) evens the whole pane so the ground
+	   reads as light behind the glass rather than shapes stuck to it. */
+	-webkit-backdrop-filter: blur(26px) saturate(1.35);
+	backdrop-filter: blur(26px) saturate(1.35);
 	transition:
 		box-shadow 420ms ease,
 		border-color 420ms ease;
