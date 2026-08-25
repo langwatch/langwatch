@@ -54,8 +54,16 @@ export function RolePermissionComposer({
 }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Areas the reader opened by hand. Groups holding grants start open —
+  // an editor must see what the role already says — and everything else
+  // starts closed, because six group headers are readable and sixty rows
+  // are a wall.
+  const [openAreas, setOpenAreas] = useState<Set<string>>(() =>
+    areasHoldingSelections(selected),
+  );
 
   const areas = useMemo(() => offeredAreas(), []);
+  const searching = search.trim().length > 0;
   const visibleAreas = useMemo(
     () =>
       areas
@@ -77,8 +85,16 @@ export function RolePermissionComposer({
       return next;
     });
 
+  const toggleArea = (area: string) =>
+    setOpenAreas((current) => {
+      const next = new Set(current);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+
   return (
-    <VStack align="stretch" gap={4} width="full">
+    <VStack align="stretch" gap={3} width="full">
       <PermissionSearchField
         search={search}
         onSearchChange={setSearch}
@@ -92,39 +108,135 @@ export function RolePermissionComposer({
         </Text>
       ) : (
         visibleAreas.map((group) => (
-          <VStack key={group.area} align="stretch" gap={2}>
-            <Text
-              fontSize="xs"
-              fontWeight="semibold"
-              letterSpacing="wide"
-              textTransform="uppercase"
-              color="fg.muted"
-            >
-              {group.area}
-            </Text>
-            <VStack
-              align="stretch"
-              gap={0}
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="md"
-              separator={<Box height="1px" background="border" />}
-            >
-              {group.resources.map((resource) => (
-                <ResourceRow
-                  key={resource}
-                  resource={resource}
-                  selected={selected}
-                  onChange={onChange}
-                  expanded={expanded.has(resource)}
-                  onToggleExpanded={() => toggleExpanded(resource)}
-                />
-              ))}
-            </VStack>
-          </VStack>
+          <AreaGroup
+            key={group.area}
+            area={group.area}
+            resources={group.resources}
+            selected={selected}
+            onChange={onChange}
+            // A search opens every group it touches: the reader asked to
+            // see these rows, so a closed header would be the wrong answer.
+            open={searching || openAreas.has(group.area)}
+            onToggle={() => toggleArea(group.area)}
+            expandedResources={expanded}
+            onToggleResource={toggleExpanded}
+          />
         ))
       )}
     </VStack>
+  );
+}
+
+function areasHoldingSelections(selected: AuthzPermission[]): Set<string> {
+  return new Set(
+    offeredAreas()
+      .filter((group) =>
+        group.resources.some((resource) =>
+          offeredPermissions(resource).some((permission) =>
+            selected.includes(permission),
+          ),
+        ),
+      )
+      .map((group) => group.area),
+  );
+}
+
+/**
+ * One part of the product, closed to a single line until asked. The header
+ * carries the whole summary — the area's name and how many permissions the
+ * role holds inside — so a closed group is still an answered question.
+ */
+function AreaGroup({
+  area,
+  resources,
+  selected,
+  onChange,
+  open,
+  onToggle,
+  expandedResources,
+  onToggleResource,
+}: {
+  area: string;
+  resources: Resource[];
+  selected: AuthzPermission[];
+  onChange: (next: AuthzPermission[]) => void;
+  open: boolean;
+  onToggle: () => void;
+  expandedResources: Set<string>;
+  onToggleResource: (resource: string) => void;
+}) {
+  const held = resources.flatMap((resource) =>
+    offeredPermissions(resource).filter((permission) =>
+      selected.includes(permission),
+    ),
+  );
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      overflow="hidden"
+    >
+      <HStack
+        as="button"
+        type="button"
+        width="full"
+        paddingX={4}
+        paddingY={3}
+        gap={3}
+        cursor="pointer"
+        onClick={onToggle}
+        aria-expanded={open}
+        _hover={{ background: "bg.subtle" }}
+        data-testid={`permission-area-${area}`}
+      >
+        <Text fontSize="sm" fontWeight="semibold">
+          {area}
+        </Text>
+        {held.length > 0 && (
+          <Box
+            fontSize="xs"
+            color="fg.muted"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="full"
+            paddingX={2}
+            paddingY={0.5}
+          >
+            {held.length} selected
+          </Box>
+        )}
+        <Spacer />
+        <Box color="fg.muted" display="flex" alignItems="center">
+          {open ? (
+            <ChevronDown size={14} aria-hidden />
+          ) : (
+            <ChevronRight size={14} aria-hidden />
+          )}
+        </Box>
+      </HStack>
+      {open && (
+        <VStack
+          align="stretch"
+          gap={0}
+          borderTopWidth="1px"
+          borderColor="border"
+          separator={<Box height="1px" background="border" />}
+        >
+          {resources.map((resource) => (
+            <ResourceRow
+              key={resource}
+              resource={resource}
+              selected={selected}
+              onChange={onChange}
+              expanded={expandedResources.has(resource)}
+              onToggleExpanded={() => onToggleResource(resource)}
+            />
+          ))}
+        </VStack>
+      )}
+    </Box>
   );
 }
 
@@ -176,6 +288,14 @@ function PermissionSearchField({
         borderRadius="md"
         paddingX={3}
         gap={2}
+        // The wrapper is the field, so the wrapper wears the focus: the
+        // input inside is unstyled, and a flushed underline peeking out of
+        // the bottom of a bordered box read as a rendering glitch.
+        _focusWithin={{
+          borderColor: "colorPalette.solid",
+          outline: "1px solid",
+          outlineColor: "colorPalette.solid",
+        }}
       >
         <Box color="fg.muted" display="flex" alignItems="center">
           <Search size={14} aria-hidden />
@@ -184,9 +304,13 @@ function PermissionSearchField({
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search permissions"
-          variant="flushed"
+          variant="subtle"
+          background="transparent"
           border="none"
+          outline="none"
+          _focus={{ boxShadow: "none", outline: "none" }}
           size="sm"
+          paddingX={0}
           aria-label="Search permissions"
         />
       </HStack>
@@ -277,7 +401,10 @@ function ResourceRow({
         )}
       </HStack>
 
-      {level === "custom" && !expanded && (
+      {/* The permission strings the level actually grants, spelled out on
+          the row — the power user recognises `traces:view` faster than any
+          sentence, and it is the same token the audit log will show. */}
+      {held.length > 0 && !expanded && (
         <HStack gap={1.5} flexWrap="wrap">
           {held.map((permission) => (
             <PermissionToken key={permission} permission={permission} />

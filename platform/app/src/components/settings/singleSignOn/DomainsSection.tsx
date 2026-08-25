@@ -98,13 +98,15 @@ export function DomainsSection({
       )}
 
       {canManage && (
-        <HStack>
+        <HStack align="stretch">
           <Input
             placeholder="Domain, for example acme.com"
             value={domain}
             onChange={(event) => setDomain(event.target.value)}
           />
           <Button
+            height="auto"
+            flexShrink={0}
             loading={claim.isPending}
             onClick={() =>
               claim.mutate(

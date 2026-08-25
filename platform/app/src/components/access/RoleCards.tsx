@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   HStack,
-  Separator,
   Spacer,
   Text,
   VStack,
@@ -57,9 +56,10 @@ export function BuiltinRoleCard({
     <Card.Root
       width="full"
       height="full"
-      borderWidth="1px"
+      variant="outline"
       borderColor="border.muted"
       colorPalette={TIER_TONE[tier]}
+      _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
       data-testid={`builtin-role-${tier}`}
     >
       <Card.Body display="flex" flexDirection="column" gap={2.5} padding={4}>
@@ -96,11 +96,11 @@ export function BuiltinRoleCard({
           borderColor="border.muted"
           paddingTop={2.5}
         >
-          <Text fontSize="xs" color="fg.subtle">
+          <SectionEyebrow>
             {copy.inheritsFrom
-              ? `Everything ${BUILTIN_TIER_COPY[copy.inheritsFrom].name} has, and:`
-              : "The base every other role builds on:"}
-          </Text>
+              ? `Everything ${BUILTIN_TIER_COPY[copy.inheritsFrom].name} has, and`
+              : "The base every other role builds on"}
+          </SectionEyebrow>
           <PermissionTokenList permissions={shown} limit={shown.length} />
           <Text fontSize="xs" color="fg.subtle">
             {total} permissions in total
@@ -182,65 +182,72 @@ export function CustomRoleCard({
   return (
     <Card.Root
       width="full"
-      borderWidth="1px"
-      borderColor="border"
+      variant="outline"
+      borderColor="border.muted"
+      _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
       data-testid={`custom-role-${role.id}`}
     >
-      <Card.Body display="flex" flexDirection="column" gap={4} padding={5}>
+      <Card.Body display="flex" flexDirection="column" gap={3} padding={4}>
         <HStack width="full" align="start" gap={3}>
           <VStack align="start" gap={1} flex={1} minWidth={0}>
             <Text fontWeight="semibold" fontSize="sm">
               {role.name}
             </Text>
             {role.description ? (
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
                 {role.description}
               </Text>
             ) : null}
-            <Text fontSize="xs" color="fg.subtle">
-              Created {format(new Date(role.createdAt), "d MMM yyyy")}
-            </Text>
           </VStack>
-          {canManage && (
-            <HStack gap={1}>
-              <Tooltip content="Edit this role">
-                <Button size="xs" variant="ghost" onClick={onEdit}>
-                  <Pencil size={14} aria-hidden />
-                  Edit
-                </Button>
-              </Tooltip>
-              <Tooltip content="Delete this role">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="red"
-                  onClick={onDelete}
-                >
-                  <Trash2 size={14} aria-hidden />
-                  Delete
-                </Button>
-              </Tooltip>
-            </HStack>
-          )}
+          <HStack gap={2} flexShrink={0}>
+            <PeopleCount people={people} />
+            {canManage && (
+              <HStack gap={0.5}>
+                <Tooltip content="Edit this role">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    color="fg.muted"
+                    aria-label="Edit this role"
+                    onClick={onEdit}
+                  >
+                    <Pencil size={14} aria-hidden />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Delete this role">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    color="fg.muted"
+                    aria-label="Delete this role"
+                    _hover={{ color: "red.solid" }}
+                    onClick={onDelete}
+                  >
+                    <Trash2 size={14} aria-hidden />
+                  </Button>
+                </Tooltip>
+              </HStack>
+            )}
+          </HStack>
         </HStack>
 
-        <Separator />
-
-        <VStack align="start" gap={2} width="full">
-          <Text fontSize="xs" color="fg.subtle">
-            Grants
-          </Text>
+        <CardSection>
+          <SectionEyebrow>Grants</SectionEyebrow>
           <PermissionTokenList permissions={role.permissions} limit={6} />
-          <Button size="xs" variant="plain" padding={0} onClick={onOpenDetail}>
+          <Button
+            size="xs"
+            variant="plain"
+            padding={0}
+            color="fg.muted"
+            onClick={onOpenDetail}
+          >
             See all {role.permissions.length}{" "}
             {role.permissions.length === 1 ? "permission" : "permissions"}
           </Button>
-        </VStack>
+        </CardSection>
 
-        <VStack align="start" gap={2} width="full">
-          <Text fontSize="xs" color="fg.subtle">
-            In force on
-          </Text>
+        <CardSection>
+          <SectionEyebrow>In force on</SectionEyebrow>
           {scopes.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
               Nowhere yet. This role grants nothing until somebody is assigned
@@ -255,24 +262,59 @@ export function CustomRoleCard({
               }))}
             />
           )}
-        </VStack>
+          {assignedBelowOrganizationOnly && (
+            <Text fontSize="xs" color="fg.muted">
+              {inert.length}{" "}
+              {inert.length === 1 ? "permission takes" : "permissions take"}{" "}
+              effect only where this role is assigned on the organization.
+            </Text>
+          )}
+        </CardSection>
 
-        {assignedBelowOrganizationOnly && (
-          <Text fontSize="xs" color="fg.muted">
-            {inert.length}{" "}
-            {inert.length === 1 ? "permission takes" : "permissions take"}{" "}
-            effect only where this role is assigned on the organization.
-          </Text>
-        )}
-
-        <VStack align="start" gap={2} width="full">
-          <Text fontSize="xs" color="fg.subtle">
-            Held by
-          </Text>
+        <CardSection>
+          <SectionEyebrow>Held by</SectionEyebrow>
           <RoleHolderStrip holders={holders} people={people} />
-        </VStack>
+        </CardSection>
+
+        <Text fontSize="xs" color="fg.subtle">
+          Created {format(new Date(role.createdAt), "d MMM yyyy")}
+        </Text>
       </Card.Body>
     </Card.Root>
+  );
+}
+
+/** The tracked, quiet label every card section leads with — the same
+ *  register as the stat-tile labels on the directory overview, so the two
+ *  screens read as one system. */
+function SectionEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      fontSize="10px"
+      fontWeight="medium"
+      color="fg.subtle"
+      textTransform="uppercase"
+      letterSpacing="0.08em"
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** A hairline-topped block, so the card is divided by rules rather than by
+ *  floating gaps — the mockups' idiom. */
+function CardSection({ children }: { children: React.ReactNode }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      width="full"
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={2.5}
+    >
+      {children}
+    </VStack>
   );
 }
 

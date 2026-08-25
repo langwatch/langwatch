@@ -98,7 +98,7 @@ export function SingleSignOnSetup({
   if (connection === null) {
     return (
       <VStack align="stretch" gap={6} width="full">
-        <SetupStep number={1} title="Tell us about your identity provider">
+        <SetupStep number={1} title="Connect your identity provider">
           {canManage ? (
             <RegisterConnection
               organizationId={organizationId}

@@ -435,7 +435,7 @@ describe("the organization's authentication page", () => {
       await open();
 
       expect(
-        screen.getByText(/tell us about your identity provider/i),
+        screen.getByText(/connect your identity provider/i),
       ).toBeTruthy();
       expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
       expect(screen.queryByTestId("directory-card")).toBeNull();

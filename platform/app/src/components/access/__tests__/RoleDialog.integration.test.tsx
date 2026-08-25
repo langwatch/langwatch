@@ -83,13 +83,25 @@ function renderDialog(
   return { onClose };
 }
 
+/** The groups start closed, the way the screen ships — a test reaches a row
+ *  the same way a person does, by opening the part of the product first. */
+async function openArea(area: string) {
+  const header = screen.getByTestId(`permission-area-${area}`);
+  if (header.getAttribute("aria-expanded") !== "true") {
+    await userEvent.click(header);
+  }
+}
+
 async function setLevel({
   resource,
+  area,
   level,
 }: {
   resource: string;
+  area: string;
   level: string;
 }) {
+  await openArea(area);
   const control = within(screen.getByTestId(`access-level-${resource}`));
   await userEvent.click(control.getByText(level));
 }
@@ -103,10 +115,15 @@ describe("given somebody writing a new role", () => {
 
   describe("when the dialog opens", () => {
     /** @scenario A role is built one part of the product at a time */
-    it("groups the permissions by the part of the product they are about", () => {
+    it("groups the permissions by the part of the product they are about", async () => {
       renderDialog();
 
+      // Closed by default: six group headers, not sixty rows.
       expect(screen.getByText("Data and analysis")).toBeInTheDocument();
+      expect(screen.queryByText("Traces")).toBeNull();
+
+      await openArea("Data and analysis");
+
       expect(screen.getByText("Traces")).toBeInTheDocument();
       expect(
         screen.getByText("The recorded runs of your application."),
@@ -139,7 +156,11 @@ describe("given somebody writing a new role", () => {
     it("describes what the role can do, in words", async () => {
       renderDialog();
 
-      await setLevel({ resource: "traces", level: "Read" });
+      await setLevel({
+        resource: "traces",
+        area: "Data and analysis",
+        level: "Read",
+      });
 
       const preview = within(screen.getByTestId("role-preview"));
       expect(preview.getByText("View traces")).toBeInTheDocument();
@@ -152,7 +173,11 @@ describe("given somebody writing a new role", () => {
     it("grants the one permission that covers the rest for full access", async () => {
       renderDialog();
 
-      await setLevel({ resource: "datasets", level: "Full access" });
+      await setLevel({
+        resource: "datasets",
+        area: "Building",
+        level: "Full access",
+      });
 
       const preview = within(screen.getByTestId("role-preview"));
       expect(preview.getByText("Full access to datasets")).toBeInTheDocument();
@@ -166,7 +191,11 @@ describe("given somebody writing a new role", () => {
         screen.getByRole("textbox", { name: /Name/ }),
         "Support analyst",
       );
-      await setLevel({ resource: "traces", level: "Read" });
+      await setLevel({
+        resource: "traces",
+        area: "Data and analysis",
+        level: "Read",
+      });
       await userEvent.click(
         screen.getByRole("button", { name: "Create role" }),
       );
