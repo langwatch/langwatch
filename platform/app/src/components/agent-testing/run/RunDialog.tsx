@@ -87,24 +87,31 @@ export function RunDialog({
       placement="center"
     >
       <Dialog.Content
-        bg="bg"
+        bg="bg.panel"
         maxWidth="600px"
         onClick={(event) => event.stopPropagation()}
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
+        <Dialog.Header
+          borderBottomWidth="1px"
+          borderColor="border"
+          paddingX={5}
+          paddingY={3.5}
+          display="block"
+        >
+          <Dialog.Title fontSize="14px" fontWeight="semibold">
             Run · {subjectTitle(subject)}
           </Dialog.Title>
+          <Dialog.CloseTrigger />
         </Dialog.Header>
-        <Dialog.Body>
+        <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
           <RunDialogFields form={form} isBusy={controller.isBusy} />
         </Dialog.Body>
         <RunDialogFooter
           controller={controller}
           hasTarget={!!form.target}
           isRunBlocked={isRunBlocked({ subject, form, controller })}
+          caseCount={form.caseCount}
           onClose={onClose}
         />
       </Dialog.Content>

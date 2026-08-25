@@ -483,12 +483,13 @@ describe("<RunDialog/>", () => {
 
   /** @scenario "The dialog has Cancel, Save and Run, with no dropdown on Run" */
   it("holds Cancel, Save and Run, and Run carries no dropdown", () => {
-    renderDialog(suiteSubject());
+    renderDialog(suiteSubject({ scenarioIds: ["case_1", "case_2"] }));
 
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     const run = screen.getByTestId("run-dialog-run");
-    expect(run).toHaveTextContent("Run");
+    // The subject holds two cases, and the control says so.
+    expect(run).toHaveTextContent("Run 2 cases");
     expect(run).not.toHaveAttribute("aria-haspopup");
   });
 

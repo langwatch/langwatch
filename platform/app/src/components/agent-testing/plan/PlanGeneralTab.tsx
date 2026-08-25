@@ -13,7 +13,7 @@ import { Box, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import { ScenarioPicker } from "~/components/suites/ScenarioPicker";
 import { FG_FAINT } from "../shared/design";
-import { FieldError, FieldLabel, PLAN_FIELD_STYLE } from "./PlanFields";
+import { FieldError, FieldLabel, DIALOG_FIELD_STYLE } from "../shared/DialogFields";
 import type { PlanEditorState } from "./usePlanEditor";
 
 export function PlanGeneralTab({
@@ -32,7 +32,7 @@ export function PlanGeneralTab({
       <Box>
         <FieldLabel>Name</FieldLabel>
         <Input
-          {...PLAN_FIELD_STYLE}
+          {...DIALOG_FIELD_STYLE}
           autoFocus
           aria-label="Name"
           aria-invalid={!!errors.name || undefined}
@@ -46,7 +46,7 @@ export function PlanGeneralTab({
       <Box>
         <FieldLabel>Description · optional</FieldLabel>
         <Textarea
-          {...PLAN_FIELD_STYLE}
+          {...DIALOG_FIELD_STYLE}
           rows={2}
           resize="none"
           aria-label="Description"

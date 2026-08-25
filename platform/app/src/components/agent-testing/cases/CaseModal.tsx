@@ -31,6 +31,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
 import { FG_FAINT, FG_MUTED } from "../shared/design";
+import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { SmallButton } from "../shared/SmallButton";
 import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 import type { TestSuiteEntry } from "./test-cases";
@@ -53,34 +54,6 @@ export type CaseModalProps = {
   /** Opens the version history of the case being edited. */
   onOpenHistory: () => void;
 };
-
-/** One label above a field. */
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <HStack
-      as="span"
-      gap={1.5}
-      marginBottom={1}
-      fontSize="11.5px"
-      fontWeight="medium"
-      color={FG_MUTED}
-    >
-      {children}
-    </HStack>
-  );
-}
-
-const FIELD_STYLE = {
-  borderRadius: "lg",
-  borderWidth: "1px",
-  borderColor: "border",
-  background: "bg.panel",
-  paddingX: 3,
-  paddingY: 1.5,
-  fontSize: "13px",
-  height: "auto",
-  minHeight: "auto",
-} as const;
 
 export function CaseModal({
   open,
@@ -148,7 +121,7 @@ export function CaseModal({
                 <Box>
                   <FieldLabel>Title</FieldLabel>
                   <Input
-                    {...FIELD_STYLE}
+                    {...DIALOG_FIELD_STYLE}
                     autoFocus
                     aria-label="Title"
                     placeholder="Angry customer threatens a chargeback"
@@ -162,7 +135,7 @@ export function CaseModal({
                   <FieldLabel>Test suite</FieldLabel>
                   <NativeSelect.Root size="sm">
                     <NativeSelect.Field
-                      {...FIELD_STYLE}
+                      {...DIALOG_FIELD_STYLE}
                       aria-label="Test suite"
                       value={draft.folderId ?? ""}
                       onChange={(event) =>
@@ -186,7 +159,7 @@ export function CaseModal({
                   Situation · what is the user trying to do?
                 </FieldLabel>
                 <Textarea
-                  {...FIELD_STYLE}
+                  {...DIALOG_FIELD_STYLE}
                   rows={2}
                   resize="none"
                   aria-label="Situation"
@@ -201,7 +174,7 @@ export function CaseModal({
               <Box>
                 <FieldLabel>Rubrics · one per line</FieldLabel>
                 <Textarea
-                  {...FIELD_STYLE}
+                  {...DIALOG_FIELD_STYLE}
                   rows={4}
                   resize="none"
                   aria-label="Rubrics"
@@ -231,7 +204,7 @@ export function CaseModal({
                   />
                 </FieldLabel>
                 <Input
-                  {...FIELD_STYLE}
+                  {...DIALOG_FIELD_STYLE}
                   fontFamily="mono"
                   fontSize="12px"
                   aria-label="Parameters"
@@ -363,7 +336,7 @@ function AdvancedSection({
             <Box>
               <FieldLabel>Max turns</FieldLabel>
               <Input
-                {...FIELD_STYLE}
+                {...DIALOG_FIELD_STYLE}
                 type="number"
                 aria-label="Max turns"
                 placeholder="Default: 10"
@@ -376,7 +349,7 @@ function AdvancedSection({
             <Box>
               <FieldLabel>Min turns</FieldLabel>
               <Input
-                {...FIELD_STYLE}
+                {...DIALOG_FIELD_STYLE}
                 type="number"
                 aria-label="Min turns"
                 placeholder="Default: none"

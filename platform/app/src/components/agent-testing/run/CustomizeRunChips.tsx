@@ -7,8 +7,9 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { FG_MUTED } from "../shared/design";
 
 export type CustomizeRunChip = {
   key: string;
@@ -20,24 +21,40 @@ export function CustomizeRunChips({ chips }: { chips: CustomizeRunChip[] }) {
   if (chips.length === 0) return null;
 
   return (
-    <VStack align="stretch" gap={2} data-testid="customize-run-chips">
-      <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+    <VStack
+      align="stretch"
+      gap={2}
+      paddingTop={3}
+      data-testid="customize-run-chips"
+    >
+      <Text fontSize="11.5px" fontWeight="medium" color={FG_MUTED}>
         Customize your run
       </Text>
       <HStack gap={2} flexWrap="wrap">
         {chips.map((chip) => (
-          <Button
+          <chakra.button
             key={chip.key}
-            size="xs"
-            variant="outline"
+            type="button"
+            display="flex"
+            alignItems="center"
+            gap={1.5}
+            height="28px"
+            paddingX="10px"
+            borderRadius="lg"
+            borderWidth="1px"
             borderStyle="dashed"
-            color="fg.muted"
+            borderColor="border.emphasized"
+            fontSize="12px"
+            fontWeight="medium"
+            color={FG_MUTED}
+            cursor="pointer"
+            _hover={{ background: "bg.muted/60", color: "fg" }}
             onClick={chip.onAdd}
             data-testid={`customize-chip-${chip.key}`}
           >
             <Plus size={12} />
             {chip.label}
-          </Button>
+          </chakra.button>
         ))}
       </HStack>
     </VStack>

@@ -274,6 +274,20 @@ function buildCustomizeRunChips({
   return chips;
 }
 
+/**
+ * How many test cases a run of this subject covers, or nothing while the case
+ * list a "run everything" subject needs is still on its way.
+ */
+function caseCountOf(
+  subject: RunDialogSubject | null,
+  allScenarios: readonly { id: string }[] | undefined,
+): number | null {
+  if (!subject) return null;
+  if (subject.kind === "case") return 1;
+  if (subject.kind === "suite") return subject.scenarioIds.length;
+  return allScenarios?.length ?? null;
+}
+
 /** Everything an open run dialog holds and offers. */
 export function useRunDialogForm(subject: RunDialogSubject | null) {
   const choices = useRunDialogChoices(subject);
@@ -295,7 +309,14 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     onRunAgainstPrompt: targeting.selectPrompts,
   });
 
-  return { ...fields, ...choices, ...parameters, ...targeting, chips };
+  return {
+    ...fields,
+    ...choices,
+    ...parameters,
+    ...targeting,
+    chips,
+    caseCount: caseCountOf(subject, choices.allScenarios),
+  };
 }
 
 export type RunDialogForm = ReturnType<typeof useRunDialogForm>;

@@ -5,9 +5,10 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, FileText, Folder } from "lucide-react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import { FG_FAINT, FG_MUTED } from "../shared/design";
 
 /** One prompt as the picker lists it. */
 export type PromptEntry = {
@@ -59,22 +60,26 @@ function PromptRow({
       borderWidth="1px"
       borderColor={isActive ? "blue.500" : "transparent"}
       background={isActive ? "blue.subtle" : undefined}
-      _hover={{ background: isActive ? "blue.subtle" : "bg.muted" }}
-      borderRadius="md"
+      _hover={{ background: isActive ? "blue.subtle" : "bg.muted/60" }}
+      borderRadius="lg"
       paddingX={3}
       paddingY={2}
       gap={2.5}
       onClick={() => onSelect({ type: "prompt", id: prompt.id })}
       data-testid={`run-dialog-prompt-${prompt.id}`}
     >
-      <FileText size={14} color="var(--chakra-colors-green-500)" />
-      <Text fontSize="sm" fontWeight="medium" truncate flex={1}>
-        {prompt.handle ?? prompt.id}
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        v{prompt.version}
-      </Text>
-      {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
+      <FileText size={15} color="var(--chakra-colors-green-500)" />
+      <Box minWidth={0} flex={1}>
+        <Text fontSize="12.5px" fontWeight="medium" truncate>
+          {prompt.handle ?? prompt.id}
+        </Text>
+        <Text fontSize="11px" color={FG_MUTED} truncate>
+          v{prompt.version}
+        </Text>
+      </Box>
+      {isActive && (
+        <Check size={14} color="var(--chakra-colors-blue-500)" />
+      )}
     </HStack>
   );
 }
@@ -92,11 +97,11 @@ function PromptFolderGroup({
   onSelect: PromptSelect;
 }) {
   return (
-    <VStack align="stretch" gap={1}>
+    <VStack align="stretch" gap={1.5}>
       {folder !== "default" && (
-        <HStack gap={1.5} paddingX={1}>
-          <Folder size={11} color="var(--chakra-colors-fg-subtle)" />
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        <HStack gap={1.5} paddingX={1} marginBottom={-0.5}>
+          <Folder size={11} color="var(--chakra-colors-fg-muted)" />
+          <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
             {folder}
           </Text>
         </HStack>
@@ -129,11 +134,11 @@ export function PromptPicker({
     <VStack
       align="stretch"
       gap={2}
-      maxHeight="240px"
+      maxHeight="228px"
       overflowY="auto"
       borderWidth="1px"
       borderColor="border"
-      borderRadius="lg"
+      borderRadius="xl"
       padding={2}
       data-testid="run-dialog-prompts"
     >
@@ -147,7 +152,7 @@ export function PromptPicker({
         />
       ))}
       {prompts.length === 0 && (
-        <Text fontSize="xs" color="fg.subtle" paddingX={1} paddingY={2}>
+        <Text fontSize="12px" color={FG_FAINT} paddingX={1} paddingY={2}>
           No saved prompts in this project yet.
         </Text>
       )}

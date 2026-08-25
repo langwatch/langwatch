@@ -102,6 +102,8 @@ Feature: The run dialog
     Given the run dialog is open
     When its footer is read
     Then it holds "Cancel", "Save" and "Run"
+    And Run is the only solid control
+    And Run names how many test cases it starts
     And Run carries no dropdown
 
   @integration

@@ -14,7 +14,7 @@ import { PromptTargetMappingSection } from "~/components/suites/PromptTargetMapp
 import { TargetPicker } from "~/components/suites/TargetPicker";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { FG_MUTED } from "../shared/design";
-import { FieldError, FieldLabel, PLAN_FIELD_STYLE } from "./PlanFields";
+import { FieldError, FieldLabel, DIALOG_FIELD_STYLE } from "../shared/DialogFields";
 import type { PlanEditorState } from "./usePlanEditor";
 
 export function PlanExecutionTab({
@@ -68,7 +68,7 @@ export function PlanExecutionTab({
         >
           <Text fontWeight="medium">Repeat count</Text>
           <Input
-            {...PLAN_FIELD_STYLE}
+            {...DIALOG_FIELD_STYLE}
             type="number"
             width="56px"
             paddingX={2}

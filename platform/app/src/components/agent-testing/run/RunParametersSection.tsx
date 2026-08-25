@@ -5,13 +5,19 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Box, Input, VStack } from "@chakra-ui/react";
 import { RunParameterFields } from "~/components/suites/RunParameterFields";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
+import { RemoveBlockButton } from "./RemoveBlockButton";
 import type { RunDialogForm } from "./useRunDialogForm";
 
 /** What the one parameter line reads when it is empty. */
 export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";
+
+/** What the (i) beside the parameters line explains. */
+const PARAMETERS_HELP =
+  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same case as a free or a pro customer, in another locale, or on another model.";
 
 type RunParametersFields = Pick<
   RunDialogForm,
@@ -31,32 +37,34 @@ export function RunParametersSection({
   isBusy: boolean;
 }) {
   return (
-    <VStack align="stretch" gap={1} data-testid="run-dialog-parameters">
-      <HStack gap={1}>
-        <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+    <VStack align="stretch" gap={2} data-testid="run-dialog-parameters">
+      <Box>
+        <FieldLabel>
           Parameters
-        </Text>
-        <Button
-          size="2xs"
-          variant="ghost"
-          color="fg.muted"
-          aria-label="Remove the parameter overrides"
-          onClick={form.hideParameters}
-        >
-          <X size={12} />
-        </Button>
-      </HStack>
-      <Input
-        size="sm"
-        fontFamily="mono"
-        fontSize="13px"
-        aria-label="Parameter overrides"
-        placeholder={PARAMETER_LINE_PLACEHOLDER}
-        value={form.parameterLine}
-        onChange={(event) => form.setParameterLine(event.target.value)}
-        disabled={isBusy}
-        data-testid="run-dialog-parameter-line"
-      />
+          <FieldInfoTooltip
+            description={PARAMETERS_HELP}
+            docHref="/agent-simulations/scenario-parameters"
+            docLabel="How to annotate an agent"
+            trigger="hover"
+            testId="run-parameters-info"
+          />
+          <RemoveBlockButton
+            label="Remove the parameter overrides"
+            onClick={form.hideParameters}
+          />
+        </FieldLabel>
+        <Input
+          {...DIALOG_FIELD_STYLE}
+          fontFamily="mono"
+          fontSize="12px"
+          aria-label="Parameter overrides"
+          placeholder={PARAMETER_LINE_PLACEHOLDER}
+          value={form.parameterLine}
+          onChange={(event) => form.setParameterLine(event.target.value)}
+          disabled={isBusy}
+          data-testid="run-dialog-parameter-line"
+        />
+      </Box>
       {form.secretDefinitions.length > 0 && (
         <RunParameterFields
           title="Secret parameters"

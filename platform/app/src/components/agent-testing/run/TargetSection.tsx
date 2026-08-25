@@ -1,14 +1,15 @@
 /**
- * The target area of the run dialog: the agent blocks, the prompt picker, or
+ * The target area of the run dialog: the agent cards, the prompt picker, or
  * the setup box a project with nothing to test reads instead.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { VStack } from "@chakra-ui/react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import { FieldLabel } from "../shared/DialogFields";
 import { type PromptEntry, PromptPicker } from "./PromptPicker";
+import { RemoveBlockButton } from "./RemoveBlockButton";
 import {
   AgentBlocks,
   type RunDialogAgent,
@@ -26,28 +27,21 @@ type TargetSectionProps = {
   onSetupAgent: () => void;
 };
 
-/** The agent blocks, the prompt picker, or the setup box. */
+/** The agent cards, the prompt picker, or the setup box. */
 export function TargetSection(props: TargetSectionProps) {
   const { mode, agents, prompts, target, onSelect } = props;
 
   return (
-    <VStack align="stretch" gap={2}>
-      <HStack gap={1}>
-        <Text fontSize="xs" fontWeight="medium" color="fg.muted">
-          {mode === "prompts" ? "Prompt to be tested" : "Agent to be tested"}
-        </Text>
+    <VStack align="stretch" gap={0}>
+      <FieldLabel>
+        {mode === "prompts" ? "Prompt to be tested" : "Agent to be tested"}
         {mode === "prompts" && (
-          <Button
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            aria-label="Remove the prompt picker"
+          <RemoveBlockButton
+            label="Remove the prompt picker"
             onClick={props.onRemovePromptPicker}
-          >
-            <X size={12} />
-          </Button>
+          />
         )}
-      </HStack>
+      </FieldLabel>
       {mode === "prompts" ? (
         <PromptPicker prompts={prompts} selected={target} onSelect={onSelect} />
       ) : agents.length > 0 ? (

@@ -1,13 +1,14 @@
 /**
- * The small pieces every tab of the run plan editor is drawn from: the label
- * above a field, the field styling itself, and the message under a field the
- * server or the schema refused.
+ * The small pieces every Agent Testing dialog is drawn from: the label above a
+ * field, the field styling itself, and the message under a field the server or
+ * the schema refused.
  *
- * @see specs/features/agent-testing/run-plan-editor.feature
+ * One copy, so the test case dialog, the run plan dialog and the run dialog
+ * all read the same.
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "./design";
 
 /** One label above a field. */
 export function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 /** The border, the radius and the type size every input of the dialog takes. */
-export const PLAN_FIELD_STYLE = {
+export const DIALOG_FIELD_STYLE = {
   borderRadius: "lg",
   borderWidth: "1px",
   borderColor: "border",
