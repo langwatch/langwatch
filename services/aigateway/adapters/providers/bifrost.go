@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -303,7 +305,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, classifyChatBuildError(ctx, err)
+		return nil, classifyRequestBuildError(ctx, err)
 	}
 	stampParamsDropped(ctx, paramsDroppedFrom(dispatchCtx))
 
@@ -671,7 +673,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, classifyChatBuildError(ctx, err)
+		return nil, classifyRequestBuildError(ctx, err)
 	}
 	dropped := paramsDroppedFrom(dispatchCtx)
 	stampParamsDropped(ctx, dropped)
@@ -686,11 +688,12 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	return &bifrostStreamIterator{ch: ch, paramsDropped: dropped}, nil
 }
 
-// classifyChatBuildError turns a buildChatRequest failure into the right
-// client-facing 400: parameter-policy refusals carry the policy's full
-// sentence under unsupported_parameter (the code OpenAI itself uses for
-// parameter rejections), everything else is a malformed client body.
-func classifyChatBuildError(ctx context.Context, err error) error {
+// classifyRequestBuildError turns a request-build failure (buildChatRequest,
+// codexRequestBody) into the right client-facing 400: parameter-policy
+// refusals carry the policy's full sentence under unsupported_parameter (the
+// code OpenAI itself uses for parameter rejections), everything else is a
+// malformed client body.
+func classifyRequestBuildError(ctx context.Context, err error) error {
 	var refusal *paramRefusalError
 	if errors.As(err, &refusal) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{"message": refusal.msg, "fault": "customer"})
@@ -699,6 +702,22 @@ func classifyChatBuildError(ctx context.Context, err error) error {
 	// (unparseable JSON, malformed params): classify it as a 400 the same
 	// way the embeddings lane does, not an internal error.
 	return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+}
+
+// recordParamsDropped puts a policy drop list on the response-header seam
+// (the dispatch meta accumulator, which setMetaHeaders writes before the
+// first byte on either lane) and on the request span. The chat parse path
+// wires the same two seams itself inside buildChatRequest; lanes that build
+// their own body (codex) call this instead.
+func recordParamsDropped(ctx context.Context, dropped []string) {
+	if len(dropped) == 0 {
+		return
+	}
+	if meta := pipeline.MetaFromContext(ctx); meta != nil {
+		droppedCopy := slices.Clone(dropped)
+		meta.Update(func(m *pipeline.Meta) { m.ParamsDropped = droppedCopy })
+	}
+	stampParamsDropped(ctx, dropped)
 }
 
 // stampParamsDropped records the policy drop list on the gateway's

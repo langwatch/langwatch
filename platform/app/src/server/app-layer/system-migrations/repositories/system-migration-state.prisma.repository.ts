@@ -136,6 +136,23 @@ export class PrismaSystemMigrationStateRepository
     }
   }
 
+  /**
+   * Whether any tenant has finished this migration — the per-tenant gates'
+   * global short-circuit. `findFirst` stops at the first matching row rather
+   * than counting them all.
+   */
+  async hasFinalizedTenant({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.systemMigrationTenantState.findFirst({
+      where: { migrationName, status: "finalized" },
+      select: { tenantId: true },
+    });
+    return row !== null;
+  }
+
   /** Ops rollup: how many tenants sit in each status for one migration. */
   async findStatusCounts({
     migrationName,

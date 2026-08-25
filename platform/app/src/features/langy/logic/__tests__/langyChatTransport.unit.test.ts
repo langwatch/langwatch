@@ -451,6 +451,191 @@ describe("createLangyChatTransport", () => {
     });
   });
 
+  describe("when the live stream carries a UI action", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    it("forwards it to onUiAction as a bare passthrough, not a message chunk", async () => {
+      const onUiAction = vi.fn();
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onUiAction, onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      const entry = {
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      };
+      onData(entry);
+
+      expect(onUiAction).toHaveBeenCalledWith(entry);
+      expect(onSignal).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no onUiAction dep is wired", async () => {
+      const { transport } = makeTransport({ conversationId: null }, {});
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      expect(() =>
+        onData({ type: "ui", actionId: "a1", kind: "x", payload: {} }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when text and tool calls alternate in one turn", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    /** Read every chunk the transport enqueues, until the stream closes. */
+    function collect(stream: ReadableStream<{ type: string; id?: string }>) {
+      const chunks: Array<{ type: string; id?: string }> = [];
+      const reader = stream.getReader();
+      const done = (async () => {
+        for (;;) {
+          const next = await reader.read();
+          if (next.done) return;
+          chunks.push(next.value);
+        }
+      })();
+      return { chunks, done };
+    }
+
+    /**
+     * A turn's prose is the paragraphs between its calls. Held in ONE text part
+     * for the whole turn, the parts array said "all the text, then all the
+     * tools" whatever order they arrived in — which is what drew every card
+     * above the reply and grew the reply below them.
+     */
+    /** @scenario "A tool card sits between the paragraphs it ran between" */
+    it("closes the paragraph a call interrupts and opens a new one after it", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({ type: "delta", text: "Looking at the failures." });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+      });
+      onData({ type: "delta", text: "They are all timeouts." });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.map((chunk) => chunk.type)).toEqual([
+        "start",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "tool-input-available",
+        "tool-output-available",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "finish",
+      ]);
+      const runs = chunks
+        .filter((chunk) => chunk.type === "text-start")
+        .map((chunk) => chunk.id);
+      expect(new Set(runs).size).toBe(2);
+    });
+
+    /**
+     * Only a STARTING call ends a paragraph. An output that lands after the
+     * model has moved on would otherwise cut the paragraph it is writing in
+     * two, and the card would still be back where the call began.
+     */
+    it("leaves the open paragraph alone when a call reports its output", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({ type: "delta", text: "While that runs," });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+      });
+      onData({ type: "delta", text: " here is what I expect." });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.map((chunk) => chunk.type)).toEqual([
+        "start",
+        "tool-input-available",
+        "text-start",
+        "text-delta",
+        "tool-output-available",
+        "text-delta",
+        "text-end",
+        "finish",
+      ]);
+    });
+
+    it("opens no paragraph at all for a turn that only ran tools", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.some((chunk) => chunk.type.startsWith("text-"))).toBe(
+        false,
+      );
+    });
+  });
+
   describe("reconnectToStream", () => {
     it("returns null — resume is a panel-driven re-subscribe, not a transport reconnect", async () => {
       const { transport } = makeTransport();

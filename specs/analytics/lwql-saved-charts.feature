@@ -359,6 +359,67 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
     When the saved chart paths are looked up in it
     Then all five operations are described, each with a summary, a tag and a response schema
 
+  # Dashboard placement — what a placed workbench chart draws, asks for, and
+  # is offered. The routing claims are the load-bearing ones: `kind` decides
+  # which renderer receives the row, and both directions of getting it wrong
+  # are silent rather than a type error.
+
+  @integration
+  Scenario: A placed workbench card draws the widget, not the builder
+    Given a dashboard grid holding a saved workbench chart
+    When the card is rendered
+    Then the LangWatchQL widget draws it, and the builder renderer is not mounted
+
+  @integration
+  Scenario: A builder card keeps the builder renderer and its alert bell
+    Given a dashboard grid holding a builder graph
+    When the card is rendered
+    Then the builder renderer draws it and the add-alert control is offered
+
+  @unit
+  Scenario: The dashboard list counts exactly the cards the grid will render
+    Given a dashboard holding a builder graph and a saved workbench chart
+    When the dashboards are listed with the workbench on and again with it off
+    Then in each state the list's card count admits the same kinds the dashboard's grid read admits
+    And with the workbench off the count sees only builder graphs, as it did before the feature existed
+
+  @integration
+  Scenario: A workbench card is not offered an alert it cannot evaluate
+    Given a dashboard grid holding a saved workbench chart
+    When the card is rendered
+    Then no add-alert control is offered, because a saved statement has no series to threshold
+
+  @integration
+  Scenario: A placed widget asks the run to coarsen rather than refuse
+    Given a placed workbench chart whose card is showing
+    When the widget runs its chart for the dashboard's period
+    Then the request asks for coarsening on budget overflow, so a wide period redraws the card instead of blanking it
+
+  @integration
+  Scenario: A coarsened widget says which step it actually ran at
+    Given a placed workbench chart whose period forced a coarser step
+    When the widget draws the answer
+    Then it shows a notice naming both the step asked for and the step used
+    And a run that coarsened nothing shows no notice
+
+  @integration
+  Scenario: A widget ignores an answer for a period it has left
+    Given a placed workbench chart whose period changed while a run was in flight
+    When the older run resolves after the newer one
+    Then the card keeps the newer answer, rather than settling on the period it has left
+
+  @integration
+  Scenario: A widget names a run refusal instead of the generic card
+    Given a placed workbench chart whose run answers with a handled LangWatchQL error
+    When the widget settles on that failure
+    Then the card shows the registry copy for that code, not the generic error treatment
+
+  @integration
+  Scenario: A widget falls back to the generic card only for unknown failures
+    Given a placed workbench chart whose run fails with an error no registry names
+    When the widget settles on that failure
+    Then the card shows the generic treatment under a headline naming the action, and leaks no internal message
+
 # --- AC Coverage Map ---
 # Issue #6582, slice 1 ("Schema + repository + service — model decision,
 # validation choke point, unit/integration tests").
@@ -474,7 +535,26 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
 # carrying neither field is a refusal rather than a silent no-op:
 #   → Scenario: An update naming neither a name nor a definition is refused rather than quietly doing nothing
 #
+# Issue #6582, slice 3 ("dashboard placement and rendering").
+#
+# AC "a placed workbench card draws the widget, never the builder renderer,
+#    and the reverse"
+#   → Scenario: A placed workbench card draws the widget, not the builder
+#   → Scenario: A builder card keeps the builder renderer and its alert bell
+#   → Scenario: The dashboard list counts exactly the cards the grid will render
+# AC "a saved statement has no series to threshold, so it is offered no alert"
+#   → Scenario: A workbench card is not offered an alert it cannot evaluate
+# AC "a placed widget's run asks to coarsen on budget overflow, and names what
+#    it substituted"
+#   → Scenario: A placed widget asks the run to coarsen rather than refuse
+#   → Scenario: A coarsened widget says which step it actually ran at
+# AC "a widget settles on the newest run for its period, not the newest to resolve"
+#   → Scenario: A widget ignores an answer for a period it has left
+# AC "a run refusal is named from the error registry, and only falls back to
+#    the generic card for a code the registry does not carry"
+#   → Scenario: A widget names a run refusal instead of the generic card
+#   → Scenario: A widget falls back to the generic card only for unknown failures
+#
 # Deliberately NOT in this feature file, because they are not in these slices:
-# dashboard placement and rendering (with #6631's time-window contract),
 # per-viewer re-execution and its degraded cards, and the MCP/langy authoring
-# tools. Each lands with its own scenarios in slices 3 and 5.
+# tools. Each lands with its own scenarios in slice 5.

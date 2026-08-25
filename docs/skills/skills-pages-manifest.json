@@ -50,7 +50,7 @@
         "promptFile": "datasets.docs.txt"
       },
       {
-        "boldPrefix": "\u2b50 All of the above:",
+        "boldPrefix": "⭐ All of the above:",
         "title": "Take my agent to the next level",
         "skill": "langwatch/skills/level-up",
         "slashCommand": "/level-up",
@@ -59,7 +59,7 @@
     ],
     "recipes": [
       {
-        "boldPrefix": "\u2b50",
+        "boldPrefix": "⭐",
         "title": "What should I do next to improve my agent?",
         "skill": "langwatch/skills/agent-improve",
         "slashCommand": "/agent-improve",
@@ -124,6 +124,12 @@
         "skill": "langwatch/skills/recipes/test-cli-usability",
         "slashCommand": "/test-cli-usability",
         "promptFile": "recipes-test-cli-usability.docs.txt"
+      },
+      {
+        "title": "Build a chart from a question and put it on my dashboard",
+        "skill": "langwatch/skills/recipes/lwql-charts",
+        "slashCommand": "/lwql-charts",
+        "promptFile": "recipes-lwql-charts.docs.txt"
       }
     ]
   },

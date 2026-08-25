@@ -93,7 +93,11 @@ export default defineConfig({
       "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",
-      "**/e2e/**/*",
+      // e2e stays out of the unit run — it needs a live stack — EXCEPT for
+      // `*.unit.test.ts`, which tests the e2e HARNESS itself (the scenario
+      // runner, its retry policy) and needs nothing but mocks. Without this
+      // carve-out such a test is silently collected by nobody and rots green.
+      "**/e2e/**/!(*.unit).{test,spec}.?(c|m)[jt]s?(x)",
     ],
     env: {
       /*

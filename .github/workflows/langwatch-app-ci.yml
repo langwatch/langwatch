@@ -406,6 +406,26 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz-server run test
 
+      # @langwatch/identity is the pure identity core (ADR-115) and
+      # @langwatch/identity-server its storage-port runtime — same raw
+      # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
+      # step the authz pair lacks: sources and tests are only compiled here.
+      - name: Run @langwatch/identity unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity run test
+
+      - name: Typecheck @langwatch/identity
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity run typecheck
+
+      - name: Run @langwatch/identity-server unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-server run test
+
+      - name: Typecheck @langwatch/identity-server
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-server run typecheck
+
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
       - name: Run @langwatch/system-migrations unit tests

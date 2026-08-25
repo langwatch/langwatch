@@ -55,7 +55,7 @@ describe("the authz engine gate's browser safety", () => {
     /** The cached-flag helper is in the same graph and carries the same rule. */
     it("holds the same rule for the cache it depends on", () => {
       expect(
-        importsOf("per-organization-cached-gate.ts").filter((spec) =>
+        importsOf("../_shared/per-subject-cached-gate.ts").filter((spec) =>
           RUNS_AT_IMPORT.includes(spec),
         ),
       ).toEqual([]);

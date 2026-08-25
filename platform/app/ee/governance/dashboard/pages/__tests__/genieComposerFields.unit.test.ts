@@ -14,8 +14,8 @@
  * integration tests can stay about rendering.
  */
 import { describe, expect, it } from "vitest";
-import type { ComposerState } from "../ingestion-sources";
-import { buildCreateInput, PARSER_FIELDS } from "../ingestion-sources";
+import type { ComposerState } from "../inventory";
+import { buildCreateInput, PARSER_FIELDS } from "../inventory";
 
 const genieFields = PARSER_FIELDS.databricks_genie;
 const keysInOrder = genieFields.map((f) => f.key);
@@ -31,6 +31,7 @@ const genieComposer = (overrides: Partial<ComposerState>): ComposerState => ({
   },
   ottlStatements: [],
   pullSchedule: "",
+  traceProjectId: null,
   ...overrides,
 });
 
@@ -122,6 +123,29 @@ describe("given the create input for a pull-mode source", () => {
       expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual(
         [],
       );
+    });
+  });
+
+  describe("when a trace destination was picked", () => {
+    /** @scenario "The composer of a conversation source offers a destination" */
+    it("carries it on the create request", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({ traceProjectId: "proj_analytics" }),
+        organizationId: "org-1",
+      });
+      expect(input?.traceProjectId).toBe("proj_analytics");
+    });
+  });
+
+  describe("when no trace destination was picked", () => {
+    /** @scenario "A source created without a destination routes nothing" */
+    it("creates the source anyway, carrying no destination", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
+      expect(input).not.toBeNull();
+      expect(input?.traceProjectId).toBeNull();
     });
   });
 });

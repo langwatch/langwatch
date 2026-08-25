@@ -124,17 +124,16 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ### Attribute sessions to pull requests
 
-LangWatch joins a session to a pull request through the repository and branch the session reports. The session reports the directory it is working in, read at the start of the session and again after every turn. Two rules follow from how Claude Code tracks that directory:
+LangWatch joins a session to a pull request through the repository and branch the session reports. Two channels report it, and together they cover every way a session moves:
 
-- A `cd` inside the Bash tool does not move the session. The session still reports the directory it was launched in.
-- A native switch with the EnterWorktree tool does move the session. From then on it reports the repository and branch of the worktree it entered.
+- **Automatic**: the session reports the directory it is working in, read at the start of the session and again after every turn. A native switch with the EnterWorktree tool moves it; a `cd` inside the Bash tool does not, because the session's own directory stays where it was launched.
+- **Declared by the agent**: the agent runs `langwatch ingest context` from inside a checkout, and the session is attributed to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through the Bash tool in a directory the session never natively entered.
 
-So to get a session attributed to the pull request it works on, either start Claude Code inside a checkout of that branch, or have the session switch natively:
+The setup installs the second channel for you. The LangWatch plugin (or, without plugin support, the hooks `langwatch instrument claude` writes) tells every session to run the command when it switches repository, branch or worktree, so a session declares its own moves without you asking it to. You can also just tell a session "declare your working context" at any time.
 
-1. Create a worktree for the branch: `git -C <repo> fetch origin <branch> && git -C <repo> worktree add .claude/worktrees/<name> <branch>`
-2. Ask the session to call the EnterWorktree tool with that worktree's path.
+Work done outside any checkout, for example reviewing with `gh` commands from a home directory, attaches to no repository and no pull request, and its token cost cannot be attributed. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
 
-A long-lived session that picks up several pull requests should switch this way each time it moves to the next one. Work done from a directory outside any checkout, for example reviewing with `gh` commands from a home directory, attaches to no repository and no pull request, and its token cost cannot be attributed. The per pull request rollup is available over the API as [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage).
+One limit to know: a session keeps the first repository it reported. A later declaration for a different branch of the same repository is attributed in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository keeps that session's row on the first repository.
 
 ## Content and privacy
 

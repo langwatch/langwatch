@@ -15,7 +15,8 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
 /**
  * tRPC router for feature flag checks.
  *
- * Uses PostHog for flag evaluation with optional project/organization targeting.
+ * Resolves through the in-code registry and the operator flag store, with
+ * optional project/organization targeting.
  * Results are cached server-side (5s TTL) and client-side (React Query).
  *
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
@@ -41,8 +42,8 @@ export const featureFlagRouter = createTRPCRouter({
       reason:
         "feature flags are read per authenticated user; no tenant data is exposed",
       allow: {
-        projectId: "for PostHog targeting, not resource access",
-        organizationId: "for PostHog targeting, not resource access",
+        projectId: "for flag targeting rules, not resource access",
+        organizationId: "for flag targeting rules, not resource access",
       },
     })
     .query(async ({ ctx, input }) => {
@@ -58,10 +59,15 @@ export const featureFlagRouter = createTRPCRouter({
         "Feature flag check requested",
       );
 
-      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS
-      // (a subset of registered PRODUCT keys), so the cast is safe;
-      // FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum value
-      // type, hence the explicit FeatureFlagKey narrowing.
+      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS, but
+      // that list is not a subset of the registry: `ops_ui_ops_menu_pinned` is
+      // deliberately unregistered, so for that one key the cast below widens a
+      // string the type system cannot vouch for. It stays sound at runtime —
+      // an unregistered key falls through to the legacy in-memory resolver and
+      // returns false — and frontendFlagsRegistered.unit.test.ts pins that
+      // exception by name so a second one cannot slip in behind it. For every
+      // other entry the cast is exact, and FeatureFlagKey is scope-agnostic,
+      // so SYSTEM and PRODUCT keys are equally valid here.
       const enabled = await featureFlagService.isEnabled(
         input.flag as FeatureFlagKey,
         {

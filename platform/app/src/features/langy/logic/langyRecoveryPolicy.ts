@@ -233,6 +233,13 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // entries rather than the `?? terminal` fallback so the coverage test pins them.
   langy_model_not_configured: terminal("langy_model_not_configured"),
   langy_model_not_allowed: terminal("langy_model_not_allowed"),
+
+  // The same wall, found later: the turn started because the model passed the
+  // allowlist, and the gateway then answered that no provider serves it. The
+  // explainer re-keys that reason chain to this kind. Deterministic in the way
+  // that matters — the identical turn asks for the identical model and gets the
+  // identical answer — so the card offers the model settings and no retry.
+  langy_model_unavailable: terminal("langy_model_unavailable"),
   langy_egress_misconfigured: terminal("langy_egress_misconfigured"),
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),

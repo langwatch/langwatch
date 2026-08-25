@@ -165,21 +165,6 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 };
 
 /**
- * The migration runner's per-tenant statuses as a sentence reads them.
- *
- * Authored rather than derived: `meta.status` is a machine sub-classifier, and
- * this registry's rule for those is to branch on the value and return copy,
- * never to render the value. Reshaping `rolled_back` into prose with string
- * surgery also only works by accident — `String.prototype.replace` with a
- * string pattern converts the FIRST match, so the first status with two
- * underscores would reach a customer half-converted.
- */
-const MIGRATION_STATUS_LABELS: Record<string, string> = {
-  parked: "parked for retry",
-  rolled_back: "already rolled back",
-};
-
-/**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
  * keying copy on them is safe; an unmapped name falls back to the generic
@@ -356,14 +341,48 @@ const presentations = {
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
   lwql_reserved_parameter_supplied: {
-    title: "The time window isn't yours to set",
-    describe: () =>
-      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+    // One code covers three reserved names, so both halves of the copy are
+    // built from the ones actually supplied (`meta.parameters`, the same list
+    // the server's own sentence is built from). Naming the window pair
+    // unconditionally told a caller that sent only the granularity step to
+    // remove two parameters it had never sent.
+    title: "That setting isn't yours to set",
+    describe: (error) => {
+      const supplied = strList(error, "parameters");
+      if (supplied.length === 0) {
+        return "Some of these parameters come from the page showing this chart. Remove them from your parameters and change the page's settings instead.";
+      }
+      const plural = supplied.length > 1;
+      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.`;
+    },
   },
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
+  // either `"declared-type"` or `"step-value"`, but the three doors that can
+  // reach this code (REST, the ad-hoc tRPC query, run-by-chart-id) now reject
+  // an off-list `granularitySeconds` at their own zod schema before a request
+  // ever reaches the service's `"step-value"` backstop, so this code is only
+  // ever live for the declaration-type fault today. One message, not a
+  // `meta`-branched pair, for a discriminator whose other branch is
+  // unreachable from every current caller.
+  lwql_granularity_parameter_type: {
+    title: "The granularity has to be declared as UInt32",
+    describe: () =>
+      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+  },
+  lwql_granularity_too_fine: {
+    title: "That granularity would return too many datapoints",
+    describe: () =>
+      "The bucket size you picked produces more datapoints than one query may return for this date range. Pick a bucket size that fits the range from the offered steps -- 1 second, 1 minute or 1 hour -- or narrow the range.",
+  },
+  lwql_granularity_requires_window: {
+    title: "Granularity needs the period parameters",
+    describe: () =>
+      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
@@ -374,6 +393,11 @@ const presentations = {
     title: "That chart id is already taken",
     describe: () =>
       "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
+  saved_workbench_chart_dashboard_not_found: {
+    title: "That dashboard isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboards and try placing the chart again.",
   },
   saved_workbench_chart_not_found: {
     title: "That saved chart isn't here",
@@ -512,6 +536,33 @@ const presentations = {
   experiment_not_found: {
     title: "Experiment not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  experiment_stale_workbench_state: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This evaluation changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  experiment_workbench_missing_reference: {
+    title: "This evaluation points at something that no longer exists",
+    describe: () =>
+      "One of its targets, evaluators or datasets was deleted. Remove it or pick another one, then save again.",
+  },
+  experiment_invalid_workbench_state: {
+    title: "This evaluation's setup could not be saved",
+    describe: () =>
+      "Part of it is incomplete. Check the targets, evaluators and datasets, then save again.",
+  },
+  experiment_type_mismatch: {
+    title: "This experiment is not an evaluation workbench",
+    describe: () =>
+      "It was made with another kind of experiment and opens in its own view. Pick an evaluation instead.",
+  },
+  experiment_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the version list to see what this evaluation still has.",
   },
   invalid_experiment_configuration: {
     // fault: platform. The saved workbench state stopped matching its schema,
@@ -718,6 +769,15 @@ const presentations = {
     title: "You can't change default models here",
     describe: () =>
       "They're managed above where you can act. Ask an admin on your team to change them.",
+  },
+  model_default_user_key_required: {
+    // Not a permission refusal like `model_default_scope_forbidden`: the
+    // person may well be allowed: the key just does not say who they are, so
+    // there is nobody to check. Only an API or CLI caller can reach this, so
+    // the copy names the two ways out rather than sending them to an admin.
+    title: "This API key can't change default models",
+    describe: () =>
+      "Default models are set per user, and this key is not tied to one. Use a user API key, or change the default in settings.",
   },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
@@ -1080,6 +1140,18 @@ const presentations = {
     describe: () =>
       "Your membership is still here with everything you did. An organization admin can turn your access back on when a seat is free.",
   },
+  migration_enrolled_automatically: {
+    title: "This migration already covers every organization",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `Every organization is already covered by ${migration}, including any created from now on, so there is nothing to enroll.`
+        : "Every organization is already covered by this migration, including any created from now on, so there is nothing to enroll.";
+    },
+  },
   migration_enrollment_already_exists: {
     title: "This organization is already enrolled",
     describe: (error) => {
@@ -1136,11 +1208,6 @@ const presentations = {
     describe: () =>
       "It arrives in a later release and will run automatically then — nothing to do until that release.",
   },
-  migration_state_not_found: {
-    title: "No migration state for that organization",
-    describe: () =>
-      "Check the organization id — only organizations a migration has already processed have state to act on.",
-  },
   migration_rollback_blocked_by_dependent: {
     title: "Another migration still stands on this one",
     describe: (error) => {
@@ -1157,15 +1224,6 @@ const presentations = {
     title: "This organization has not been cut over",
     describe: () =>
       "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
-  },
-  migration_rollback_requires_migrated_or_finalized: {
-    title: "Only a migrated or finalized organization can be rolled back",
-    describe: (error) => {
-      const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
-      return state
-        ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
-        : "This organization has not reached the ledger, so it is already on the legacy path.";
-    },
   },
   duplicate_invite: {
     title: "They already have an invite",
@@ -1627,6 +1685,51 @@ const presentations = {
       "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
+  // ---- identity ----
+  identity_verification_invalid: {
+    title: "That verification link didn't work",
+    describe: () =>
+      "Open the newest verification email and finish confirming from the place where you requested it.",
+  },
+  identity_verification_expired: {
+    title: "That verification link has expired",
+    describe: () => "Request a new verification email and use the newest link.",
+  },
+  identity_identifier_not_found: {
+    title: "That sign-in method is no longer on your account",
+    describe: () =>
+      "Refresh the page to see your current sign-in methods, then try again.",
+  },
+  identity_identifier_not_verifiable: {
+    title: "That sign-in method can't be verified right now",
+    describe: () =>
+      "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  identity_primary_must_demote_first: {
+    title: "Your primary sign-in method can't be removed",
+    describe: () =>
+      "Make another verified sign-in method primary first, then remove this one.",
+  },
+  identity_primary_requires_verified: {
+    title: "Only a verified sign-in method can be primary",
+    describe: () => "Verify this sign-in method first, then make it primary.",
+  },
+  identity_unsupported_storage_query: {
+    title: "We couldn't read your sign-in methods",
+    describe: () =>
+      "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
+  identity_email_in_use: {
+    title: "That email address is already in use",
+    describe: () =>
+      "Another account already holds it. Sign in with that account, or use a different address here.",
+  },
+  identity_engine_unavailable: {
+    title: "We couldn't finish creating your account",
+    describe: () =>
+      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
+
   // ---- governance ----
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
@@ -1893,6 +1996,51 @@ const presentations = {
     describe: () =>
       "Langy didn't finish in time. Try again, or ask for a narrower slice: a shorter time range, or a single trace.",
   },
+  langy_ui_turn_inactive: {
+    title: "Langy isn't replying right now",
+    describe: () =>
+      "Langy can only drive this page while it is answering you. Send it a message and ask again.",
+  },
+  langy_ui_action_unknown: {
+    title: "Langy tried something this page doesn't do",
+    describe: () =>
+      "Langy asked the page for an action it doesn't offer. Ask Langy to try a different way.",
+  },
+  langy_ui_payload_invalid: {
+    title: "Langy sent a change this page couldn't read",
+    describe: () =>
+      "The change didn't match what the page expects, so nothing was applied. Ask Langy to try again.",
+  },
+  langy_ui_experiment_required: {
+    title: "Langy needs to know which evaluation to change",
+    describe: () =>
+      "No page was open, and Langy didn't name the evaluation to apply the change to. Ask again with the evaluation named, or open it first.",
+  },
+  langy_ui_page_out_of_date: {
+    title: "This page is behind the saved evaluation",
+    describe: () =>
+      "The evaluation changed elsewhere, so this page could not save Langy's change. Reload the page and ask again.",
+  },
+  langy_ui_save_failed: {
+    title: "Langy's change was not saved",
+    describe: () =>
+      "The change is on this page but could not be saved. Check your connection, then ask Langy again.",
+  },
+  langy_ui_no_browser: {
+    title: "No page was open to make the change",
+    describe: () =>
+      "Langy tried to change a page you don't have open. Open the page and ask again, or ask Langy to make the change directly.",
+  },
+  langy_ui_timeout: {
+    title: "Langy's change didn't finish",
+    describe: () =>
+      "Langy tried to update this page and the update didn't finish in time. Check whether the change landed before asking it to retry.",
+  },
+  langy_ui_handler_failed: {
+    title: "Langy's change didn't apply",
+    describe: () =>
+      "The page couldn't carry out the change Langy asked for. Nothing else was affected. Ask Langy to try again.",
+  },
   langy_agent_at_capacity: {
     title: "Langy is busy right now",
     describe: () =>
@@ -1980,6 +2128,17 @@ const presentations = {
     title: "Choose a model for Langy",
     describe: () =>
       "Langy needs a model to run. Pick one in your project's model settings, then try again.",
+  },
+  langy_model_unavailable: {
+    // The other half of `langy_model_not_configured`: there nothing is chosen,
+    // here something is and this project cannot serve it. The gateway's own
+    // `model_provider_not_bound` copy says to bind the provider to the key or
+    // drop the prefix from the model name, which is correct for whoever
+    // configures a virtual key and unusable in the panel, where the model came
+    // from a menu.
+    title: "Langy can't use that model",
+    describe: () =>
+      "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
   },
   langy_codex_plan_limit: {
     // fault: provider. The limit belongs to the customer's OpenAI plan, not to

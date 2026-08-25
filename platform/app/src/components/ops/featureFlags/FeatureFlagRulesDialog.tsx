@@ -181,9 +181,9 @@ export function FeatureFlagRulesDialog({
           <VStack align="stretch" gap={3}>
             <Text fontSize="sm" color="fg.muted">
               Rules are evaluated top-to-bottom; the first match wins. When no
-              rule matches, the row-level toggle is used as the fallback. Once a
-              row exists in postgres, PostHog is no longer consulted for this
-              flag.
+              rule matches, the row-level toggle is used as the fallback. A
+              per-flag env override, where one is allowed, still wins over
+              everything here.
             </Text>
             <Box>
               <Text fontFamily="mono" fontSize="xs" color="fg.muted">

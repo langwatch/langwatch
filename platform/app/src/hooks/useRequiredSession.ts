@@ -7,6 +7,7 @@ export const publicRoutes = [
   "/auth/signup",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/verify-email",
   "/auth/error",
 ];
 
@@ -43,6 +44,15 @@ export const noOrgBouncerRoutes = [
   // just haven't created a project yet (and may never need to; governance
   // is org-scoped).
   "/governance",
+  "/governance/inventory",
+  "/governance/inventory/[id]",
+  "/governance/people",
+  "/governance/costs",
+  "/governance/billed",
+  // The retired addresses stay exempt so each redirect route renders
+  // before the bouncer fires (cost-centers precedent below).
+  "/governance/catalog",
+  "/governance/catalog/[id]",
   "/governance/ingestion-sources",
   "/governance/ingestion-sources/[id]",
   "/governance/anomaly-rules",

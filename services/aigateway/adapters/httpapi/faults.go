@@ -1,10 +1,14 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -89,17 +93,31 @@ func faultForCode(code herr.Code) Fault {
 	}
 }
 
+// requestError is one failure, as the log line states it.
+type requestError struct {
+	fault   Fault
+	code    string
+	status  int
+	message string
+	// reason is the provider's own words for a forwarded rejection, when its
+	// body states something our message does not.
+	reason string
+}
+
 // logRequestError emits the single stable failure log line CloudWatch metric
 // filters key on: msg="gateway_request_failed" with fault/code/status fields,
 // plus the calling identity when the request was authenticated.
-func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code string, status int, message string) {
+func logRequestError(logger *zap.Logger, ctx context.Context, failure requestError) {
 	fields := []zap.Field{
-		zap.String("fault", string(fault)),
-		zap.String("code", code),
-		zap.String("message", message),
+		zap.String("fault", string(failure.fault)),
+		zap.String("code", failure.code),
+		zap.String("message", failure.message),
 	}
-	if status > 0 {
-		fields = append(fields, zap.Int("status", status))
+	if failure.status > 0 {
+		fields = append(fields, zap.Int("status", failure.status))
+	}
+	if failure.reason != "" {
+		fields = append(fields, zap.String("upstream_reason", failure.reason))
 	}
 	if bundle := BundleFromContext(ctx); bundle != nil {
 		fields = append(fields,
@@ -108,7 +126,60 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 			zap.String("virtual_key_id", bundle.VirtualKeyID),
 		)
 	}
-	logger.Log(fault.level(), "gateway_request_failed", fields...)
+	logger.Log(failure.fault.level(), "gateway_request_failed", fields...)
+}
+
+// upstreamReasonLimit caps the reason field: long enough for any provider's
+// rejection sentence, short enough that a provider answering at length cannot
+// take the log line over.
+const upstreamReasonLimit = 256
+
+// upstreamReason reads the provider's own explanation out of a forwarded error
+// body. Providers state it in different places: OpenAI and Anthropic use
+// error.message, the codex backend answers "detail", several others use a bare
+// message or a plain error string. Each of those is a field the provider wrote
+// to explain itself, which is what the operator needs.
+//
+// A body in none of those shapes is described, never quoted. An HTML edge page
+// or a plain-text rejection can reflect the request that caused it, so quoting
+// it would put a prompt, a key or personal data on a log line. The status, the
+// code and the size still say who answered and that we could not read it.
+func upstreamReason(body []byte) string {
+	for _, path := range []string{"error.message", "detail", "message", "error"} {
+		if value := gjson.GetBytes(body, path); value.Type == gjson.String && value.Str != "" {
+			return cappedReason(value.Str)
+		}
+	}
+	return unreadableReason(body)
+}
+
+// unreadableReason states that a body carried no reason we can read, and how
+// big it was, with nothing of the body itself.
+func unreadableReason(body []byte) string {
+	size := len(bytes.TrimSpace(body))
+	if size == 0 {
+		return ""
+	}
+	return fmt.Sprintf("unrecognized upstream body, %d bytes", size)
+}
+
+// unstatedReason is upstreamReason minus what the message already says, so a
+// provider whose words we forwarded as the message is not quoted twice.
+func unstatedReason(message string, body []byte) string {
+	reason := upstreamReason(body)
+	if reason == "" || strings.Contains(message, reason) {
+		return ""
+	}
+	return reason
+}
+
+func cappedReason(text string) string {
+	text = strings.TrimSpace(text)
+	if len(text) <= upstreamReasonLimit {
+		return text
+	}
+	const ellipsis = "..."
+	return strings.ToValidUTF8(text[:upstreamReasonLimit-len(ellipsis)], "") + ellipsis
 }
 
 // recordClientReject counts a rejection the GATEWAY issued against the caller.
@@ -146,7 +217,13 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 		if status <= 0 {
 			status = http.StatusBadGateway
 		}
-		logRequestError(logger, ctx, faultForUpstreamStatus(ue.StatusCode), "upstream_error", status, ue.Message)
+		logRequestError(logger, ctx, requestError{
+			fault:   faultForUpstreamStatus(ue.StatusCode),
+			code:    "upstream_error",
+			status:  status,
+			message: ue.Message,
+			reason:  unstatedReason(ue.Message, ue.Body),
+		})
 		return
 	}
 	var e herr.E
@@ -155,9 +232,17 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 		if m, ok := e.Meta["message"].(string); ok {
 			msg = m
 		}
-		logRequestError(logger, ctx, faultForCode(e.Code), e.Code.String(), 0, msg)
+		logRequestError(logger, ctx, requestError{
+			fault:   faultForCode(e.Code),
+			code:    e.Code.String(),
+			message: msg,
+		})
 		recordClientReject(ctx, e.Code)
 		return
 	}
-	logRequestError(logger, ctx, FaultPlatform, "unhandled", 0, err.Error())
+	logRequestError(logger, ctx, requestError{
+		fault:   FaultPlatform,
+		code:    "unhandled",
+		message: err.Error(),
+	})
 }
