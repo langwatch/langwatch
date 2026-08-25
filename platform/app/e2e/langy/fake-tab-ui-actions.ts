@@ -73,7 +73,13 @@ function actionTransport({
   };
 }
 
-/** Which list the settled action belongs on, and what the drop is worth saying. */
+/**
+ * A settled action goes on one of two lists, and an assertion reads both.
+ *
+ * A dropped action carries the reason it was not run, because "the tab did
+ * nothing" otherwise reads the same as "the tab never saw the action", and the
+ * two are different failures.
+ */
 function fileOutcome({
   record,
   outcome,

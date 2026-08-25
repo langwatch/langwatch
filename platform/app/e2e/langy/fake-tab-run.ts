@@ -12,6 +12,7 @@ import { foldEvaluationEvent } from "~/experiments-v3/execution/resultsFold";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import type {
   EvaluationV3Event,
+  ExecutionRequest,
   ExecutionScope,
 } from "~/server/experiments-v3/execution/types";
 import { APP_BASE, PROJECT_ID } from "./config";
@@ -117,7 +118,7 @@ async function streamRunEvents({
   onEvent,
 }: {
   cookie: string;
-  request: unknown;
+  request: ExecutionRequest;
   onEvent: (event: EvaluationV3Event) => void;
 }): Promise<StreamOutcome> {
   const controller = new AbortController();

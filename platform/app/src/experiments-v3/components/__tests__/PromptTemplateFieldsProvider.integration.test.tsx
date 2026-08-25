@@ -24,6 +24,12 @@ type PromptQueryResult = {
 };
 
 const promptQueryResults = new Map<string, PromptQueryResult>();
+/** Every input the provider asked a prompt query with, in order. */
+const promptQueryInputs: Array<{
+  idOrHandle: string;
+  versionId?: string;
+  version?: number;
+}> = [];
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -31,7 +37,12 @@ vi.mock("~/utils/api", () => ({
       build: (t: {
         prompts: {
           getByIdOrHandle: (
-            input: { idOrHandle: string; projectId: string },
+            input: {
+              idOrHandle: string;
+              projectId: string;
+              versionId?: string;
+              version?: number;
+            },
             options: unknown,
           ) => PromptQueryResult;
         };
@@ -39,8 +50,12 @@ vi.mock("~/utils/api", () => ({
     ) =>
       build({
         prompts: {
-          getByIdOrHandle: (input) =>
-            promptQueryResults.get(input.idOrHandle) ?? { data: undefined },
+          getByIdOrHandle: (input) => {
+            promptQueryInputs.push(input);
+            return (
+              promptQueryResults.get(input.idOrHandle) ?? { data: undefined }
+            );
+          },
         },
       }),
   },
@@ -89,8 +104,14 @@ const renderProvider = (target: TargetConfig) => {
   );
 };
 
+const createIdPinnedTarget = (promptVersionId: string): TargetConfig => ({
+  ...createTarget(),
+  promptVersionId,
+});
+
 beforeEach(() => {
   promptQueryResults.clear();
+  promptQueryInputs.length = 0;
 });
 
 afterEach(() => {
@@ -131,6 +152,39 @@ describe("PromptTemplateFieldsProvider", () => {
       });
 
       renderProvider(createTarget(3));
+
+      expect(screen.getByTestId("resolved").textContent).toBe("unresolved");
+    });
+  });
+
+  describe("given the target is pinned by version id and names no number", () => {
+    it("asks for that version, so the mapping describes the template that runs", () => {
+      promptQueryResults.set("prompt-classifier", {
+        data: {
+          version: 3,
+          versionId: "version-3",
+          messages: [{ role: "user", content: "Classify {{product_name}}" }],
+        },
+      });
+
+      renderProvider(createIdPinnedTarget("version-3"));
+
+      expect(promptQueryInputs[0]?.versionId).toBe("version-3");
+      expect(screen.getByTestId("resolved").textContent).toBe("product_name");
+    });
+  });
+
+  describe("given the answer is a different version than the id pin", () => {
+    it("resolves nothing, rather than describing the column from the latest", () => {
+      promptQueryResults.set("prompt-classifier", {
+        data: {
+          version: 9,
+          versionId: "version-9",
+          messages: [{ role: "user", content: "Classify {{sku}}" }],
+        },
+      });
+
+      renderProvider(createIdPinnedTarget("version-3"));
 
       expect(screen.getByTestId("resolved").textContent).toBe("unresolved");
     });

@@ -12,15 +12,50 @@ import {
 /** What one resolved prompt query answers with, of the parts read here. */
 type ResolvedPrompt = {
   version?: number;
+  versionId?: string;
   messages: PromptTemplateMessage[];
+};
+
+/**
+ * Which version one column pins to, in the order the execution request reads
+ * them: the version id is the exact row, the number is the same row addressed
+ * by its place in the prompt's history.
+ */
+const versionSelectorOf = (
+  target: TargetConfig,
+): { versionId?: string; version?: number } => {
+  if (target.promptVersionId !== undefined) {
+    return { versionId: target.promptVersionId };
+  }
+  if (target.promptVersionNumber !== undefined) {
+    return { version: target.promptVersionNumber };
+  }
+  return {};
+};
+
+/** Whether an answer is the version the column pinned to. */
+const isThePinnedVersion = ({
+  target,
+  prompt,
+}: {
+  target: TargetConfig;
+  prompt: ResolvedPrompt;
+}): boolean => {
+  if (target.promptVersionId !== undefined) {
+    return prompt.versionId === target.promptVersionId;
+  }
+  if (target.promptVersionNumber !== undefined) {
+    return prompt.version === target.promptVersionNumber;
+  }
+  return true;
 };
 
 /**
  * The variables one column's template really consumes.
  *
  * Undefined when the answer is not the template this column runs: the query
- * asks for the pinned version, so a version mismatch means describing the
- * column from the wrong template, which is worse than describing nothing.
+ * asks for the pinned version, so a mismatch means describing the column from
+ * the wrong template, which is worse than describing nothing.
  */
 const fieldsUsedByTarget = ({
   target,
@@ -30,12 +65,7 @@ const fieldsUsedByTarget = ({
   prompt: ResolvedPrompt | null | undefined;
 }): Set<string> | undefined => {
   if (!prompt) return undefined;
-  if (
-    target.promptVersionNumber !== undefined &&
-    target.promptVersionNumber !== prompt.version
-  ) {
-    return undefined;
-  }
+  if (!isThePinnedVersion({ target, prompt })) return undefined;
   return getFieldsUsedByPromptTemplate({
     messages: prompt.messages,
     declaredFieldIds: (target.inputs ?? []).map((input) => input.identifier),
@@ -82,9 +112,7 @@ export const PromptTemplateFieldsProvider = ({
           // decides which variables are required is that version's. Asking for
           // the latest and dropping it when it disagrees left the column with
           // no required fields at all, which reads as "nothing to map".
-          ...(target.promptVersionNumber !== undefined
-            ? { version: target.promptVersionNumber }
-            : {}),
+          ...versionSelectorOf(target),
         },
         {
           enabled: !!target.promptId && !!projectId,
@@ -100,6 +128,7 @@ export const PromptTemplateFieldsProvider = ({
   const resolvedSignature = JSON.stringify(
     promptTargets.map((target, index) => [
       target.id,
+      target.promptVersionId ?? null,
       target.promptVersionNumber ?? null,
       promptQueries[index]?.data?.versionId ?? null,
       (target.inputs ?? []).map((input) => input.identifier),
