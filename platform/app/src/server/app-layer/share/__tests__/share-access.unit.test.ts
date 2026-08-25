@@ -201,6 +201,7 @@ describe("engineShareAccessDecider", () => {
       expect(outcome.allowed).toBe(false);
     });
 
+    /** @scenario An annotate link reads the trace it may comment on */
     it("grants a link whose permission covers the read and more", async () => {
       const outcome = await presentToken(
         deciderOver(
