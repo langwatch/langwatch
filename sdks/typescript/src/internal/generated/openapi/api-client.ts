@@ -2720,10 +2720,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        /** @description List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
         get: operations["listScimTokens"];
         put?: never;
-        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        /** @description Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately. */
         post: operations["createScimToken"];
         delete?: never;
         options?: never;
@@ -20557,6 +20557,7 @@ export interface operations {
                         tokens: {
                             id: string;
                             description: string | null;
+                            connectionId: string | null;
                             createdAt: string;
                             lastUsedAt: string | null;
                         }[];
@@ -20576,6 +20577,7 @@ export interface operations {
             content: {
                 "application/json": {
                     description?: string;
+                    connectionId?: string;
                 };
             };
         };
@@ -20589,6 +20591,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         token: string;
+                        connectionId: string;
                         description: string | null;
                     };
                 };

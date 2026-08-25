@@ -43834,6 +43834,12 @@
                               "null"
                             ]
                           },
+                          "connectionId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -43847,6 +43853,7 @@
                         "required": [
                           "id",
                           "description",
+                          "connectionId",
                           "createdAt",
                           "lastUsedAt"
                         ]
@@ -43861,7 +43868,7 @@
             }
           }
         },
-        "description": "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
+        "description": "List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
         "tags": [
           "SCIM Tokens"
         ],
@@ -43887,6 +43894,9 @@
                     "token": {
                       "type": "string"
                     },
+                    "connectionId": {
+                      "type": "string"
+                    },
                     "description": {
                       "type": [
                         "string",
@@ -43897,6 +43907,7 @@
                   "required": [
                     "id",
                     "token",
+                    "connectionId",
                     "description"
                   ]
                 }
@@ -43904,7 +43915,7 @@
             }
           }
         },
-        "description": "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+        "description": "Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately.",
         "tags": [
           "SCIM Tokens"
         ],
@@ -43919,6 +43930,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
