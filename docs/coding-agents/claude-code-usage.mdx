@@ -1,7 +1,15 @@
 ---
-title: Track your Claude Code usage
-description: See what you spend per session, which models you hit, how many tokens are cached, and the full prompt + response trail. Two paths, depending on whether you pay Anthropic per token or on a Claude Max / Pro plan.
+title: Track Your Claude Code Usage
 sidebarTitle: Track your Claude Code usage
+description: See Claude Code usage per session: what you spent, which models you hit, how many tokens came from cache, and the full prompt and response trail. Works on pay-per-token API keys and on Claude Max and Pro plans.
+keywords:
+  - claude code usage
+  - ccusage
+  - claude code cost
+  - claude code token usage
+  - claude code usage tracking
+  - claude max usage
+  - claude code analytics
 ---
 
 The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs. Without that, you can't debug your own agent.
@@ -14,6 +22,8 @@ This guide wires Claude Code up so all of that lands on LangWatch, where you can
 - Full prompt body
 - Trace tree of tool calls, latencies, and durations
 - **Have your agent automatically self-improve by inspecting its own traces, via [LangWatch skills](https://langwatch.ai/docs/skills/directory) or [MCP](https://langwatch.ai/docs/integration/mcp)**
+
+If you already read your local usage with `ccusage`, this is the same accounting with the conversation attached, kept across every machine you work on, and reported the same way for Codex, Copilot, Gemini CLI and opencode.
 
 How you pay Anthropic decides which path you walk:
 

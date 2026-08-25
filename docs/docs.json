@@ -830,7 +830,7 @@
             "pages": [
               "coding-agents/overview",
               "coding-agents/quickstart",
-              "coding-agents/track-your-claude-code-usage"
+              "coding-agents/claude-code-usage"
             ]
           },
           {
@@ -1655,7 +1655,7 @@
     },
     {
       "source": "/ai-governance/track-your-claude-code-usage",
-      "destination": "/coding-agents/track-your-claude-code-usage"
+      "destination": "/coding-agents/claude-code-usage"
     },
     {
       "source": "/ai-governance/explore-your-usage-with-your-own-agent",

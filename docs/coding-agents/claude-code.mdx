@@ -1,7 +1,15 @@
 ---
-title: Claude Code Integration Guide
+title: Claude Code Monitoring with OpenTelemetry
 sidebarTitle: Claude Code
-description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+description: Monitor Claude Code with OpenTelemetry. Send sessions, cost and traces to LangWatch with one command, or set CLAUDE_CODE_ENABLE_TELEMETRY and the OTEL_ variables by hand.
+keywords:
+  - claude code monitoring
+  - claude code opentelemetry
+  - claude_code_enable_telemetry
+  - claude code otel
+  - claude code telemetry
+  - claude code traces
+  - monitor claude code
 ---
 
 Claude Code reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
@@ -204,7 +212,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
 }
 ```
 
-To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/coding-agents/track-your-claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper). To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
+To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/coding-agents/claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper). To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
 
 ### Team attribution
 
