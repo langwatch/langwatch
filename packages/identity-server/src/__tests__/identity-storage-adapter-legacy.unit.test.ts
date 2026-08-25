@@ -253,36 +253,39 @@ describe("better-auth over the identity storage adapter", () => {
     });
 
     /** @scenario "A connection is found by its own issuer, not refused for it" */
-    it("finds a connection's account by the real issuer its provider brings", async () => {
+    it("finds a connection's account the way the callback actually looks for it", async () => {
       await signUp(identity.auth, EMAIL);
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;
       // A connection id, in the shape `newSsoConnectionId` mints under a
-      // non-production environment prefix.
+      // non-production environment prefix, and the issuer it registered.
       const connectionId = "local_ssoc_00006mVlCMfpl4S67cYCs9ZC272Ho";
+      const issuer = "https://idp.acme1.test";
       const subject = "t1-user-admin";
+      identity.registerConnection({ providerId: connectionId, issuer });
 
-      // The first sign-in, which is the one that used to work.
+      // The first sign-in, which is the one that always worked.
       await context.internalAdapter.linkAccount({
         userId,
         providerId: connectionId,
-        issuer: "https://idp.acme1.test",
+        issuer,
         accountId: subject,
       });
 
-      // The second sign-in: the same lookup the callback makes before it
-      // decides whether to create. Answering null here is what sent it into
-      // a duplicate insert and a unique-constraint failure.
-      const row = await context.adapter.findOne({
-        model: "account",
-        where: [
-          { field: "providerId", value: connectionId },
-          { field: "issuer", value: "https://idp.acme1.test" },
-          { field: "accountId", value: subject },
-        ],
+      // THE SECOND SIGN-IN, keyed the way better-auth keys it:
+      // `findAccountOwnerByKey` sends the issuer and the subject and NO
+      // provider id at all. Answering null here is what sent the callback
+      // into a duplicate insert and a unique-constraint failure.
+      const owner = await context.internalAdapter.findAccountOwnerByKey({
+        issuer,
+        accountId: subject,
       });
 
-      expect(row).not.toBeNull();
+      expect(owner).not.toBeNull();
+      // And the row comes back wearing the issuer the ceremony is running
+      // for. A synthetic one fails 1.7's own `acc.issuer === account.issuer`
+      // comparison, so finding the row would not have been enough by itself.
+      expect(owner?.account.issuer).toBe(issuer);
     });
 
     /** @scenario "An issuer the legacy table cannot answer returns no rows instead of throwing" */

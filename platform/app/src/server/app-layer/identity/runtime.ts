@@ -118,6 +118,7 @@ import {
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
+import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
@@ -911,6 +912,7 @@ const identityStorage = createIdentityStorageAdapter({
   legacyEngine: prismaAdapter(prisma, { provider: "postgresql" }),
   accounts: identityAccounts,
   resolution: identityResolution,
+  connectionIssuers: new PrismaSsoConnectionIssuers(prisma),
   ceremonies: identityCeremonies(),
   isUserOnIdentityWrites: isLatched,
   isAnyoneOnIdentityWrites: isAnyoneLatched,

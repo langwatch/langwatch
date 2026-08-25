@@ -34,6 +34,7 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "./storage-ports";
 
@@ -65,6 +66,12 @@ export interface IdentityStorageAdapterDeps {
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
   accounts: IdentityAccountsPort;
   resolution: IdentityResolutionPort;
+  /**
+   * The issuer each connection registered, both ways. Required rather than
+   * optional: without it the legacy branch silently cannot serve a single
+   * connection, which is the shape of failure this port exists to end.
+   */
+  connectionIssuers: IdentityConnectionIssuersPort;
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
@@ -167,6 +174,7 @@ function identityCustomAdapter({
   legacy,
   accounts,
   resolution,
+  connectionIssuers,
   ceremonies,
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
@@ -643,10 +651,10 @@ function identityCustomAdapter({
      *   widened account key is how one IdP's subject resolves another IdP's
      *   user.
      */
-    const legacyAccountWhere = (
+    const legacyAccountWhere = async (
       model: string,
       where: readonly CleanedWhere[] | undefined,
-    ): readonly CleanedWhere[] | undefined | null => {
+    ): Promise<readonly CleanedWhere[] | undefined | null> => {
       if (where === undefined) return where;
       const canonicalNameOf = (clause: CleanedWhere): string =>
         getDefaultFieldName({ model, field: clause.field });
@@ -691,8 +699,24 @@ function identityCustomAdapter({
         if (derived === null && isSsoConnectionId(providerId)) return rest;
         return null;
       }
-      if (derived === null) return null;
-      return [...rest, { ...issuerClause, field: "providerId", value: derived }];
+
+      // AN ISSUER STANDING ALONE, which is the shape that actually matters:
+      // `findAccountOwnerByKey` — the OAuth callback's lookup — sends the
+      // issuer and the subject and NO provider id at all. A synthetic issuer
+      // decodes; a connection's real one has to be looked up, because the
+      // connection wrote it down when it registered.
+      const registered =
+        derived === null
+          ? await connectionIssuers.providerIdForIssuer({ issuer })
+          : derived;
+      // Still nobody's: an issuer no connection registered and no provider id
+      // encodes. Widening to "any provider" here is precisely how one
+      // identity provider's subject would resolve another's user.
+      if (registered === null) return null;
+      return [
+        ...rest,
+        { ...issuerClause, field: "providerId", value: registered },
+      ];
     };
 
     /** The same column, kept out of a legacy WRITE: the engine would refuse
@@ -714,13 +738,24 @@ function identityCustomAdapter({
      * because the legacy table never stored a real one: a provider with an
      * issuer of its own arrived after the identity branch existed to hold it.
      */
-    const withLegacyIssuer = (model: string, row: Row): Row => {
+    const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
       if (modelOf(model) !== "account") return row;
       if (row.issuer != null) return row;
       const providerId = row.providerId;
-      return typeof providerId === "string"
-        ? { ...row, issuer: issuerForProviderId(providerId) }
-        : row;
+      if (typeof providerId !== "string") return row;
+      // A CONNECTION GETS THE ISSUER IT REGISTERED, not a synthetic one.
+      // 1.7 compares the issuer on the row it is handed against the issuer
+      // the ceremony is running for (`acc.issuer === account.issuer`, and
+      // again under `requireExactAccountBinding`). Minting `local:oauth:<id>`
+      // for a connection fails that comparison every time, so finding the row
+      // at all would not have been enough on its own.
+      const registered = await connectionIssuers.registeredIssuerFor({
+        providerId,
+      });
+      return {
+        ...row,
+        issuer: registered ?? issuerForProviderId(providerId),
+      };
     };
 
     const adapter: CustomAdapter = {
@@ -753,7 +788,7 @@ function identityCustomAdapter({
           // ceremony pinned would stop being the row's.
           forceAllowId: true,
         });
-        return toStorageKeys(model, withLegacyIssuer(model, row)) as never;
+        return toStorageKeys(model, await withLegacyIssuer(model, row)) as never;
       },
 
       findOne: async ({ model, where, select, join }) => {
@@ -768,7 +803,7 @@ function identityCustomAdapter({
             const row = rows[0];
             return row ? (toStorageKeys(model, { ...row }) as never) : null;
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return null;
           legacyWhere = translated;
         }
@@ -783,7 +818,7 @@ function identityCustomAdapter({
         });
         return found === null
           ? null
-          : (toStorageKeys(model, withLegacyIssuer(model, found)) as never);
+          : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
       },
 
       findMany: async ({
@@ -816,7 +851,7 @@ function identityCustomAdapter({
               .slice(0, limit)
               .map((row) => toStorageKeys(model, { ...row })) as never;
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return [] as never;
           legacyWhere = translated;
         }
@@ -832,16 +867,18 @@ function identityCustomAdapter({
           offset,
           join,
         });
-        return found.map((row) =>
-          toStorageKeys(model, withLegacyIssuer(model, row)),
-        ) as never;
+        return (await Promise.all(
+          found.map(async (row) =>
+            toStorageKeys(model, await withLegacyIssuer(model, row)),
+          ),
+        )) as never;
       },
 
       count: async ({ model, where }) => {
         if (modelOf(model) === "account") {
           const rows = await routeAccount({ model, operation: "count", where });
           if (rows !== null) return rows.length;
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return 0;
           return legacy.count({ model, where: translated });
         }
@@ -873,7 +910,7 @@ function identityCustomAdapter({
               ? null
               : (toStorageKeys(model, { ...fresh }) as never);
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return null;
           legacyWhere = translated;
         }
@@ -912,7 +949,7 @@ function identityCustomAdapter({
         });
         return row === null
           ? null
-          : (toStorageKeys(model, withLegacyIssuer(model, row)) as never);
+          : (toStorageKeys(model, await withLegacyIssuer(model, row)) as never);
       },
 
       updateMany: async ({ model, where, update }) => {
@@ -933,7 +970,7 @@ function identityCustomAdapter({
             });
             return rows.length;
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return 0;
           legacyWhere = translated;
         }
@@ -968,7 +1005,7 @@ function identityCustomAdapter({
             await detachOnIdentityBranch(rows);
             return;
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return;
           await legacy.delete({ model, where: translated });
           return;
@@ -995,7 +1032,7 @@ function identityCustomAdapter({
               erasingUser: isWholeUserScope(model, where),
             });
           }
-          const translated = legacyAccountWhere(model, where);
+          const translated = await legacyAccountWhere(model, where);
           if (translated === null) return 0;
           return legacy.deleteMany({ model, where: translated });
         }

@@ -83,14 +83,23 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # and its subject, which reached the person as a generic "something went
   # wrong". Every RETURNING person on a connection hit it.
   #
-  # The provider id beside the issuer is a connection id, unique to one
-  # identity provider by construction, so answering widens nothing.
+  # The lookup carries the ISSUER AND THE SUBJECT and no provider id at all,
+  # so nothing in the clause can be decoded: the mapping has to be read from
+  # the connection's own registration. An issuer nobody registered is still
+  # unanswerable, which is what keeps one provider's subject from resolving
+  # another's user.
+  #
+  # Both directions matter. Finding the row is not enough on its own — the
+  # row is handed back to a library that compares the issuer on it against
+  # the issuer the ceremony is running for, so a synthetic one fails just as
+  # surely as a missing row.
   @unit
   Scenario: A connection is found by its own issuer, not refused for it
     Given a user "olga" whose identifier backfill has not finalized
     And "olga" has signed in once through a single sign-on connection
-    When better-auth reads that account keyed by the connection and its real issuer
+    When better-auth looks that account up by the issuer and the subject alone
     Then the account row is returned
+    And it carries the issuer the connection registered, not a synthesized one
     And the legacy engine is never queried with the issuer column
 
   @unit

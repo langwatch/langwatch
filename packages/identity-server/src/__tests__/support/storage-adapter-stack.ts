@@ -21,6 +21,7 @@ import {
 import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
 import type {
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
@@ -352,6 +353,25 @@ export function identityStack({
     ? inertIdentityPorts.resolution
     : storage;
 
+  /**
+   * The connection registry, over the same rows production reads: one
+   * `ssoProvider` row per connection, carrying the issuer it registered.
+   * Tests put a row in with `registerConnection` and the branch can then
+   * translate that issuer both ways, exactly as it does against Postgres.
+   */
+  const connectionIssuers: IdentityConnectionIssuersPort = {
+    providerIdForIssuer: async ({ issuer }) => {
+      const row = (db.ssoProvider ?? []).find((held) => held.issuer === issuer);
+      return typeof row?.providerId === "string" ? row.providerId : null;
+    },
+    registeredIssuerFor: async ({ providerId }) => {
+      const row = (db.ssoProvider ?? []).find(
+        (held) => held.providerId === providerId,
+      );
+      return typeof row?.issuer === "string" ? row.issuer : null;
+    },
+  };
+
   const bridge = bridgeAccountCeremonies({
     ceremonies,
     routesToIdentity: birthAwareGate(isUserOnIdentityWrites),
@@ -363,6 +383,7 @@ export function identityStack({
         : memoryAdapter(db),
       accounts,
       resolution,
+      connectionIssuers,
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
@@ -391,6 +412,17 @@ export function identityStack({
     migrationState,
     engine,
     events,
+    /** Registers a connection, the way its setup journey would have. */
+    registerConnection: ({
+      providerId,
+      issuer,
+    }: {
+      providerId: string;
+      issuer: string;
+    }) => {
+      db.ssoProvider ??= [];
+      db.ssoProvider.push({ id: providerId, providerId, issuer, domain: "" });
+    },
   };
 }
 
