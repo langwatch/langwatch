@@ -558,11 +558,19 @@ describe("Feature: Role bindings REST API", () => {
           expiresAt,
         });
 
-        expect(response.status).toBe(201);
         // The round trip is the point: the service forwarding `expiresAtMs` is
         // proven at the unit level, but nothing showed the boundary parsing an
         // ISO string, storing it, and serialising it back unchanged.
-        expect((await response.json()).expiresAt).toBe(expiresAt);
+        //
+        // Asserted as one object so a refusal names itself. `toBe(201)` on its
+        // own reports "expected 409 to be 201" and leaves the reason in the
+        // response body nobody reads.
+        const body = await response.json();
+        expect({ status: response.status, code: body.code }).toEqual({
+          status: 201,
+          code: undefined,
+        });
+        expect(body.expiresAt).toBe(expiresAt);
       });
 
       /** @scenario "A binding with no end date reports none" */
