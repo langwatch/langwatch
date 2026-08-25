@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
+import type { TopicService } from "@langwatch/topic-contract";
 import type {
   EvaluationService,
   EvaluationSummary,
 } from "@langwatch/evaluation-contract";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
-import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {

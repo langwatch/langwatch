@@ -101,12 +101,6 @@ import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
-import type {
-  ClusteringPageOutcome,
-  ClusteringRunContext,
-} from "./topic-clustering/clustering";
-import type { TopicService } from "./topic-clustering/topic.service";
-import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -122,6 +116,7 @@ import type { PromptService } from "@langwatch/prompt-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
+import type { TopicService } from "@langwatch/topic-contract";
 
 export interface DataRetentionDependencies {
   policy: DataRetentionPolicyService;
@@ -204,25 +199,8 @@ export interface AppDependencies {
   suiteRuns: {
     runs: SuiteRunService;
   };
-  /**
-   * ADR-051 §7: read side of topic clustering. The commands live on
-   * `commands.topicClustering` and are merged onto the same `app.topicClustering`
-   * facade, so callers get status reads and clustering requests from one place.
-   */
-  topicClustering: {
-    status: TopicClusteringStatusService;
-    topics: TopicService;
-    /**
-     * One clustering page, already bound to the composition root's ClickHouse
-     * resolver. Callers outside the event-sourcing runtime take the page from
-     * here instead of resolving a client of their own.
-     */
-    runPage: (params: {
-      projectId: string;
-      searchAfter?: [number, string];
-      runContext?: ClusteringRunContext;
-    }) => Promise<ClusteringPageOutcome>;
-  };
+  /** One process-owned Topic capability shared by reads and transports. */
+  topics: TopicService;
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment
    * without ClickHouse, where the budget service falls back to Postgres.

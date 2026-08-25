@@ -51,10 +51,12 @@ export const topicClusteringRunHistoryEntrySchema = z.object({
   skippedReason: z.string().nullable(),
   errorCode: z.string().nullable(),
   isErrorUserActionable: z.boolean(),
-  tracesProcessed: z.number().int().nonnegative(),
-  topicsCount: z.number().int().nonnegative(),
-  subtopicsCount: z.number().int().nonnegative(),
-  pages: z.number().int().nonnegative(),
+  // These are projection counters. Keep the read contract numeric (rather
+  // than adding a new rejection policy to this compatibility surface).
+  tracesProcessed: z.number(),
+  topicsCount: z.number(),
+  subtopicsCount: z.number(),
+  pages: z.number(),
 }).strict();
 
 export type TopicClusteringRunHistoryEntry = z.infer<

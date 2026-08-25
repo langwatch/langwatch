@@ -1,13 +1,13 @@
-import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
+import {
+  clusterTopicsForProject,
+  type ClusteringPageOutcome,
+} from "~/server/app-layer/topic-clustering/clustering";
 
 export default async function execute(projectId: string) {
-  // The App owns the ClickHouse resolver clustering reads through, so the task
-  // boots it and takes the clustering page from there rather than wiring its
-  // own.
-  initializeDefaultApp();
-  const { runPage } = getApp().topicClustering;
+  // The App owns the ClickHouse resolver; the task calls the clustering
+  // algorithm directly because it is not an App service surface.
+  const app = initializeDefaultApp();
 
   // One stable run identity for the whole walk, so re-recorded pages dedupe
   // instead of appending a fresh topics_recorded chain on every re-run.
@@ -15,10 +15,11 @@ export default async function execute(projectId: string) {
   let page = 1;
   let searchAfter: ClusteringPageOutcome["nextSearchAfter"];
   do {
-    const outcome = await runPage({
+    const outcome = await clusterTopicsForProject({
       projectId,
       searchAfter,
       runContext: { runId, page },
+      resolveClickHouseClient: app.clickhouse.resolveClient,
     });
     console.log(
       `mode=${outcome.mode} traces=${outcome.tracesProcessed}` +

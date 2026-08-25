@@ -351,7 +351,7 @@ export const projectRouter = createTRPCRouter({
         // ask it first and report which of the two the click actually did.
         // Best effort by nature: the scheduler, not this check, is what keeps
         // two runs off one project.
-        if (await ctx.app.topicClustering.status.isRunInFlight(input)) {
+        if ((await ctx.app.topics.getClusteringStatus(input)).isRunInFlight) {
           return {
             started: false as const,
             reason: "already_running" as const,

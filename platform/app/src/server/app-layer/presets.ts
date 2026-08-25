@@ -360,14 +360,14 @@ import { AppSuiteExecutionPort } from "../suites/suite-run.executor";
 import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
-import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
-import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
+import type {
+  ClusteringPageOutcome,
+  ClusteringRunContext,
+} from "./topic-clustering/clustering";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
-import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
-import { TopicService } from "./topic-clustering/topic.service";
-import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
+import { AppTopicRuntime } from "~/runtime/app/features/topic";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
@@ -452,12 +452,15 @@ export function initializeDefaultApp(options?: {
     return client;
   };
 
-  // Clustering reads ClickHouse directly (its query has no repository yet), so
-  // it takes the resolver as a parameter. Bound once here, then handed to both
-  // the event-sourcing run port and the App, so no caller re-derives one.
-  const runClusteringPage: AppDependencies["topicClustering"]["runPage"] = (
-    params,
-  ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
+  const processStore = new PrismaProcessStore(prisma);
+
+  // Bind the clustering page runner once for the Eventing process.
+  const runClusteringPage = (params: {
+    projectId: string;
+    searchAfter?: [number, string];
+    runContext?: ClusteringRunContext;
+  }): Promise<ClusteringPageOutcome> =>
+    clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
   // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
@@ -611,7 +614,10 @@ export function initializeDefaultApp(options?: {
     "TraceSummaryService",
   );
   const topics = traced(
-    new TopicService(new PrismaTopicRepository(prisma)),
+    AppTopicRuntime.create({
+      database: prisma,
+      processStore,
+    }).build(),
     "TopicService",
   );
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
@@ -1113,7 +1119,7 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
       PLATFORM_DEFAULT_RETENTION_DAYS,
     ),
-    processStore: new PrismaProcessStore(prisma),
+    processStore,
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -2083,13 +2089,7 @@ export function initializeDefaultApp(options?: {
     simulations,
     simulationExports,
     suiteRuns: { runs: suiteRunService },
-    topicClustering: {
-      status: new TopicClusteringStatusService(
-        new PrismaTopicClusteringStatusRepository(prisma),
-      ),
-      topics,
-      runPage: runClusteringPage,
-    },
+    topics,
     gateway: {
       budgetOverview: governanceRuntime.budgetOverview,
       budgetDecisions: GatewayBudgetService.create(
@@ -2443,6 +2443,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     executor: null,
     database: DEFAULT_LWQL_DATABASE,
   });
+  const testTopics = AppTopicRuntime.create({
+    database: testPrisma,
+    processStore: new PrismaProcessStore(testPrisma),
+  }).build();
 
   return new App({
     config,
@@ -2472,7 +2476,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           new TraceListService(
             new NullTraceListRepository(),
             testEvaluationService,
-            new TopicService(new NullTopicRepository()),
+            testTopics,
           ),
           "TraceListService",
         ),
@@ -2581,15 +2585,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     suiteRuns: {
       runs: testSuiteRuns,
     },
-    topicClustering: {
-      status: new TopicClusteringStatusService(
-        new PrismaTopicClusteringStatusRepository(testPrisma),
-      ),
-      topics: new TopicService(new PrismaTopicRepository(testPrisma)),
-      runPage: () => {
-        throw new Error("Topic clustering is not available in the test app");
-      },
-    },
+    topics: testTopics,
     gateway: {
       budgetOverview: testGovernanceRuntime.budgetOverview,
       budgetDecisions: GatewayBudgetService.create(testPrisma),

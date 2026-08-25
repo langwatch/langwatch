@@ -51,7 +51,6 @@ export class PrismaTopicRepository extends TopicRepository {
   async findAll(input: TopicProjectInput): Promise<Topic[]> {
     const rows = await this.database.topic.findMany({
       where: { projectId: input.projectId },
-      orderBy: { createdAt: "asc" },
       select: {
         id: true,
         name: true,
@@ -116,6 +115,8 @@ export class PrismaTopicRepository extends TopicRepository {
         select: { Runs: true },
       });
     if (!row) return [];
-    return runsSchema.parse(row.Runs);
+    // Malformed projection JSON is an empty rebuildable history.
+    const parsed = runsSchema.safeParse(row.Runs);
+    return parsed.success ? parsed.data : [];
   }
 }

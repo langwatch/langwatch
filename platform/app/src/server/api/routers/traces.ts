@@ -166,7 +166,7 @@ export const tracesRouter = createTRPCRouter({
 
       const topicsMap = Object.fromEntries(
         (
-          await getApp().topicClustering.topics.getAll({
+          await ctx.app.topics.getAll({
             projectId: input.projectId,
           })
         ).map((topic) => [topic.id, topic]),

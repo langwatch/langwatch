@@ -1,7 +1,9 @@
 Feature: Topic read surface
 
   The Topic service is the single read capability for the projected topic
-  model and its clustering status.
+  model and its clustering status, exposed through the process-owned
+  application's `app.topics`. Clustering commands, process logic and
+  projections remain application-owned.
 
   Scenario: list topics for a project
     When a caller asks the Topic service for a project's topics
@@ -16,3 +18,8 @@ Feature: Topic read surface
     When a caller asks for a project's clustering status
     Then it receives the projected outcome and the next durable wake
     And run history contains no raw provider error text
+
+  Scenario: tolerate an unavailable history projection
+    Given the history JSON is missing or malformed
+    When a caller asks for the project's clustering history
+    Then it receives an empty history that can be rebuilt from events

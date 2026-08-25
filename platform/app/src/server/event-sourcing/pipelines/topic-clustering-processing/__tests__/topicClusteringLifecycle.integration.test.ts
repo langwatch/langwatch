@@ -3,11 +3,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
-import { PrismaTopicClusteringStatusRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-status.repository";
 import { PrismaTopicModelProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-model-projection.prisma.repository";
 import { seedProjectTopicModel } from "~/server/app-layer/topic-clustering/seedTopicModel";
-import { TopicClusteringStatusService } from "~/server/app-layer/topic-clustering/topic-clustering-status.service";
+import { AppTopicRuntime } from "~/runtime/app/features/topic";
 import { prisma } from "~/server/db";
+import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import {
@@ -124,6 +124,10 @@ describe.skipIf(!hasTestcontainers)(
   "topic clustering lifecycle (commands → event log → Postgres projections)",
   () => {
     let eventSourcing: EventSourcing;
+    const topics = AppTopicRuntime.create({
+      database: prisma,
+      processStore: new PrismaProcessStore(prisma),
+    }).build();
     // The registered pipeline's command handles (send-capable), assigned in
     // beforeAll once the pipeline is registered.
     let commands: any;
@@ -174,11 +178,6 @@ describe.skipIf(!hasTestcontainers)(
     }, 60_000);
 
     describe("when a manual run goes through its whole lifecycle", () => {
-      const statusService = () =>
-        new TopicClusteringStatusService(
-          new PrismaTopicClusteringStatusRepository(prisma),
-        );
-
       it("records the ask, the start, the topics, and the finish where the settings page reads them", async () => {
         const projectId = projectIdFlow;
         const runId = `manual-${ns}`;
@@ -199,7 +198,7 @@ describe.skipIf(!hasTestcontainers)(
         }, "the manual request to reach the run-status projection");
 
         // Wait: the ask alone reads as in flight (and only a MANUAL ask may).
-        const asked = await statusService().getByProjectId({ projectId });
+        const asked = await topics.getClusteringStatus({ projectId });
         expect(asked.isRunInFlight).toBe(true);
         expect(asked.isInProgress).toBe(false);
 
@@ -212,7 +211,7 @@ describe.skipIf(!hasTestcontainers)(
           page: 1,
         });
         const started = await waitFor(async () => {
-          const status = await statusService().getByProjectId({ projectId });
+          const status = await topics.getClusteringStatus({ projectId });
           return status.isInProgress ? status : null;
         }, "the run start to reach the run-status projection");
         expect(started.isRunInFlight).toBe(true);
@@ -265,7 +264,7 @@ describe.skipIf(!hasTestcontainers)(
           subtopicsCount: 1,
         });
         const finished = await waitFor(async () => {
-          const status = await statusService().getByProjectId({ projectId });
+          const status = await topics.getClusteringStatus({ projectId });
           return status.lastRunOutcome === "completed" ? status : null;
         }, "the completion to reach the run-status projection");
         expect(finished.isInProgress).toBe(false);
@@ -274,7 +273,7 @@ describe.skipIf(!hasTestcontainers)(
         expect(finished.lastRunTracesProcessed).toBe(42);
 
         const history = await waitFor(async () => {
-          const runs = await statusService().getRunHistoryByProjectId({
+          const runs = await topics.getClusteringRunHistory({
             projectId,
           });
           return runs.length > 0 ? runs : null;

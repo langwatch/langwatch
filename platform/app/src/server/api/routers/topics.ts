@@ -6,9 +6,7 @@ export const topicsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      // The projected topic model is the source of truth; read it through
-      // the topic-clustering service, never straight at the table.
-      return await ctx.app.topicClustering.topics.getAll({
+      return await ctx.app.topics.getAll({
         projectId: input.projectId,
       });
     }),
@@ -17,7 +15,7 @@ export const topicsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return await ctx.app.topicClustering.status.getByProjectId({
+      return await ctx.app.topics.getClusteringStatus({
         projectId: input.projectId,
       });
     }),
@@ -26,7 +24,7 @@ export const topicsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return await ctx.app.topicClustering.status.getRunHistoryByProjectId({
+      return await ctx.app.topics.getClusteringRunHistory({
         projectId: input.projectId,
       });
     }),

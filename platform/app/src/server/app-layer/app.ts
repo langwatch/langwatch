@@ -74,8 +74,8 @@ export class App {
   readonly simulations: AppDependencies["simulations"];
   readonly simulationExports: AppDependencies["simulationExports"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
-  readonly topicClustering: AppDependencies["topicClustering"] &
-    AppCommands["topicClustering"];
+  readonly topics: AppDependencies["topics"];
+  readonly topicClustering: AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
     AppCommands["codingAgents"];
   readonly gateway: AppDependencies["gateway"];
@@ -187,10 +187,8 @@ export class App {
     this.simulations = deps.simulations;
     this.simulationExports = deps.simulationExports;
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
-    this.topicClustering = {
-      ...deps.topicClustering,
-      ...deps.commands.topicClustering,
-    };
+    this.topics = deps.topics;
+    this.topicClustering = deps.commands.topicClustering;
     this.codingAgents = {
       ...deps.codingAgents,
       ...deps.commands.codingAgents,
