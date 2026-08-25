@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
@@ -29,7 +29,7 @@ export default defineConfig({
     // action manifest and UI-action orchestration, so this suite imports from
     // `~/...` the same way the app does. Mirrors platform/app/vitest.config.ts.
     alias: {
-      "~/": join(here, "../../src/"),
+      "~/": join(__dirname, "../../src/"),
     },
     // ONE zod instance for the app AND the packages this suite loads
     // (@langwatch/scenario resolves its own copy otherwise): zod v3
