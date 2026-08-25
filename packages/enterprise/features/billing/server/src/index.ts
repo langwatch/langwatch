@@ -16,7 +16,6 @@ export {
   BillableEventsRepository,
   type BillableEventsWindow,
 } from "./ports/billable-events.port";
-export { NotificationRepository } from "./ports/notification.port";
 export { OrganizationPricingRepository } from "./ports/organization-pricing.port";
 export { BillingSubscriptionRepository } from "./ports/subscription.port";
 export {

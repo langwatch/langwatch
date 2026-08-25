@@ -4,7 +4,12 @@ import type {
   ResourceLimitNotifierInput,
 } from "@langwatch/enterprise-billing-contract";
 import {
-  NotificationRepository,
+  NotificationService as NotificationRecordService,
+  type CreateNotificationCommand,
+  type Notification,
+  type NotificationRecentQuery,
+} from "@langwatch/notification-contract";
+import {
   NotificationService,
   type UsageLimitEmailData,
 } from "~/runtime/app/features/billing";
@@ -56,6 +61,26 @@ export interface UsageLimitData {
   maxMonthlyUsageLimit: number;
 }
 
+class NullNotificationRecordService extends NotificationRecordService {
+  listRecentByOrganization(
+    _input: NotificationRecentQuery,
+  ): Promise<Notification[]> {
+    return Promise.resolve([]);
+  }
+
+  create(input: CreateNotificationCommand): Promise<Notification> {
+    return Promise.resolve({
+      id: "notification_null",
+      organizationId: input.organizationId,
+      projectId: input.projectId ?? null,
+      metadata: input.metadata,
+      sentAt: input.sentAt,
+      createdAt: input.sentAt,
+      updatedAt: input.sentAt,
+    });
+  }
+}
+
 /**
  * Service layer for usage limit notification business logic.
  * Single Responsibility: Handle business logic for WHEN/WHAT to send.
@@ -64,7 +89,7 @@ export interface UsageLimitData {
  * Framework-agnostic - no tRPC dependencies.
  */
 export class UsageLimitService {
-  private readonly notificationRepository: NotificationRepository;
+  private readonly notificationRecords: NotificationRecordService;
   private readonly organizationService: OrganizationService;
   private readonly usageService: UsageService;
   private readonly notificationService: NotificationService;
@@ -73,7 +98,7 @@ export class UsageLimitService {
   private readonly baseHost: string;
 
   private constructor({
-    notificationRepository,
+    notificationRecords,
     organizationService,
     usageService,
     notificationService,
@@ -81,7 +106,7 @@ export class UsageLimitService {
     isSaas,
     baseHost,
   }: {
-    notificationRepository: NotificationRepository;
+    notificationRecords: NotificationRecordService;
     organizationService: OrganizationService;
     usageService: UsageService;
     notificationService: NotificationService;
@@ -89,7 +114,7 @@ export class UsageLimitService {
     isSaas: boolean;
     baseHost: string;
   }) {
-    this.notificationRepository = notificationRepository;
+    this.notificationRecords = notificationRecords;
     this.organizationService = organizationService;
     this.usageService = usageService;
     this.notificationService = notificationService;
@@ -102,7 +127,7 @@ export class UsageLimitService {
    * Static factory method for creating a UsageLimitService with proper DI.
    */
   static create({
-    notificationRepository,
+    notificationRecords,
     organizationService,
     usageService,
     notificationService,
@@ -110,7 +135,7 @@ export class UsageLimitService {
     isSaas = false,
     baseHost = "https://app.langwatch.ai",
   }: {
-    notificationRepository: NotificationRepository;
+    notificationRecords: NotificationRecordService;
     organizationService: OrganizationService;
     usageService: UsageService;
     notificationService: NotificationService;
@@ -119,7 +144,7 @@ export class UsageLimitService {
     baseHost?: string;
   }): UsageLimitService {
     return new UsageLimitService({
-      notificationRepository,
+      notificationRecords,
       organizationService,
       usageService,
       notificationService,
@@ -134,10 +159,7 @@ export class UsageLimitService {
    * Use in tests or non-SaaS deployments where no notifications are needed.
    */
   static createNull(): UsageLimitService {
-    const noopRepo = {
-      findRecentByOrganization: async () => [],
-      create: async () => ({}) as any,
-    } as unknown as NotificationRepository;
+    const noopRecords = new NullNotificationRecordService();
     const noopOrg = {
       findWithAdmins: async () => null,
     } as unknown as OrganizationService;
@@ -151,7 +173,7 @@ export class UsageLimitService {
       getActivePlan: async () => ({ name: "free" }),
     } as unknown as PlanProvider;
     return new UsageLimitService({
-      notificationRepository: noopRepo,
+      notificationRecords: noopRecords,
       organizationService: noopOrg,
       usageService: noopUsage,
       notificationService: NotificationService.createNull(),
@@ -377,10 +399,10 @@ export class UsageLimitService {
     const currentMonthStart = getCurrentMonthStart();
 
     const recentNotifications =
-      await this.notificationRepository.findRecentByOrganization(
+      await this.notificationRecords.listRecentByOrganization({
         organizationId,
-        currentMonthStart,
-      );
+        since: currentMonthStart,
+      });
 
     const recentNotification = recentNotifications.find((notification) => {
       if (!notification.metadata || typeof notification.metadata !== "object") {
@@ -655,7 +677,8 @@ export class UsageLimitService {
   }
 
   /**
-   * Creates a notification record in the repository after successful email delivery.
+   * Creates a notification record through the canonical Notification service
+   * after successful email delivery.
    */
   private async recordNotification({
     organizationId,
@@ -678,7 +701,7 @@ export class UsageLimitService {
     recipientsFailureCount: number;
     failedRecipients: Array<{ userId: string; error: string }>;
   }) {
-    return this.notificationRepository.create({
+    return this.notificationRecords.create({
       organizationId,
       sentAt: new Date(),
       metadata: {

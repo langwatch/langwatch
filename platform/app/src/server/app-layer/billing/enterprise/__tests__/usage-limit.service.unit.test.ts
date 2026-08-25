@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import type { PlanLimitNotifierInput } from "@langwatch/enterprise-billing-contract";
+import type { NotificationService as NotificationRecordService } from "@langwatch/notification-contract";
 import type {
-  NotificationRepository,
   NotificationService,
 } from "~/runtime/app/features/billing";
 
@@ -60,17 +60,16 @@ function createMockNotificationService(): NotificationService {
   } as unknown as NotificationService;
 }
 
-function createMockNotificationRepository(): NotificationRepository {
+function createMockNotificationRecords(): NotificationRecordService {
   return {
-    findRecentByOrganization: vi.fn().mockResolvedValue([]),
+    listRecentByOrganization: vi.fn().mockResolvedValue([]),
     create: vi.fn().mockImplementation((params: Record<string, unknown>) => ({
       id: "notif_1",
       ...params,
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
-    findById: vi.fn().mockResolvedValue(null),
-  } as unknown as NotificationRepository;
+  } as unknown as NotificationRecordService;
 }
 
 function createMockOrganizationService(): OrganizationService {
@@ -98,7 +97,7 @@ function createMockPlanProvider(): PlanProvider {
 }
 
 function createService({
-  notificationRepository = createMockNotificationRepository(),
+  notificationRecords = createMockNotificationRecords(),
   organizationService = createMockOrganizationService(),
   usageService = createMockUsageService(),
   notificationService = createMockNotificationService(),
@@ -107,7 +106,7 @@ function createService({
 } = {}) {
   return {
     service: UsageLimitService.create({
-      notificationRepository,
+      notificationRecords,
       organizationService,
       usageService,
       notificationService,
@@ -115,7 +114,7 @@ function createService({
       isSaas,
       baseHost: "https://app.langwatch.ai",
     }),
-    notificationRepository,
+    notificationRecords,
     organizationService,
     usageService,
     notificationService,
@@ -744,14 +743,14 @@ describe("UsageLimitService", () => {
         const {
           service,
           organizationService,
-          notificationRepository,
+          notificationRecords,
           notificationService,
         } = createService();
         (
           organizationService.findWithAdmins as ReturnType<typeof vi.fn>
         ).mockResolvedValue(ORG_WITH_ADMIN);
         (
-          notificationRepository.findRecentByOrganization as ReturnType<
+          notificationRecords.listRecentByOrganization as ReturnType<
             typeof vi.fn
           >
         ).mockResolvedValue([
@@ -787,7 +786,7 @@ describe("UsageLimitService", () => {
         const {
           service,
           organizationService,
-          notificationRepository,
+          notificationRecords,
           usageService,
           notificationService,
         } = createService();
@@ -810,7 +809,7 @@ describe("UsageLimitService", () => {
         expect(notificationService.sendUsageLimitEmail).not.toHaveBeenCalled();
         // No record either: recording a send that did not happen would put the
         // organization into cooldown and suppress the real warning.
-        expect(notificationRepository.create).not.toHaveBeenCalled();
+        expect(notificationRecords.create).not.toHaveBeenCalled();
       });
     });
 
@@ -819,7 +818,7 @@ describe("UsageLimitService", () => {
         const {
           service,
           organizationService,
-          notificationRepository,
+          notificationRecords,
           usageService,
           notificationService,
         } = createService();
@@ -844,7 +843,7 @@ describe("UsageLimitService", () => {
           }),
         ).rejects.toThrow("All 1 usage limit warning emails failed to send");
 
-        expect(notificationRepository.create).not.toHaveBeenCalled();
+        expect(notificationRecords.create).not.toHaveBeenCalled();
       });
     });
 

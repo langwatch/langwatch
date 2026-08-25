@@ -1987,9 +1987,9 @@ export function initializeDefaultApp(options?: {
     errorReporter: billingErrorReporter,
     usageLimitEmail: AppUsageLimitEmailAdapter.create(),
   });
-  const notificationRepository = billingPersistence.notifications;
+  const notificationRecords = billingPersistence.notifications;
   const usageLimits = UsageLimitService.create({
-    notificationRepository,
+    notificationRecords,
     organizationService: organizations,
     usageService: usage,
     notificationService: notifications,

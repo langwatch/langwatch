@@ -128,6 +128,7 @@
     "@langwatch/experiment-server": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/monitor-server": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-server": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
